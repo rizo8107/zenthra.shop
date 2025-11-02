@@ -66,4 +66,4 @@ ENV NODE_ENV=production \
 EXPOSE 80
 
 # Start CMS (Node) then run Nginx in foreground
-CMD sh -c "node /srv/cms/dist-server/server/index.js --port $CMS_PORT & nginx -g 'daemon off;'"
+CMD sh -c "PORT=$CMS_PORT node /srv/cms/dist-server/server/index.js & nginx -g 'daemon off;'"
