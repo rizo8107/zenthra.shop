@@ -3,7 +3,6 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import webpush from 'web-push';
-import emailRoutes from '../api/email';
 import evolutionRoutes from './evolutionService';
 import customerJourneyRoutes from '../api/customerJourney';
 import { fileURLToPath } from 'url';
@@ -64,8 +63,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Routes
-app.use('/email', emailRoutes);
+// Routes (email routes removed)
 app.use('/evolution', evolutionRoutes);
 app.use('/api', customerJourneyRoutes);
 
