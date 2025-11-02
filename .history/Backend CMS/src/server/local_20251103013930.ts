@@ -4,7 +4,7 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 
 const DEFAULT_PORT = parseInt(process.env.SERVER_PORT || '3001', 10);
-const ALTERNATIVE_PORTS = [4001, 4002, 4003];
+const ALTERNATIVE_PORTS = [3002,3004, 4001, 4002, 4003];
 
 const server = createServer(app);
 
