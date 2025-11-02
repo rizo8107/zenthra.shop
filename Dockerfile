@@ -33,9 +33,10 @@ RUN npm run build
 # ---------- CMS build ----------
 FROM node:20-alpine AS cms-builder
 WORKDIR /app/BackendCMS
-COPY "Backend CMS"/package*.json ./
+# Use JSON-array COPY to handle folder name with space
+COPY ["Backend CMS/package*.json", "./"]
 RUN npm ci --production=false
-COPY "Backend CMS"/ ./
+COPY ["Backend CMS/", "./"]
 RUN npm run build && npm run build:server
 RUN npm prune --production
 
@@ -55,7 +56,7 @@ COPY --from=cms-builder /app/BackendCMS/node_modules /srv/cms/node_modules
 COPY --from=cms-builder /app/BackendCMS/package*.json /srv/cms/
 
 # Nginx config with API proxy
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY Frontend/nginx.conf /etc/nginx/conf.d/default.conf
 
 # Environment
 ENV NODE_ENV=production \
