@@ -55,15 +55,15 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# Build the frontend and server
+# Build only the frontend (skip server bundle)
 RUN npm run build
-RUN npm run build:server
 
 # Optionally, prune dev dependencies to reduce image size for production
 RUN npm prune --production
 
-# Expose the ports the app runs on
-EXPOSE 8080 3001 3002 3003 3004 4001 4002 4003
+# Default port and expose
+ENV PORT=8080
+EXPOSE 8080
 
-# Start both the server and static file server
-CMD ["sh", "-c", "node dist-server/server/index.js & SERVER_PID=$!; npx serve -s dist -l ${PORT:-8080} & SERVE_PID=$!; trap \"kill $SERVER_PID $SERVE_PID\" SIGINT SIGTERM; wait"]
+# Start static file server only (shell form to expand PORT)
+CMD ["sh", "-c", "npx serve -s dist -l ${PORT}"]
