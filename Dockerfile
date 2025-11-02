@@ -36,7 +36,7 @@ WORKDIR /app/BackendCMS
 # Use JSON-array COPY to handle folder name with space (no wildcards)
 COPY ["Backend CMS/package.json", "./package.json"]
 COPY ["Backend CMS/package-lock.json", "./package-lock.json"]
-RUN npm ci --production=false
+RUN npm install
 COPY ["Backend CMS/", "./"]
 RUN npm run build && npm run build:server
 RUN npm prune --production
