@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { createWhatsAppActivity } from './pocketbase.js';
+import { createWhatsAppActivity } from './pocketbase';
 
 dotenv.config();
 

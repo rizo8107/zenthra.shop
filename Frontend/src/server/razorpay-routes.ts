@@ -1,4 +1,4 @@
-import express, { RequestHandler } from 'express';
+import express from 'express';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 
@@ -18,13 +18,12 @@ const RAZORPAY_AUTH = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).t
  * Create a new Razorpay order
  * POST /api/razorpay/create-order
  */
-const createOrder: RequestHandler = async (req, res) => {
+router.post('/create-order', async (req, res) => {
   try {
     const { amount, currency = 'INR', receipt, notes } = req.body;
     
     if (!amount) {
-      res.status(400).json({ error: 'Amount is required' });
-      return;
+      return res.status(400).json({ error: 'Amount is required' });
     }
     
     // Convert amount to paise if it's not already (Razorpay expects amount in paise)
@@ -72,28 +71,25 @@ const createOrder: RequestHandler = async (req, res) => {
     const order = await response.json();
     console.log('Successfully created Razorpay order:', order.id);
     
-    res.status(200).json(order);
+    return res.status(200).json(order);
   } catch (error) {
     console.error('Error in create-order endpoint:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to create order'
     });
   }
-};
-
-router.post('/create-order', createOrder);
+});
 
 /**
  * Verify a Razorpay payment
  * POST /api/razorpay/verify-payment
  */
-const verifyPayment: RequestHandler = async (req, res) => {
+router.post('/verify-payment', async (req, res) => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
     
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      res.status(400).json({ error: 'Missing required parameters' });
-      return;
+      return res.status(400).json({ error: 'Missing required parameters' });
     }
     
     // Create the data string that was used to generate the signature
@@ -109,8 +105,7 @@ const verifyPayment: RequestHandler = async (req, res) => {
     const isValid = expectedSignature === razorpay_signature;
     
     if (!isValid) {
-      res.status(400).json({ error: 'Invalid payment signature' });
-      return;
+      return res.status(400).json({ error: 'Invalid payment signature' });
     }
     
     // Get payment details from Razorpay
@@ -132,32 +127,28 @@ const verifyPayment: RequestHandler = async (req, res) => {
     
     res.status(200).json({
       success: true,
-      payment: paymentDetails,
-      verified: isValid
+      payment: paymentDetails
     });
   } catch (error) {
     console.error('Error in verify-payment endpoint:', error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Payment verification failed'
+      error: error instanceof Error ? error.message : 'Failed to verify payment'
     });
   }
-};
-
-router.post('/verify-payment', verifyPayment);
+});
 
 /**
  * Capture a Razorpay payment
  * POST /api/razorpay/capture-payment
  */
-const capturePayment: RequestHandler = async (req, res) => {
+router.post('/capture-payment', async (req, res) => {
   try {
     const { payment_id, amount } = req.body;
     
     console.log('Capture payment request received:', { payment_id, amount });
     
     if (!payment_id) {
-      res.status(400).json({ error: 'Payment ID is required' });
-      return;
+      return res.status(400).json({ error: 'Payment ID is required' });
     }
     
     // Convert amount to paise if provided
@@ -210,21 +201,18 @@ const capturePayment: RequestHandler = async (req, res) => {
       error: error instanceof Error ? error.message : 'Failed to capture payment'
     });
   }
-};
-
-router.post('/capture-payment', capturePayment);
+});
 
 /**
  * Refund a Razorpay payment
  * POST /api/razorpay/refund-payment
  */
-const refundPayment: RequestHandler = async (req, res) => {
+router.post('/refund-payment', async (req, res) => {
   try {
     const { payment_id, amount } = req.body;
     
     if (!payment_id) {
-      res.status(400).json({ error: 'Payment ID is required' });
-      return;
+      return res.status(400).json({ error: 'Payment ID is required' });
     }
     
     // Convert amount to paise if provided
@@ -262,11 +250,9 @@ const refundPayment: RequestHandler = async (req, res) => {
   } catch (error) {
     console.error('Error in refund-payment endpoint:', error);
     res.status(500).json({
-      error: error instanceof Error ? error.message : 'Failed to process refund'
+      error: error instanceof Error ? error.message : 'Failed to refund payment'
     });
   }
-};
-
-router.post('/refund-payment', refundPayment);
+});
 
 export default router;
