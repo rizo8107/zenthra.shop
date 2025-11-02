@@ -56,8 +56,8 @@ COPY --from=cms-builder /app/BackendCMS/dist-server /srv/cms/dist-server
 COPY --from=cms-builder /app/BackendCMS/node_modules /srv/cms/node_modules
 COPY --from=cms-builder /app/BackendCMS/package*.json /srv/cms/
 
-# Nginx config with API proxy
-COPY Frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Nginx config with API proxy (complete config, not just server block)
+COPY Frontend/nginx.conf /etc/nginx/nginx.conf
 
 # Environment
 ENV NODE_ENV=production \
