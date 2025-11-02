@@ -33,8 +33,9 @@ RUN npm run build
 # ---------- CMS build ----------
 FROM node:20-alpine AS cms-builder
 WORKDIR /app/BackendCMS
-# Use JSON-array COPY to handle folder name with space
-COPY ["Backend CMS/package*.json", "./"]
+# Use JSON-array COPY to handle folder name with space (no wildcards)
+COPY ["Backend CMS/package.json", "./package.json"]
+COPY ["Backend CMS/package-lock.json", "./package-lock.json"]
 RUN npm ci --production=false
 COPY ["Backend CMS/", "./"]
 RUN npm run build && npm run build:server
