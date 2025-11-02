@@ -1,0 +1,533 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { Star, ThumbsUp, MessageSquare, Image as ImageIcon, X, Camera } from 'lucide-react';
+import { format } from 'date-fns';
+import { 
+  getProductReviews, 
+  createReview, 
+  addReviewComment, 
+  voteReview,
+  type Review,
+  pocketbase 
+} from '@/lib/pocketbase';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { getOrderConfig } from '@/lib/order-config-service';
+
+// Extend the Review type to include the commentCount property
+interface ExtendedReview extends Review {
+  commentCount?: number;
+}
+
+interface ProductReviewsProps {
+  productId: string;
+  initialReviewCount?: number;
+  onReviewAdded?: () => Promise<void>;
+}
+
+export const ProductReviews = ({ productId, initialReviewCount = 0, onReviewAdded }: ProductReviewsProps) => {
+  const [reviews, setReviews] = useState<ExtendedReview[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [selectedImages, setSelectedImages] = useState<File[]>([]);
+  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  const [rating, setRating] = useState(5);
+  const [title, setTitle] = useState('');
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [activeCommentId, setActiveCommentId] = useState<string | null>(null);
+  const [commentContent, setCommentContent] = useState('');
+  const [orderConfig, setOrderConfig] = useState<{ showReviewComments: boolean }>({ showReviewComments: true });
+  const [configLoaded, setConfigLoaded] = useState(false);
+  
+  const { toast } = useToast();
+  const { user } = useAuth();
+
+  const loadOrderConfig = async () => {
+    try {
+      const config = await getOrderConfig();
+      setOrderConfig(config);
+      setConfigLoaded(true);
+    } catch (error) {
+      console.error('Error loading order configuration:', error);
+      setConfigLoaded(true);
+    }
+  };
+
+  const loadReviews = useCallback(async () => {
+    try {
+      const data = await getProductReviews(productId);
+      setReviews(data);
+    } catch (error) {
+      console.error('Error loading reviews:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to load reviews. Please try again later.",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [productId, toast]);
+  
+  useEffect(() => {
+    loadReviews();
+    loadOrderConfig();
+  }, [loadReviews]);
+  
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length + selectedImages.length > 5) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "You can upload a maximum of 5 images.",
+      });
+      return;
+    }
+    
+    setSelectedImages(prev => [...prev, ...files]);
+    
+    // Create preview URLs
+    const newPreviewUrls = files.map(file => URL.createObjectURL(file));
+    setImagePreviewUrls(prev => [...prev, ...newPreviewUrls]);
+  };
+  
+  const removeImage = (index: number) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    URL.revokeObjectURL(imagePreviewUrls[index]);
+    setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+  
+  const handleSubmitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Please Login",
+        description: "You need to be logged in to submit a review.",
+      });
+      return;
+    }
+    
+    if (!content.trim()) {
+      toast({
+        variant: "destructive",
+        title: "Review Required",
+        description: "Please write your review before submitting.",
+      });
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      
+      // Check if user has purchased the product
+      const verifiedPurchase = await checkVerifiedPurchase(productId);
+      
+      // Create the review
+      await createReview(
+        productId,
+        rating,
+        title.trim() || 'Product Review', // Use default title if empty
+        content.trim(),
+        selectedImages,
+        verifiedPurchase
+      );
+      
+      // Reset form
+      setRating(5);
+      setTitle('');
+      setContent('');
+      
+      // Cleanup preview URLs
+      imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      setImagePreviewUrls([]);
+      setSelectedImages([]);
+      setShowReviewForm(false);
+      
+      // Reload reviews
+      await loadReviews();
+      
+      // Call the callback if provided
+      if (onReviewAdded) {
+        await onReviewAdded();
+      }
+      
+      toast({
+        title: "Review Submitted",
+        description: "Thank you for your review!",
+      });
+    } catch (error) {
+      console.error('Error submitting review:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to submit review. Please try again later.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  
+  // Add helper function to check if user has purchased the product
+  const checkVerifiedPurchase = async (productId: string): Promise<boolean> => {
+    if (!user?.id) return false;
+    
+    try {
+      const response = await pocketbase.collection('orders').getList(1, 1, {
+        filter: `user = "${user.id}" && products.productId = "${productId}" && status = "delivered"`,
+      });
+      return response.totalItems > 0;
+    } catch (error) {
+      console.error('Error checking purchase verification:', error);
+      return false;
+    }
+  };
+  
+  const handleAddComment = async (reviewId: string) => {
+    // Check if comments are enabled in the config
+    if (!orderConfig.showReviewComments) {
+      toast({
+        variant: "destructive",
+        title: "Comments Disabled",
+        description: "Comments are currently disabled for this product.",
+      });
+      return;
+    }
+
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Please Login",
+        description: "You need to be logged in to add a comment.",
+      });
+      return;
+    }
+    
+    try {
+      await addReviewComment(reviewId, commentContent);
+      setCommentContent('');
+      setActiveCommentId(null);
+      await loadReviews();
+      
+      toast({
+        title: "Comment Added",
+        description: "Your comment has been added successfully.",
+      });
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to add comment. Please try again later.",
+      });
+    }
+  };
+  
+  const handleVote = async (reviewId: string) => {
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Please Login",
+        description: "You need to be logged in to vote.",
+      });
+      return;
+    }
+    
+    try {
+      await voteReview(reviewId);
+      await loadReviews();
+    } catch (error) {
+      console.error('Error voting:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to register vote. Please try again later.",
+      });
+    }
+  };
+  
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((acc, review) => acc + review.rating, 0) / reviews.length
+    : 0;
+  
+  return (
+    <div className="mt-16" id="reviews">
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-2xl font-bold">Customer Reviews</h2>
+        <Button onClick={() => setShowReviewForm(true)}>Write a Review</Button>
+      </div>
+      
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="bg-gray-50 p-6 rounded-lg">
+          <div className="text-center mb-4">
+            <div className="text-4xl font-bold mb-2">{averageRating.toFixed(1)}</div>
+            <div className="flex items-center justify-center gap-1 text-yellow-400 mb-2">
+              {Array(5).fill(null).map((_, i) => (
+                <Star 
+                  key={i} 
+                  className={cn(
+                    "h-5 w-5",
+                    i < Math.round(averageRating) ? "fill-current" : ""
+                  )} 
+                />
+              ))}
+            </div>
+            <div className="text-sm text-muted-foreground">
+              Based on {reviews.length} reviews
+            </div>
+          </div>
+          
+          <div className="space-y-2">
+            {[5, 4, 3, 2, 1].map((rating) => {
+              const count = reviews.filter(r => r.rating === rating).length;
+              const percentage = (count / reviews.length) * 100 || 0;
+              return (
+                <div key={rating} className="flex items-center gap-2">
+                  <span className="text-sm w-6">{rating}</span>
+                  <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-yellow-400 rounded-full"
+                      style={{ width: `${percentage}%` }} // eslint-disable-line @typescript-eslint/no-explicit-any
+                    />
+                  </div>
+                  <span className="text-sm w-12 text-right">{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        
+        <div className="md:col-span-2 space-y-6">
+          {reviews.map((review) => (
+            <div key={review.id} className="border-b pb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1 text-yellow-400">
+                  {Array(5).fill(null).map((_, i) => (
+                    <Star 
+                      key={i} 
+                      className={cn(
+                        "h-4 w-4",
+                        i < review.rating ? "fill-current" : "text-gray-300"
+                      )} 
+                    />
+                  ))}
+                </div>
+                <span className="text-sm text-muted-foreground">
+                  {format(new Date(review.created), 'MMM d, yyyy')}
+                </span>
+              </div>
+              
+              <p className="text-muted-foreground mb-4">{review.content}</p>
+              
+              {/* Review Images */}
+              {review.images && review.images.length > 0 && (
+                <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                  {review.images.map((image, index) => (
+                    <Dialog key={index}>
+                      <DialogTrigger asChild>
+                        <button className="shrink-0">
+                          <img 
+                            src={`${import.meta.env.VITE_POCKETBASE_URL}/api/files/reviews/${review.id}/${image}`}
+                            alt={`Review image ${index + 1}`}
+                            className="w-20 h-20 object-cover rounded-lg"
+                          />
+                        </button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-3xl">
+                        <img 
+                          src={`${import.meta.env.VITE_POCKETBASE_URL}/api/files/reviews/${review.id}/${image}`}
+                          alt={`Review image ${index + 1}`}
+                          className="w-full h-auto"
+                        />
+                      </DialogContent>
+                    </Dialog>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex items-center gap-4 mb-4">
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>{review.expand?.user?.name || 'Anonymous'}</span>
+                  {review.verified_purchase && (
+                    <Badge variant="secondary">Verified Purchase</Badge>
+                  )}
+                </div>
+                
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => handleVote(review.id)}
+                  className="text-sm"
+                >
+                  <ThumbsUp className="h-4 w-4 mr-1" />
+                  Helpful ({review.helpful_votes})
+                </Button>
+                
+                {orderConfig.showReviewComments && (
+                  <button
+                    onClick={() => setActiveCommentId(activeCommentId === review.id ? null : review.id)}
+                    className="flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Add comment"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-1" />
+                    {review.commentCount || 0} Comments
+                  </button>
+                )}
+              </div>
+              
+              {/* Comments Section */}
+              {review.expand?.comments && review.expand.comments.length > 0 && (
+                <div className="pl-6 border-l space-y-4 mb-4">
+                  {review.expand.comments.map((comment) => (
+                    <div key={comment.id} className="text-sm">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium">
+                          {comment.expand?.user?.name || 'Anonymous'}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {format(new Date(comment.created), 'MMM d, yyyy')}
+                        </span>
+                      </div>
+                      <p className="text-muted-foreground">{comment.content}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Comment Form */}
+              {activeCommentId === review.id && orderConfig.showReviewComments && (
+                <div className="mt-4 border-t pt-3">
+                  <div className="flex gap-2">
+                    <Textarea
+                      value={commentContent}
+                      onChange={(e) => setCommentContent(e.target.value)}
+                      placeholder="Add a comment..."
+                      className="text-sm min-h-[60px]"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      disabled={!commentContent.trim()}
+                      onClick={() => handleAddComment(review.id)}
+                    >
+                      Post
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+      
+      {/* Review Dialog */}
+      <Dialog open={showReviewForm} onOpenChange={setShowReviewForm}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Write a Review</DialogTitle>
+          </DialogHeader>
+          
+          <form onSubmit={handleSubmitReview} className="space-y-6">
+            <div>
+              <Label>Rating</Label>
+              <div className="flex items-center gap-1 text-yellow-400">
+                {Array(5).fill(null).map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => setRating(i + 1)}
+                    className="focus:outline-none"
+                    aria-label={`Rate ${i + 1} out of 5 stars`}
+                  >
+                    <Star 
+                      className={cn(
+                        "h-8 w-8",
+                        i < rating ? "fill-current" : ""
+                      )} 
+                    />
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <div>
+              <Label htmlFor="content">Review</Label>
+              <Textarea
+                id="content"
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Share your experience with this product"
+                required
+                rows={4}
+              />
+            </div>
+            
+            <div>
+              <Label>Photos</Label>
+              <div className="flex flex-wrap gap-4 mt-2">
+                {imagePreviewUrls.map((url, index) => (
+                  <div key={index} className="relative">
+                    <img
+                      src={url}
+                      alt={`Preview ${index + 1}`}
+                      className="w-20 h-20 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-md"
+                      aria-label={`Remove image ${index + 1}`}
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+                {selectedImages.length < 5 && (
+                  <label htmlFor="review-images" className="w-20 h-20 flex items-center justify-center border-2 border-dashed rounded-lg cursor-pointer hover:border-primary transition-colors">
+                    <input
+                      id="review-images"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                      className="hidden"
+                      multiple
+                      aria-label="Upload product images"
+                    />
+                    <Camera className="h-8 w-8 text-muted-foreground" />
+                  </label>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                You can upload up to 5 images
+              </p>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowReviewForm(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={submitting || !content.trim()}
+              >
+                {submitting ? 'Submitting...' : 'Submit Review'}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};

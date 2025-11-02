@@ -1,0 +1,2173 @@
+import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCart } from '@/contexts/CartContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { formatCurrency } from '@/lib/utils';
+import { calculateOrderTotal } from '@/utils/orderUtils';
+import { pocketbase } from '@/lib/pocketbase';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/components/ui/use-toast';
+import { Loader2, ShoppingBag, LockIcon, CheckCircle, AlertTriangle, Tag, CreditCard } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { OfferBanner } from '@/components/OfferBanner';
+import { 
+  getRazorpayKeyId,
+  RazorpayResponse
+} from '@/lib/razorpay';
+import {
+  createRazorpayOrder,
+  verifyRazorpayPayment,
+  captureRazorpayPayment,
+  openRazorpayCheckout,
+  getRazorpayKeySecret,
+  loadRazorpayScript
+} from '@/lib/razorpay-client';
+import { trackEcommerceEvent } from '@/utils/analytics';
+import { 
+  trackBeginCheckout, 
+  trackAddShippingInfo, 
+  trackAddPaymentInfo, 
+  trackPaymentStart, 
+  trackPaymentSuccess, 
+  trackPaymentFailure,
+  trackButtonClick,
+  trackFormStart,
+  trackFormCompletion,
+  trackFormError,
+  trackDynamicConversion
+} from '@/lib/analytics';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
+import { calculateShippingCost, getDeliveryTime } from '@/lib/config/product-settings';
+import { getShippingConfig, calculateShippingCostFromConfig, getDeliveryTimeFromConfig } from '@/lib/shipping-config-service';
+
+interface CouponData {
+  id: string;
+  code: string;
+  type: 'percentage' | 'fixed';
+  amount: number;
+  active: boolean;
+  expiration_date?: string;
+  min_purchase?: number;
+  max_uses?: number;
+  current_uses?: number;
+  discountAmount?: number;
+  description?: string;
+}
+
+interface CheckoutFormData {
+  name: string;
+  email: string;
+  address: string;
+  city: string;
+  state: string;
+  zipCode: string;
+  phone: string;
+}
+
+// Using the more complete CouponData interface defined above
+
+interface OrderData {
+  id: string;
+  total: number;
+  subtotal: number;
+  shipping_cost: number;
+  status: string;
+  payment_status: string;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  shipping_address: string; // ID of the address record in addresses collection
+  products: string; // JSON string of products array
+  payment_id?: string;
+  razorpay_order_id?: string;
+  razorpay_payment_id?: string;
+  razorpay_signature?: string;
+  coupon_code?: string;
+  discount_amount?: number;
+  notes?: string;
+}
+
+export default function CheckoutPage() {
+  const navigate = useNavigate();
+  const { user, signInWithGoogle } = useAuth();
+  const { toast } = useToast();
+  const { items, subtotal, total, clearCart, isLoading: cartLoading } = useCart();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
+  const [razorpayLoaded, setRazorpayLoaded] = useState(false);
+  const [isFormValid, setIsFormValid] = useState(false);
+  
+  // Guest checkout states
+  const [isGuestCheckout, setIsGuestCheckout] = useState<boolean>(false);
+  const [showLoginOptions, setShowLoginOptions] = useState<boolean>(!user);
+  
+  // Limited time offer settings
+  const [offerExpiryTime, setOfferExpiryTime] = useState<Date | null>(null);
+  const [showOffer, setShowOffer] = useState(false);
+  const [offerDiscount, setOfferDiscount] = useState(0);
+  const [offerTitle, setOfferTitle] = useState('');
+  const [offerDescription, setOfferDescription] = useState('');
+  const [offerMinOrder, setOfferMinOrder] = useState<number | null>(null);
+  const [offerLoading, setOfferLoading] = useState(true);
+  const [hideOfferBanner, setHideOfferBanner] = useState(false);
+  const [offerImageUrl, setOfferImageUrl] = useState<string | undefined>(undefined);
+  
+  const [formData, setFormData] = useState<CheckoutFormData>({
+    name: user?.name || '',
+    email: user?.email || '',
+    address: '',
+    city: '',
+    state: '',
+    zipCode: '',
+    phone: user?.phone || ''
+  });
+  
+  // Coupon state
+  const [couponCode, setCouponCode] = useState('');
+  const [couponError, setCouponError] = useState<string | null>(null);
+  const [couponLoading, setCouponLoading] = useState(false);
+  const [appliedCoupon, setAppliedCoupon] = useState<CouponData | null>(null);
+  const [suggestedCoupons, setSuggestedCoupons] = useState<CouponData[]>([]);
+  const [suggestedCouponsLoading, setSuggestedCouponsLoading] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string | null }>({});
+
+  // Calculate final total with all discounts and shipping - removed duplicate
+  
+  // Load Razorpay script
+  useEffect(() => {
+    const loadScript = async () => {
+      const isLoaded = await loadRazorpayScript();
+      setRazorpayLoaded(isLoaded);
+      if (!isLoaded) {
+        console.error('Failed to load Razorpay script');
+      }
+    };
+    
+    loadScript();
+  }, []);
+
+  // Fetch suggested coupons from PocketBase
+  useEffect(() => {
+    let isMounted = true;
+    
+    const fetchSuggestedCoupons = async () => {
+      try {
+        if (isMounted) setSuggestedCouponsLoading(true);
+        
+        // Get current date/time for comparison
+        const now = new Date();
+        
+        try {
+          // Fetch active coupons from PocketBase that are marked for display on checkout
+          const coupons = await pocketbase.collection('coupons').getList(1, 5, {
+            filter: `active = true && display_on_checkout = true && start_date <= "${now.toISOString()}" && end_date >= "${now.toISOString()}"`,
+            sort: '-display_priority'
+          });
+          
+          if (isMounted && coupons && coupons.items.length > 0) {
+            // Cast RecordModel[] to CouponData[] for UI suggestions
+            setSuggestedCoupons(coupons.items as unknown as CouponData[]);
+            console.log('Suggested coupons found:', coupons.items.length);
+          }
+        } catch (collectionError) {
+          // Collection might not exist yet
+          console.warn('Coupons collection not found:', collectionError);
+        }
+      } catch (error) {
+        console.error('Error fetching suggested coupons:', error);
+      } finally {
+        if (isMounted) setSuggestedCouponsLoading(false);
+      }
+    };
+    
+    fetchSuggestedCoupons();
+    
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  // Fetch special offers from PocketBase
+  useEffect(() => {
+    // Flag to prevent state updates if component unmounts during fetch
+    let isMounted = true;
+    
+    const fetchSpecialOffer = async () => {
+      try {
+        // Only set loading state if component is still mounted
+        if (isMounted) setOfferLoading(true);
+        console.log('[special_offers] Fetch started. PB URL set:', !!import.meta.env.VITE_POCKETBASE_URL);
+        
+        // Check if collection exists before fetching
+        try {
+          // Fetch active offers from PocketBase
+          const offers = await pocketbase.collection('special_offers').getList(1, 1, {
+            // Use @now to avoid timezone/format issues
+            filter: 'active = true && start_date <= @now && end_date >= @now',
+            sort: '-created',
+            expand: 'product'
+          });
+          
+          // Only update state if component is still mounted
+          if (isMounted) {
+            if (offers && offers.items.length > 0) {
+              const offer = offers.items[0];
+              console.log('[special_offers] Offer fetched:', offer);
+              setOfferDiscount(offer.discount_percentage || 0);
+              setOfferTitle(offer.title || '');
+              setOfferDescription(offer.description || '');
+              setOfferMinOrder(typeof offer.min_order_value === 'number' ? offer.min_order_value : null);
+              // Try to resolve related product image via expand
+              try {
+                const expanded: any = (offer as any).expand;
+                const prod = expanded?.product;
+                const firstImage = Array.isArray(prod?.images) && prod.images.length > 0 ? prod.images[0] : undefined;
+                if (prod && typeof firstImage === 'string') {
+                  const url = pocketbase.files.getURL(prod, firstImage);
+                  setOfferImageUrl(url);
+                } else {
+                  setOfferImageUrl(undefined);
+                }
+              } catch (e) {
+                console.warn('[special_offers] Failed to build product image URL from relation:', e);
+                setOfferImageUrl(undefined);
+              }
+
+              // Fallback: if offer is a free_gift and has gift_product_id, fetch that product to resolve image
+              try {
+                const offerType = (offer as any).offer_type as string | undefined;
+                const giftProductId = (offer as any).gift_product_id as string | undefined;
+                if (!offerImageUrl && offerType === 'free_gift' && giftProductId) {
+                  console.log('[special_offers] Fetching gift product for image:', giftProductId);
+                  const giftProduct = await pocketbase.collection('products').getOne(giftProductId, { $autoCancel: false });
+                  const images: unknown = (giftProduct as any).images;
+                  if (Array.isArray(images) && images.length > 0 && typeof images[0] === 'string') {
+                    const url = pocketbase.files.getURL(giftProduct, images[0]);
+                    setOfferImageUrl(url);
+                  }
+                }
+              } catch (giftErr) {
+                console.warn('[special_offers] Could not resolve gift product image:', giftErr);
+              }
+              
+              // Always set to 30 minutes from now regardless of database end_date
+              const expiryTime = new Date();
+              expiryTime.setMinutes(expiryTime.getMinutes() + 30);
+              setOfferExpiryTime(expiryTime);
+              
+              setShowOffer(true);
+              console.log('Active offer found:', offer.title, offer.discount_percentage + '%');
+            } else {
+              console.warn('[special_offers] No items returned by query. Check active flag, date window, and permissions.');
+              // Optional dev fallback to visualize banner while setting up backend
+              const enableFallback = import.meta.env.VITE_ENABLE_OFFER_FALLBACK === 'true';
+              if (enableFallback) {
+                console.log('[special_offers] Fallback enabled. Showing default test offer.');
+                setOfferDiscount(5);
+                setOfferTitle('Limited Time Offer');
+                setOfferDescription('Complete your purchase to save now.');
+                setOfferMinOrder(0);
+                const expiryTime = new Date();
+                expiryTime.setMinutes(expiryTime.getMinutes() + 30);
+                setOfferExpiryTime(expiryTime);
+                setShowOffer(true);
+              } else {
+                setShowOffer(false);
+                console.log('No active offers found');
+              }
+            }
+          }
+        } catch (collectionError) {
+          // Collection might not exist yet, use fallback
+          console.warn('Special offers collection not found, using fallback offer');
+          
+          if (isMounted) {
+            // Set default offer values
+            setOfferDiscount(5); // 5% discount
+            setOfferTitle('Limited Time Offer');
+            setOfferDescription('Complete your purchase to save now.');
+            setOfferMinOrder(0);
+            
+            // Set expiry to 30 minutes from now
+            const defaultExpiry = new Date();
+            defaultExpiry.setMinutes(defaultExpiry.getMinutes() + 30);
+            setOfferExpiryTime(defaultExpiry);
+            
+            setShowOffer(true);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching special offers:', error);
+        if (isMounted) setShowOffer(false);
+      } finally {
+        if (isMounted) setOfferLoading(false);
+      }
+    };
+    
+    fetchSpecialOffer();
+    
+    // Cleanup function to prevent state updates after unmount
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    // Only redirect if cart is empty (after loading)
+    if (!cartLoading && (!items || items.length === 0)) {
+      toast({
+        title: "Empty Cart",
+        description: "Your cart is empty. Please add items before checkout.",
+      });
+      navigate('/shop');
+      return;
+    }
+    
+    // If user logs in during checkout, update the form data
+    if (user) {
+      setShowLoginOptions(false);
+      setIsGuestCheckout(false);
+    } else {
+      // Make sure login options are shown when there's no user
+      setShowLoginOptions(true);
+    }
+
+    const loadUserAddress = async () => {
+      if (!user?.id) return;
+
+      try {
+        // Update form with user data including phone number
+        setFormData(prev => ({
+          ...prev,
+          name: user.name || '',
+          email: user.email || '',
+          phone: user.phone || ''
+        }));
+        
+        const address = await pocketbase.collection('addresses')
+          .getFirstListItem(`user="${user.id}"`);
+        
+        if (address) {
+          setFormData(prev => ({
+            ...prev,
+            address: address.street || '',
+            city: address.city || '',
+            state: address.state || '',
+            zipCode: address.postalCode || '',
+            // Only override phone from address if user doesn't have a phone number
+            phone: prev.phone || address.phone || ''
+          }));
+        }
+      } catch (error) {
+        // Only log error if it's not a 404 (no address found)
+        if (error && typeof error === 'object' && 'status' in error && error.status !== 404) {
+          console.warn('Failed to load saved address:', error);
+        }
+      }
+    };
+
+    loadUserAddress();
+  }, [user, navigate, items, cartLoading, toast]);
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+    
+    // Validate form after input change
+    validateForm({ ...formData, [name]: value });
+  };
+  
+  // Validate all required fields
+  const validateForm = (data: CheckoutFormData) => {
+    const requiredFields = ['name', 'email', 'address', 'city', 'state', 'zipCode', 'phone'];
+    const isAllFilled = requiredFields.every(field => 
+      data[field as keyof CheckoutFormData] && data[field as keyof CheckoutFormData].trim() !== ''
+    );
+    
+    // Additional validation for email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isEmailValid = emailRegex.test(data.email);
+    
+    // Phone validation for Indian numbers
+    const phoneRegex = /^[6-9]\d{9}$/;
+    const cleanPhone = data.phone.replace(/\D/g, '');
+    const formattedPhone = cleanPhone.replace(/^(\+?91)/, '');
+    const isPhoneValid = phoneRegex.test(formattedPhone);
+
+    // ZIP validation: exactly 6 digits (IN PIN code)
+    const zipRegex = /^\d{6}$/;
+    const isZipValid = zipRegex.test(data.zipCode.trim());
+    
+    setIsFormValid(isAllFilled && isEmailValid && isPhoneValid && isZipValid);
+  };
+  
+  // Function to validate coupons directly in frontend
+  const validateCouponInFrontend = async (code: string, currentSubtotal: number) => {
+    try {
+      // Search for the coupon directly
+      const coupons = await pocketbase.collection('coupons').getList(1, 1, {
+        filter: `code="${code}" && active=true`
+      });
+
+      if (coupons.items.length === 0) {
+        return { valid: false, message: 'Invalid coupon code' };
+      }
+
+      const coupon = coupons.items[0];
+
+      // Check expiration
+      if (coupon.expiration_date && new Date(coupon.expiration_date) < new Date()) {
+        return { valid: false, message: 'Coupon has expired' };
+      }
+
+      // Check usage limits
+      if (coupon.max_uses && coupon.current_uses >= coupon.max_uses) {
+        return { valid: false, message: 'Coupon usage limit exceeded' };
+      }
+
+      // Check minimum purchase
+      if (coupon.min_purchase && currentSubtotal < coupon.min_purchase) {
+        return {
+          valid: false,
+          message: `Minimum purchase of ₹${coupon.min_purchase} required for this coupon`
+        };
+      }
+
+      // Calculate discount
+      let discountAmount = 0;
+      if (coupon.discount_type === 'percentage') {
+        console.log(`Calculating percentage discount: subtotal=${currentSubtotal}, coupon amount=${coupon.discount_value}, coupon type=${coupon.discount_type}`);
+        // Ensure coupon.discount_value is a number and not zero
+        const percentageAmount = Number(coupon.discount_value) || 0;
+        discountAmount = (currentSubtotal * percentageAmount) / 100;
+        console.log(`Frontend validation - percentage discount: ${currentSubtotal} * ${percentageAmount}% = ${discountAmount}`);
+      } else {
+        // Apply full fixed amount regardless of subtotal
+        discountAmount = Number(coupon.discount_value) || 0;
+        console.log(`Frontend validation - fixed discount: ${discountAmount}`);
+      }
+      
+      // Ensure discount amount is a number and not too small
+      if (typeof discountAmount !== 'number' || isNaN(discountAmount)) {
+        console.warn('Invalid discount amount, setting to 0');
+        discountAmount = 0;
+      }
+      discountAmount = parseFloat(discountAmount.toFixed(2));
+      console.log('Frontend validation - final discount amount:', discountAmount);
+
+      return {
+        valid: true,
+        message: 'Coupon applied successfully',
+        coupon,
+        discountAmount
+      };
+    } catch (error) {
+      console.error('Error validating coupon:', error);
+      return { valid: false, message: 'Failed to validate coupon' };
+    }
+  }
+
+// Function to apply coupon code from input field
+const applyCoupon = async () => {
+  if (!couponCode) {
+    setCouponError('Please enter a coupon code');
+    return;
+  }
+  
+  const code = couponCode.trim();
+  await handleApplyCoupon(code);
+};
+
+// Function to handle applying a coupon with a specific code
+const handleApplyCoupon = async (code: string) => {
+  setCouponCode(code); // Update the input field
+  setCouponLoading(true);
+  
+  try {
+    console.log('Validating coupon:', code, 'Subtotal:', subtotal);
+    
+    // Use frontend validation directly since server endpoint isn't available
+    const validationResult = await validateCouponInFrontend(code, subtotal);
+    console.log('Validation result:', validationResult);
+    
+    if (!validationResult.valid) {
+      setCouponError(validationResult.message);
+      setAppliedCoupon(null);
+      return;
+    }
+    
+    // Ensure discount amount is a number and properly formatted
+    let discountAmount = parseFloat((validationResult.discountAmount || 0).toFixed(2));
+    
+    // Double-check that we have a valid discount amount
+    if (validationResult.coupon?.discount_type === 'percentage' && validationResult.coupon?.discount_value > 0) {
+      // Recalculate to ensure it's correct
+      const percentageAmount = Number(validationResult.coupon.discount_value);
+      discountAmount = parseFloat(((subtotal * percentageAmount) / 100).toFixed(2));
+      console.log(`Recalculated percentage discount: ${subtotal} * ${percentageAmount}% = ${discountAmount}`);
+    }
+    
+    console.log('Final discount amount to be applied:', discountAmount);
+    
+    setAppliedCoupon({
+      id: validationResult.coupon?.id || '',
+      code: validationResult.coupon?.code || code,
+      type: validationResult.coupon?.discount_type || 'percentage',
+      amount: validationResult.coupon?.discount_value || 0,
+      active: true,
+      discountAmount
+    });
+    
+    setCouponError(null);
+    toast({
+      title: "Coupon Applied",
+      description: `Discount of ₹${discountAmount.toFixed(2)} has been applied`,
+    });
+  } catch (error) {
+    console.error('Coupon validation completely failed:', error);
+    setCouponError('Failed to apply coupon. Please try again.');
+    setAppliedCoupon(null);
+  } finally {
+    setCouponLoading(false);
+  }
+};
+
+// Function to remove applied coupon
+const removeCoupon = () => {
+  setAppliedCoupon(null);
+  setCouponCode('');
+  setCouponError(null);
+};
+
+  const handlePaymentSuccess = async (response: RazorpayResponse, orderId: string) => {
+    try {
+      setIsPaymentProcessing(true);
+      toast({
+        title: "Processing payment...",
+        description: "Please wait while we verify your payment.",
+      });
+
+      console.log('Payment success, raw response:', response);
+      
+      // Extract payment details from response
+      const paymentId = response.razorpay_payment_id || response.paymentId;
+      const razorpayOrderId = response.razorpay_order_id || response.orderId;
+      const signature = response.razorpay_signature || response.signature;
+      
+      if (!paymentId) {
+        throw new Error('Missing payment ID from Razorpay');
+      }
+      
+      // Log whether this is a guest checkout or logged-in user
+      console.log(`Processing payment for ${isGuestCheckout ? 'guest checkout' : 'logged-in user'} order: ${orderId}`);
+      if (isGuestCheckout) {
+        console.log('Guest checkout information:', {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone
+        });
+      }
+
+      let verificationSuccess = false;
+      let captureSuccess = false;
+
+      try {
+        // First verify payment with Razorpay (this is handled by our backend function)
+        const verificationResult = await verifyRazorpayPayment(
+          paymentId || '',
+          razorpayOrderId || '',
+          signature || ''
+        );
+
+        console.log('Payment verification result:', verificationResult);
+        verificationSuccess = verificationResult.success;
+        
+        // Even if verification fails, we should continue with order processing
+        // since this could be due to our verification endpoint rather than an actual payment issue
+
+        // Immediately capture the payment to avoid auto-refund
+        console.log('Attempting to capture payment with ID:', paymentId);
+        const captureResult = await captureRazorpayPayment(paymentId);
+        console.log('Payment capture result:', captureResult);
+        captureSuccess = captureResult.success;
+      } catch (verifyError) {
+        // Log the error but continue with order processing
+        console.error('Payment verification/capture error:', verifyError);
+      }
+
+      // First, fetch the current order to ensure we don't lose any data
+      let existingOrder;
+      try {
+        existingOrder = await pocketbase.collection('orders').getOne(orderId);
+        console.log('Retrieved existing order data:', {
+          id: existingOrder.id,
+          shipping_address: existingOrder.shipping_address,
+          shipping_address_text: existingOrder.shipping_address_text,
+        });
+      } catch (fetchError) {
+        console.error('Failed to fetch existing order data:', fetchError);
+        // Continue with the update even if fetch fails
+      }
+
+      // Update order in PocketBase with correct payment status
+      const orderUpdateData = {
+        // Use 'paid' status to properly reflect successful payment (matching PocketBase schema)
+        payment_status: 'paid',
+        status: 'processing', // Keep order processing until fulfillment
+        payment_id: paymentId,
+        razorpay_order_id: razorpayOrderId,
+        razorpay_payment_id: paymentId,
+        razorpay_signature: signature,
+        payment_method: 'razorpay',
+        payment_date: new Date().toISOString(),
+        notes: `Payment received via Razorpay. Payment ID: ${paymentId}. Verified: ${verificationSuccess ? 'Yes' : 'No'}. Captured: ${captureSuccess ? 'Yes' : 'Pending'}`,
+        updated: new Date().toISOString(),
+        // Preserve the shipping address data from the existing order
+        shipping_address: existingOrder?.shipping_address || null,
+        // Preserve discount amount from the existing order
+        discount_amount: existingOrder?.discount_amount || 0,
+        // Recalculate total to ensure consistency (force numeric to avoid '250' + '45' -> '25045')
+        total: Number(existingOrder?.subtotal || 0) 
+          + Number(existingOrder?.shipping_cost || 0) 
+          - Number(existingOrder?.discount_amount || 0),
+        // Only include shipping_address_text if it exists in the original order
+        ...(existingOrder?.shipping_address_text ? {
+          shipping_address_text: existingOrder.shipping_address_text
+        } : {})
+      };
+
+      console.log('Updating order with data:', orderUpdateData);
+      
+      // Try to update order with multiple attempts
+      let orderUpdated = false;
+      let attempts = 0;
+      const maxAttempts = 3;
+      
+      while (!orderUpdated && attempts < maxAttempts) {
+        try {
+          attempts++;
+          console.log(`Updating order ${orderId} (attempt ${attempts}/${maxAttempts})`);
+          await pocketbase.collection('orders').update(orderId, orderUpdateData);
+          console.log('✅ Order updated successfully with payment details');
+          orderUpdated = true;
+        } catch (updateError) {
+          console.error(`Failed to update order (attempt ${attempts}/${maxAttempts}):`, updateError);
+          if (attempts < maxAttempts) {
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+        }
+      }
+      
+      // If all update attempts failed, show an error toast but continue
+      if (!orderUpdated) {
+        console.error('All attempts to update order failed');
+        toast({
+          variant: "destructive",
+          title: "Order Processing Issue",
+          description: "Your payment was received but we had trouble updating your order. Our team will review it shortly."
+        });
+      }
+
+      // Send webhook to n8n
+      try {
+        // First get the complete order details with expanded products
+        const orderDetails = await pocketbase.collection('orders').getOne(orderId);
+        
+        // Parse the products from the order
+        interface OrderProduct {
+          product: {
+            id: string;
+            name: string;
+            price: number;
+            images: string[];
+            [key: string]: unknown;
+          };
+          quantity: number;
+          price: number;
+          [key: string]: unknown;
+        }
+        let orderProducts: OrderProduct[] = [];
+        try {
+          if (typeof orderDetails.products === 'string') {
+            orderProducts = JSON.parse(orderDetails.products);
+          } else {
+            orderProducts = orderDetails.products;
+          }
+        } catch (parseError) {
+          console.error('Error parsing order products:', parseError);
+          orderProducts = [];
+        }
+        
+        // Get the shipping address
+        interface ShippingAddress {
+          street: string;
+          city: string;
+          state: string;
+          postalCode: string;
+          country: string;
+          [key: string]: string;
+        }
+        let shippingAddress: ShippingAddress = {
+          street: '',
+          city: '',
+          state: '',
+          postalCode: '',
+          country: ''
+        };
+        try {
+          if (orderDetails.shipping_address_text) {
+            shippingAddress = JSON.parse(orderDetails.shipping_address_text);
+          } else if (orderDetails.shipping_address) {
+            // Try to fetch the address
+            try {
+              const addressRecord = await pocketbase.collection('addresses').getOne(orderDetails.shipping_address);
+              shippingAddress = {
+                street: addressRecord.street,
+                city: addressRecord.city,
+                state: addressRecord.state,
+                postalCode: addressRecord.postalCode,
+                country: addressRecord.country
+              };
+            } catch (addressError) {
+              console.error('Error fetching shipping address:', addressError);
+            }
+          }
+        } catch (addressParseError) {
+          console.error('Error parsing shipping address:', addressParseError);
+        }
+        
+        // Prepare product details with image URLs
+        const productsWithImages = orderProducts.map((product: OrderProduct) => {
+          // Construct image URLs for each product
+          let imageUrls: string[] = [];
+          if (product.product && product.product.images) {
+            imageUrls = product.product.images.map((img: string) => {
+              // Use the exact PocketBase URL format provided
+              // The product ID should only be included once in the URL
+              return `${import.meta.env.VITE_POCKETBASE_URL || 'http://localhost:8090'}/api/files/pbc_4092854851/${img}`;
+            });
+          }
+          
+          return {
+            id: product.productId,
+            name: product.product?.name || 'Unknown Product',
+            price: product.product?.price || 0,
+            quantity: product.quantity,
+            color: product.color || 'Default',
+            images: imageUrls,
+            imageUrl: imageUrls[0] || '' // First image as the main image
+          };
+        });
+        
+        // Prepare the webhook data
+        const n8nWebhookData = {
+          event: "order.payment_success",
+          order: {
+            id: orderId,
+            order_link: `https://shop.karigaistore.in/orders/${orderId}`,
+            customer: {
+              name: orderDetails.customer_name,
+              email: orderDetails.customer_email,
+              phone: orderDetails.customer_phone,
+              is_guest: orderDetails.is_guest_order || false,
+              user_id: orderDetails.user || 'guest'
+            },
+            payment: {
+              id: paymentId,
+              status: captureSuccess ? "captured" : "authorized",
+              method: "Razorpay"
+            },
+            shipping_address: shippingAddress,
+            products: productsWithImages,
+            totals: {
+              subtotal: orderDetails.subtotal,
+              shipping: orderDetails.shipping_cost,
+              discount: orderDetails.discount_amount || 0,
+              total: orderDetails.total
+            },
+            created_at: orderDetails.created,
+            status: orderDetails.status,
+            is_guest_order: orderDetails.is_guest_order || false
+          }
+        };
+
+        // Send to the n8n webhook
+        console.log('Sending order details to n8n webhook:', n8nWebhookData);
+        const n8nWebhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
+        if (!n8nWebhookUrl) {
+          console.error('VITE_N8N_WEBHOOK_URL is not set. Skipping order webhook dispatch.');
+        }
+        const n8nWebhookResponse = await fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(n8nWebhookData)
+        });
+
+        if (n8nWebhookResponse.ok) {
+          console.log('Successfully sent order details to n8n webhook');
+        } else {
+          console.error('Failed to send order details to n8n webhook:', await n8nWebhookResponse.text());
+        }
+        
+        // Original webhook code continues below
+        const webhookData = {
+          event: captureSuccess ? "payment.captured" : "payment.authorized",
+          payload: {
+            payment: {
+              entity: {
+                id: paymentId,
+                order_id: razorpayOrderId,
+                currency: "INR",
+                status: captureSuccess ? "captured" : "authorized",
+                captured: captureSuccess
+              }
+            },
+            metadata: {
+              pocketbase_order_id: orderId,
+              razorpay_order_id: razorpayOrderId,
+              razorpay_payment_id: paymentId,
+              verified: verificationSuccess,
+              manually_captured: captureSuccess
+            }
+          }
+        };
+
+        // Send to n8n webhook with correct credentials
+        const webhookResponse = await fetch('https://backend-n8n.7za6uc.easypanel.host/webhook/razorpay', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Basic ' + btoa('nnirmal7107@gmail.com:Kamala@7107')
+          },
+          body: JSON.stringify(webhookData)
+        });
+
+        console.log('Webhook response:', await webhookResponse.text());
+        
+        if (!webhookResponse.ok) {
+          console.error('Failed to send webhook:', webhookResponse.statusText);
+        }
+        
+        // Also update Razorpay payment with notes
+        try {
+          const razorpayUpdateResponse = await fetch(`https://api.razorpay.com/v1/payments/${paymentId}/notes`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Basic ' + btoa(`${getRazorpayKeyId()}:${getRazorpayKeySecret()}`)
+            },
+            body: JSON.stringify({
+              'pocketbase_order_id': orderId,
+              'order_status': 'processing',
+              'webhook_sent': 'true',
+              'customer_email': '',
+              'customer_name': ''
+            })
+          });
+          
+          console.log('Razorpay update response:', await razorpayUpdateResponse.text());
+        } catch (razorpayError) {
+          console.error('Error updating Razorpay payment:', razorpayError);
+          // Don't fail the order just because the webhook failed
+        }
+      } catch (webhookError) {
+        console.error('Error sending webhook:', webhookError);
+        // Don't fail the order just because the webhook failed
+      }
+
+      // Track payment success event - use sessionStorage to prevent duplicate tracking
+      const paymentTrackedKey = `payment_tracked_${orderId}`;
+      if (!sessionStorage.getItem(paymentTrackedKey)) {
+        // Track payment success event
+        trackPaymentSuccess(orderId, paymentId, calculateFinalTotal().finalTotal, 'razorpay');
+        
+        // Track conversion
+        trackDynamicConversion({
+          conversion_type: 'Sale',
+          transaction_id: orderId,
+          value: calculateFinalTotal().finalTotal,
+          currency: 'INR',
+          items: items.map(item => ({
+            item_id: item.productId,
+            item_name: item.product.name,
+            price: item.product.price,
+            quantity: item.quantity
+          }))
+        });
+        
+        // Mark this payment as tracked to prevent duplicate events
+        sessionStorage.setItem(paymentTrackedKey, 'true');
+      }
+
+      // Clear the cart after successful order
+      clearCart();
+
+      // Update UI and always redirect to order confirmation page
+      if (isGuestCheckout) {
+        toast({
+          title: "Payment Successful!",
+          description: `Your order has been placed successfully. Order details have been sent to ${formData.email}.`,
+        });
+      } else {
+        toast({
+          title: "Payment Successful!",
+          description: "Your order has been placed successfully. You can view your order in your account.",
+        });
+      }
+      
+      navigate(`/order-confirmation/${orderId}`);
+    } catch (error) {
+      console.error('Payment processing error:', error);
+      toast({
+        variant: "destructive",
+        title: "Payment Processing Issue",
+        description: error instanceof Error ? error.message : "There was an issue processing your payment, but your order has been placed.",
+      });
+      
+      // Track payment issue
+      trackPaymentFailure(
+        orderId, 
+        calculateFinalTotal().finalTotal, 
+        'razorpay', 
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      
+      // Attempt to update order status to note the issue if we have an order ID
+      if (orderId) {
+        try {
+          await pocketbase.collection('orders').update(orderId, {
+            status: 'payment_issue', 
+            notes: `Payment processing issue: ${error instanceof Error ? error.message : "Unknown error"}`
+          });
+        } catch (updateError) {
+          console.error('Failed to update order status:', updateError);
+        }
+      }
+      
+      // Even with an error, redirect to order confirmation
+      // The order has been created, and we've logged the payment issue
+      navigate(`/order-confirmation/${orderId}`);
+    } finally {
+      // Reset UI state whether successful or not
+      setIsPaymentProcessing(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  // State to store shipping configuration (loaded from PocketBase)
+  const [shippingConfig, setShippingConfig] = useState<{
+    tnShippingCost: number;
+    otherStatesShippingCost: number;
+    tnDeliveryDays: string;
+    otherStatesDeliveryDays: string;
+  } | null>(null);
+  
+  // State to store calculated shipping cost and delivery time
+  const [shippingCost, setShippingCost] = useState<number>(0);
+  const [estimatedDelivery, setEstimatedDelivery] = useState<string>('');
+  
+  // Load shipping configuration from PocketBase
+  useEffect(() => {
+    const loadShippingConfig = async () => {
+      try {
+        const config = await getShippingConfig();
+        setShippingConfig(config);
+        console.log('Loaded shipping config:', config);
+      } catch (error) {
+        console.error('Failed to load shipping config:', error);
+      }
+    };
+    
+    loadShippingConfig();
+  }, []);
+  
+  // Import the Tamil Nadu pincode utility
+  const [tnPincodeUtil, setTnPincodeUtil] = useState<{ isTamilNaduPincode: (pincode: string | number) => boolean | Promise<boolean> } | null>(null);
+  
+  // Load the Tamil Nadu pincode utility
+  useEffect(() => {
+    const loadTnPincodeUtil = async () => {
+      try {
+        const module = await import('@/lib/utils/tn-pincodes');
+        setTnPincodeUtil(module);
+      } catch (error) {
+        console.error('Failed to load Tamil Nadu pincode utility:', error);
+      }
+    };
+    
+    loadTnPincodeUtil();
+  }, []);
+
+  // Normalize and validate state input reliably (handles spaces, dashes, punctuation, case)
+  const isTamilNaduState = (value: string) => {
+    if (!value) return false;
+    const normalized = value.toLowerCase().replace(/[^a-z]/g, ''); // keep letters only
+    // Accept common variants
+    const variants = new Set(['tamilnadu', 'tamilnad', 'tn']);
+    return variants.has(normalized);
+  };
+
+  const calculateFinalTotal = () => {
+    const finalSubtotal = subtotal;
+    let finalDiscount = 0;
+    
+    // Apply coupon discount if available
+    let couponDiscountAmount = 0;
+    if (appliedCoupon && appliedCoupon.discountAmount) {
+      couponDiscountAmount = appliedCoupon.discountAmount;
+      finalDiscount += couponDiscountAmount;
+      console.log(`Applying coupon discount: ${couponDiscountAmount}`);
+    }
+    
+    // Apply limited time offer discount if active and eligible by min_order_value
+    let offerDiscountAmount = 0;
+    const isOfferEligible = showOffer && offerDiscount > 0 && (offerMinOrder == null || finalSubtotal >= offerMinOrder);
+    if (isOfferEligible) {
+      offerDiscountAmount = parseFloat(((finalSubtotal * offerDiscount) / 100).toFixed(2));
+      finalDiscount += offerDiscountAmount;
+      console.log(`Applying offer discount: ${offerDiscountAmount}`);
+    }
+    
+    // Round the final discount to 2 decimal places
+    finalDiscount = parseFloat(finalDiscount.toFixed(2));
+    
+    // Calculate shipping cost based on state or pincode using PocketBase config
+    let shippingCost = 60; // Default value
+    let estimatedDelivery = '3-4 days'; // Default value
+    
+    if (formData.state) {
+      // Use the shipping config from PocketBase if available
+      if (shippingConfig) {
+        // Check if it's a pincode or state name
+        if (/^\d{6}$/.test(formData.state)) {
+          // It's a pincode - use the Tamil Nadu pincode utility
+          if (tnPincodeUtil && typeof tnPincodeUtil.isTamilNaduPincode === 'function') {
+            const isTNPincode = tnPincodeUtil.isTamilNaduPincode(formData.state);
+            if (isTNPincode instanceof Promise) {
+              // Handle async result - we'll use the default for now
+              // and update the UI when the promise resolves
+              isTNPincode.then(result => {
+                setShippingCost(result ? shippingConfig.tnShippingCost : shippingConfig.otherStatesShippingCost);
+                setEstimatedDelivery(result ? shippingConfig.tnDeliveryDays : shippingConfig.otherStatesDeliveryDays);
+              });
+            } else {
+              // Handle synchronous result
+              shippingCost = isTNPincode ? shippingConfig.tnShippingCost : shippingConfig.otherStatesShippingCost;
+              estimatedDelivery = isTNPincode ? shippingConfig.tnDeliveryDays : shippingConfig.otherStatesDeliveryDays;
+            }
+          } else {
+            // Fallback if utility not loaded
+            shippingCost = shippingConfig.otherStatesShippingCost;
+            estimatedDelivery = shippingConfig.otherStatesDeliveryDays;
+          }
+        } else {
+          // It's a state name
+          const isTamilNadu = isTamilNaduState(formData.state);
+          shippingCost = isTamilNadu ? shippingConfig.tnShippingCost : shippingConfig.otherStatesShippingCost;
+          estimatedDelivery = isTamilNadu ? shippingConfig.tnDeliveryDays : shippingConfig.otherStatesDeliveryDays;
+        }
+      } else {
+        // Fallback to the static function if config isn't loaded
+        shippingCost = calculateShippingCost(formData.state);
+        estimatedDelivery = getDeliveryTime(formData.state);
+      }
+    }
+    
+    console.log(`Shipping cost for ${formData.state || 'unknown state'}: ${shippingCost}`);
+    console.log(`Estimated delivery for ${formData.state || 'unknown state'}: ${estimatedDelivery}`);
+    
+    // Only include shipping cost in the total if the address is filled
+    const shouldIncludeShipping = formData.state ? true : false;
+    const finalTotal = Math.max(0, finalSubtotal + (shouldIncludeShipping ? shippingCost : 0) - finalDiscount);
+    console.log(`Final calculation: ${finalSubtotal} + ${shouldIncludeShipping ? shippingCost : 0} - ${finalDiscount} = ${finalTotal}`);
+    
+    return {
+      finalSubtotal,
+      finalDiscount,
+      couponDiscountAmount,
+      offerDiscountAmount,
+      shippingCost,
+      finalTotal,
+      estimatedDelivery
+    };
+  };
+  
+  // Start tracking checkout form
+  useEffect(() => {
+    if (items && items.length > 0) {
+      trackFormStart('checkout_form', 'checkout-form');
+    }
+    
+    // Validate form on initial load
+    validateForm(formData);
+    
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isSubmitting || isPaymentProcessing) {
+        event.preventDefault();
+        event.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [items, isSubmitting, isPaymentProcessing, formData]);
+  
+  // Re-validate form when user data changes
+  useEffect(() => {
+    if (user) {
+      const updatedFormData = {
+        ...formData,
+        name: formData.name || user.name || '',
+        email: formData.email || user.email || '',
+        phone: formData.phone || user.phone || ''
+      };
+      setFormData(updatedFormData);
+      validateForm(updatedFormData);
+      
+      // If user logs in during checkout, hide login options
+      if (showLoginOptions) {
+        setShowLoginOptions(false);
+        toast({
+          title: "Logged in successfully",
+          description: "Continuing with checkout...",
+        });
+      }
+    }
+  }, [user, formData, showLoginOptions, toast]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (isSubmitting || isPaymentProcessing) {
+      return; // Prevent double submission
+    }
+
+    // Track beginning of checkout process with Google Tag Manager
+    trackBeginCheckout(
+      items.map(item => ({
+        item_id: item.productId,
+        item_name: item.product.name,
+        price: Number(item.product.price) || 0,
+        quantity: item.quantity,
+        item_variant: item.color || undefined,
+        affiliation: 'Karigai Web Store'
+      })),
+      calculateFinalTotal().finalTotal
+      // Removed third parameter as trackBeginCheckout only accepts two parameters
+    );
+    
+    // Track the checkout button click
+    trackButtonClick('checkout_submit_button', 'Place Order', window.location.pathname);
+
+    try {
+      setIsSubmitting(true);
+
+      // For guest checkout, we don't need to check for user.id
+      // We'll create a guest order or use the logged-in user information if available
+
+      if (!items || items.length === 0) {
+        trackFormError('checkout_form', 'checkout-form', 'Cart is empty');
+        throw new Error('Your cart is empty');
+      }
+
+      // Check if Razorpay is loaded
+      if (!razorpayLoaded) {
+        trackFormError('checkout_form', 'checkout-form', 'Payment gateway not available');
+        throw new Error('Payment gateway is not available. Please refresh the page and try again.');
+      }
+
+      // Validate cart items
+      const invalidItems = items.filter(item => 
+        !item.product || 
+        !item.productId || 
+        typeof item.quantity !== 'number' || 
+        item.quantity < 1 ||
+        typeof item.product.price !== 'number' ||
+        isNaN(item.product.price)
+      );
+
+      if (invalidItems.length > 0) {
+        throw new Error('Some items in your cart are invalid. Please try refreshing the page.');
+      }
+
+      // Update user's phone number if logged in and different from what's stored
+      let validatedPhone = formData.phone;
+      if (user && formData.phone && user.phone !== formData.phone) {
+        try {
+          // Basic validation for Indian phone numbers
+          const phoneRegex = /^[6-9]\d{9}$/;
+          const cleanPhone = formData.phone.replace(/\D/g, '');
+          
+          // If phone number starts with +91 or 91, remove it
+          const formattedPhone = cleanPhone.replace(/^(\+?91)/, '');
+          
+          if (phoneRegex.test(formattedPhone)) {
+            console.log('Updating user phone number from', user.phone, 'to', formattedPhone);
+            await pocketbase.collection('users').update(user.id, {
+              phone: formattedPhone
+            });
+            console.log('Phone number updated successfully');
+            validatedPhone = formattedPhone;
+          } else {
+            console.warn('Invalid phone number format. Not updating user profile.');
+          }
+        } catch (phoneError) {
+          console.error('Failed to update phone number:', phoneError);
+          // Don't block order processing if phone update fails
+        }
+      }
+
+      // Track shipping information added
+      trackAddShippingInfo(
+        items.map(item => ({
+          item_id: item.productId,
+          item_name: item.product.name,
+          price: Number(item.product.price) || 0,
+          quantity: item.quantity,
+          item_variant: item.color || undefined,
+          discount: appliedCoupon && appliedCoupon.discountAmount ? (appliedCoupon.discountAmount / items.length) : 0
+        })),
+        calculateFinalTotal().finalTotal,
+        'standard',
+        appliedCoupon?.code
+      );
+
+      // Create or update address
+      let addressId = null;
+      const addressText = JSON.stringify({
+        street: formData.address,
+        city: formData.city,
+        state: formData.state,
+        postalCode: formData.zipCode,
+        country: 'India'
+      });
+      
+      try {
+        // For guest checkout, we don't create an address record in PocketBase
+        // We just store the address as text in the order
+        if (!isGuestCheckout && user) {
+          // Prepare address data for logged-in users
+          const addressData = {
+            user: user.id,
+            street: formData.address,
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.zipCode,
+            country: 'India',
+            isDefault: true
+          };
+
+          console.log('Preparing shipping address data for logged-in user:', addressData);
+          
+          // For logged-in users, check if they already have an address
+          try {
+            const existingAddress = await pocketbase.collection('addresses')
+              .getFirstListItem(`user="${user.id}"`);
+            
+            if (existingAddress) {
+              // Update existing address
+              await pocketbase.collection('addresses').update(existingAddress.id, addressData);
+              addressId = existingAddress.id;
+              console.log('Updated existing address:', addressId);
+            }
+          } catch (addressError: unknown) {
+            // No existing address found, create new one
+            console.log('No existing address found for user, creating new one');
+            const newAddress = await pocketbase.collection('addresses').create(addressData);
+            addressId = newAddress.id;
+            console.log('Created new address for user:', addressId);
+          }
+          
+          if (!addressId) {
+            throw new Error('Failed to create or update address');
+          }
+        } else {
+          // For guest checkout, we'll use the address text only
+          console.log('Guest checkout: using address text only (no PocketBase address record)');
+        }
+      } catch (error) {
+        trackFormError('checkout_form', 'checkout-form', 'Failed to prepare shipping address');
+        console.error('Error preparing address:', error);
+        throw new Error('Failed to prepare shipping address. Please try again.');
+      }
+
+      // For guest checkout, we'll only use the shipping_address_text field
+      // For logged-in users, we'll use both shipping_address and shipping_address_text
+      console.log(`${isGuestCheckout ? 'Guest checkout: No address ID' : `Using shipping address ID for order creation: ${addressId}`}`);
+
+      // Create order in PocketBase
+      // Compute final totals once to keep UI, DB, and Razorpay in sync
+      const totals = calculateFinalTotal();
+      const orderData = {
+        // Only include user reference if user is logged in
+        ...(user ? { user: user.id } : {}),
+        customer_name: formData.name,
+        customer_email: formData.email,
+        customer_phone: validatedPhone,
+        // Only include shipping_address for logged-in users
+        ...(user && addressId ? { shipping_address: addressId } : {}),
+        shipping_address_text: JSON.stringify({
+          street: formData.address, // Match expected field name in your system
+          city: formData.city,
+          state: formData.state,
+          postalCode: formData.zipCode, // Using the original field name as shown in your example
+          country: 'India'
+        }), // Store address in the exact format your system expects
+        products: JSON.stringify(items.map(item => ({
+          productId: item.productId,
+          product: item.product,
+          quantity: item.quantity,
+          color: item.color
+        }))),
+        subtotal: Number(totals.finalSubtotal),
+        // Shipping and discount come directly from calculateFinalTotal() which uses PocketBase config
+        shipping_cost: Number(totals.shippingCost || 0),
+        // discount_amount should include coupon + offer discounts used in total
+        discount_amount: Number(totals.finalDiscount || 0),
+        // Total from the same calculation for consistency
+        total: Number(totals.finalTotal),
+        status: 'pending',
+        payment_status: 'pending',
+        coupon_code: appliedCoupon?.code || null,
+        notes: isGuestCheckout ? 'Guest checkout order' : 'Order created, awaiting payment',
+        payment_id: '',
+        razorpay_order_id: '',
+        razorpay_payment_id: '',
+        razorpay_signature: '',
+        is_guest_order: isGuestCheckout,
+        // Explicitly set the created date to ensure it's properly recorded
+        created: new Date().toISOString(),
+      };
+
+      console.log('SHIPPING TRACKING - Before order creation:');
+      console.log(`- Calculated shippingCost: ₹${shippingCost}`);
+      console.log(`- orderData.shipping_cost: ₹${orderData.shipping_cost}`);
+      console.log(`- orderData.total: ₹${orderData.total}`);
+
+      console.log('Creating order with data:', {
+        ...orderData,
+        products: `[${items.length} items]`, // Don't log the entire products array
+      });
+
+      console.log('SHIPPING TRACKING - After order creation:');
+      console.log(`- Calculated shippingCost: ₹${shippingCost}`);
+      console.log(`- orderData.shipping_cost: ₹${orderData.shipping_cost}`);
+      console.log(`- orderData.total: ₹${orderData.total}`);
+
+      // Ensure we have admin authentication for secure order creation
+      const adminEmail = import.meta.env.VITE_POCKETBASE_ADMIN_EMAIL;
+      const adminPassword = import.meta.env.VITE_POCKETBASE_ADMIN_PASSWORD;
+      
+      let order;
+      // If we have admin credentials, try to authenticate with them
+      if (adminEmail && adminPassword) {
+        try {
+          console.log('Using superuser credentials for order creation');
+          // Store the current auth state
+          const currentAuthStore = pocketbase.authStore.exportToCookie();
+          
+          // Authenticate as admin
+          await pocketbase.admins.authWithPassword(adminEmail, adminPassword);
+          
+          // Create the order with admin privileges
+          order = await pocketbase.collection('orders').create(orderData) as unknown as OrderData;
+          
+          // Restore the original auth state
+          pocketbase.authStore.loadFromCookie(currentAuthStore);
+          
+          console.log('Order created with admin privileges, ID:', order.id);
+        } catch (authError: unknown) {
+          console.error('Failed to use admin auth for order creation:', authError);
+          // Fallback to regular create
+          order = await pocketbase.collection('orders').create(orderData) as unknown as OrderData;
+        }
+      } else {
+        // No admin credentials, use regular create
+        order = await pocketbase.collection('orders').create(orderData) as unknown as OrderData;
+      }
+      console.log('Order created successfully with ID:', order.id);
+      
+      // Track form completion
+      trackFormCompletion('checkout_form', 'checkout-form');
+
+      // Proceed with payment
+      await handleNextSteps(order);
+
+    } catch (error) {
+      console.error('Checkout error:', error);
+      trackFormError('checkout_form', 'checkout-form', error instanceof Error ? error.message : 'Unknown error');
+      toast({
+        variant: "destructive",
+        title: "Checkout Failed",
+        description: error instanceof Error ? error.message : "Failed to process your order. Please try again.",
+      });
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNextSteps = async (order: OrderData) => {
+    // Debug environment variables
+    console.log('Debug - Environment variables:');
+    
+    // CRITICAL FIX: First ensure the shipping cost is present
+    // Based on logs, we can see shipping cost is disappearing between
+    // the initial calculation and payment processing
+    console.log('========== SHIPPING COST FIX ==========');
+    console.log('ORDER OBJECT BEFORE FIX:');
+    console.log('- Order ID:', order.id);
+    console.log('- Raw shipping_cost from order:', order.shipping_cost);
+    console.log('- Raw subtotal from order:', order.subtotal);
+    console.log('- Raw total from order:', order.total);
+    
+    // SUPER IMPORTANT: If we detect our shipping cost disappeared, we need to fix it
+    const lastTotals = calculateFinalTotal();
+    const lastCalculatedShipping = lastTotals.shippingCost || 0;
+    console.log(`Last calculated shipping cost from form state (via calculateFinalTotal): ₹${lastCalculatedShipping}`);
+    
+    // If no shipping cost in order but we have a state, force the shipping cost
+    if (formData.state && (!order.shipping_cost || Number(order.shipping_cost) === 0)) {
+      console.warn('⚠️⚠️⚠️ CRITICAL: Shipping cost is missing from order object but we have an address! Fixing...');
+      
+      // Recover the shipping cost using the shipping cost calculation function
+      const fixedShippingCost = lastCalculatedShipping;
+      if (fixedShippingCost > 0) {
+        console.log(`Fixing shipping cost: Using calculated value ₹${fixedShippingCost} instead of ₹${order.shipping_cost || 0}`);
+        
+        // Fix the shipping cost in the order object
+        order.shipping_cost = fixedShippingCost;
+        
+        // Also recalculate total to ensure consistency
+        const newTotal = Number(order.subtotal || 0) + fixedShippingCost - Number(order.discount_amount || 0);
+        order.total = newTotal;
+        console.log(`Fixed total: ₹${order.total}`);
+      }
+    }
+    
+    // ===== CRITICAL PAYMENT FIX =====
+    // Fix for Razorpay amount discrepancy: ensure payment includes shipping cost
+    // This fixes the issue where Razorpay shows ₹300 instead of the correct ₹350 (which includes shipping)
+    
+    // 1. Get the raw component values
+    const subtotalAmount = Number(order.subtotal || 0);
+    let shippingAmount = Number(order.shipping_cost || 0);
+    const discountAmount = Number(order.discount_amount || 0);
+    
+    // CRITICAL SAFETY NET: If we still don't have shipping cost but have address,
+    // calculate it one last time before payment processing using calculateFinalTotal
+    if (formData.state && shippingAmount === 0) {
+      const finalShippingCost = calculateFinalTotal().shippingCost || 0;
+      console.log(`🛡️ FINAL SAFETY CHECK: Address exists but shipping is still 0. Forcing shipping cost: ₹${finalShippingCost}`);
+      shippingAmount = finalShippingCost;
+      order.shipping_cost = finalShippingCost;
+    }
+    
+    // 2. Force the correct total calculation with shipping included
+    const calculatedTotal = subtotalAmount + shippingAmount - discountAmount;
+    const orderAmount = Math.max(1, calculatedTotal); // Minimum 1 rupee
+    
+    console.log(`======= PAYMENT AMOUNT FIX =======`);
+    console.log(`FIXING Razorpay payment amount to include shipping:`);
+    console.log(`Subtotal: ₹${subtotalAmount}`);
+    console.log(`+ Shipping: ₹${shippingAmount}`);
+    console.log(`- Discount: ₹${discountAmount}`);
+    console.log(`= TOTAL: ₹${orderAmount}`);
+    console.log(`Database order.total (which may be wrong): ₹${order.total}`);
+    console.log(`Using corrected amount: ₹${orderAmount} (${orderAmount * 100} paise)`);
+    
+    // 3. CRITICAL: Update the order total in our order object to ensure consistency
+    //    This ensures Razorpay gets the correct amount including shipping
+    order.total = orderAmount;
+    console.log(`Updated order.total to: ₹${order.total}`);
+    console.log(`================================`);
+    
+    // 4. IMPORTANT: Update PocketBase order record with the corrected values
+    //    This ensures the database reflects the same values used for payment
+    try {
+      console.log('Updating PocketBase order record with corrected values:');
+      console.log(`- Original shipping_cost: ₹${order.shipping_cost}`);
+      console.log(`- Original total: ₹${order.total}`);
+      
+      // Use admin authentication for update if available
+      const adminEmail = import.meta.env.VITE_POCKETBASE_ADMIN_EMAIL;
+      const adminPassword = import.meta.env.VITE_POCKETBASE_ADMIN_PASSWORD;
+      
+      if (adminEmail && adminPassword) {
+        // Store the current auth state
+        const currentAuthStore = pocketbase.authStore.exportToCookie();
+        
+        // Authenticate as admin
+        await pocketbase.admins.authWithPassword(adminEmail, adminPassword);
+        
+        // Update the order with corrected values
+        await pocketbase.collection('orders').update(order.id, {
+          shipping_cost: Number(shippingAmount),
+          total: Number(orderAmount)
+        });
+        
+        // Restore the original auth state
+        pocketbase.authStore.loadFromCookie(currentAuthStore);
+        console.log('✅ PocketBase order updated successfully with corrected values');
+      } else {
+        // Fallback to regular update
+        await pocketbase.collection('orders').update(order.id, {
+          shipping_cost: Number(shippingAmount),
+          total: Number(orderAmount)
+        });
+        console.log('✅ PocketBase order updated successfully with corrected values');
+      }
+    } catch (updateError) {
+      console.error('Failed to update PocketBase order with corrected values:', updateError);
+      // Don't block payment process if database update fails
+      // We'll proceed with payment using the correct values in memory
+    }
+    
+    try {
+      console.log('Creating Razorpay order with the following parameters:');
+      console.log('- Amount:', orderAmount, 'rupees');
+      console.log('- Receipt:', order.id);
+      console.log('- User:', user?.id || 'guest');
+      
+      const razorpayOrderResponse = await createRazorpayOrder(
+        orderAmount, // Positive amount in rupees (will be converted to paise)
+        'INR',       // currency
+        order.id,    // receipt (using our order ID)
+        // Add notes about guest checkout status
+        {
+          user_id: user?.id || 'guest',
+          email: formData.email,
+          name: formData.name,
+          is_guest: isGuestCheckout ? 'true' : 'false'
+        }
+      );
+      
+      // Verify we received a valid order response
+      if (!razorpayOrderResponse || !razorpayOrderResponse.id) {
+        throw new Error('Invalid order response from Razorpay');
+      }
+      
+      console.log('Razorpay order created successfully:');
+      console.log('- ID:', razorpayOrderResponse.id);
+      console.log('- Amount:', razorpayOrderResponse.amount, 'paise (₹' + (razorpayOrderResponse.amount / 100).toFixed(2) + ')');
+      console.log('- Currency:', razorpayOrderResponse.currency);
+      console.log('- Receipt:', razorpayOrderResponse.receipt);
+      console.log('- Status:', razorpayOrderResponse.status);
+      
+      // IMPORTANT: The amount in the Razorpay order response is ALREADY in paise
+      // and should be used directly without further conversion
+      console.log(`Razorpay order amount: ${razorpayOrderResponse.amount} paise (₹${(razorpayOrderResponse.amount/100).toFixed(2)})`);
+
+      if (!razorpayOrderResponse || !razorpayOrderResponse.id) {
+        trackPaymentFailure(order.id, order.total, 'Razorpay', 'Failed to create payment order');
+        throw new Error('Failed to create payment order. Please try again.');
+      }
+
+      // Track payment start
+      trackPaymentStart(order.id, order.total, 'Razorpay');
+      
+      // Check environment variables again before attempting payment
+      const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
+      console.log('VITE_RAZORPAY_KEY_ID present:', !!razorpayKeyId);
+      if (!razorpayKeyId) {
+        console.error('ERROR: VITE_RAZORPAY_KEY_ID environment variable is not set');
+        throw new Error('Payment configuration error: API key missing');
+      }
+      
+      // Load the Razorpay script first
+      console.log('Loading Razorpay script...');
+      try {
+        const scriptLoaded = await loadRazorpayScript();
+        if (!scriptLoaded) {
+          console.error('Failed to load Razorpay checkout script');
+          throw new Error('Payment system unavailable. Please try again later.');
+        }
+        console.log('✅ Razorpay script loaded successfully');
+      } catch (scriptError) {
+        console.error('Error loading Razorpay script:', scriptError);
+        throw new Error('Payment initialization failed. Please try again.');
+      }
+
+      // Verify that the Razorpay order amount matches our calculated total
+      const expectedAmountInPaise = orderAmount * 100;
+      if (razorpayOrderResponse.amount !== expectedAmountInPaise) {
+        console.error(
+          `⚠️ AMOUNT MISMATCH: Razorpay order amount (${razorpayOrderResponse.amount} paise) ` +
+          `doesn't match our calculated total (${expectedAmountInPaise} paise)`
+        );
+        // We'll force our expected amount in `openRazorpayCheckout` below
+        console.log(`Using our calculated amount for checkout: ${expectedAmountInPaise} paise`);
+      }
+      // Open Razorpay payment form with explicit key from environment
+      console.log('Opening Razorpay checkout with key:', razorpayKeyId.substring(0, 4) + '...');
+      try {
+        await openRazorpayCheckout({
+          key: razorpayKeyId,
+          order_id: razorpayOrderResponse.id,
+          amount: expectedAmountInPaise,
+          currency: 'INR',
+          name: 'Karigai',
+          description: `Order #${order.id} - Total ₹${orderAmount}`,
+          image: import.meta.env.VITE_SITE_LOGO || 'https://karigai.in/assets/logo.png',
+          handler: (response) => handlePaymentSuccess(response, order.id),
+          prefill: {
+            name: formData.name,
+            email: formData.email,
+            contact: order.customer_phone,
+          },
+          notes: {
+            order_id: order.id,
+            address: `${formData.address}, ${formData.city}, ${formData.state} - ${formData.zipCode}`,
+            is_guest_checkout: isGuestCheckout ? 'true' : 'false',
+            user_id: user?.id || 'guest',
+          },
+          theme: { color: '#4F46E5' },
+        });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Payment cancelled or failed';
+        console.warn('Razorpay closed/failed:', msg);
+        trackPaymentFailure(order.id, order.total, 'Razorpay', msg);
+        toast({
+          variant: 'destructive',
+          title: 'Payment Cancelled',
+          description: 'Your Razorpay payment was cancelled or failed. No charges were made.',
+        });
+        navigate(`/order-confirmation/${order.id}?status=payment_cancelled`);
+        return;
+      }
+    } catch (error) {
+      console.error('Error creating Razorpay order or initializing payment:', error);
+      trackPaymentFailure(order.id, order.total, 'Razorpay', error instanceof Error ? error.message : 'Unknown error');
+      toast({
+        variant: 'destructive',
+        title: 'Payment Error',
+        description: 'There was an issue processing your payment. Please contact support.',
+      });
+      navigate(`/order-confirmation/${order.id}?status=payment_error`);
+    }
+
+  };
+
+  const handleAddressSelect = (address: {
+    street: string;
+    city: string;
+    state: string;
+    postalCode: string;
+    country: string;
+  }) => {
+    console.log('Address selected from Google Maps:', address);
+    
+    // For some addresses from Google Maps, the street field might contain the full formatted address
+    // We need to handle this case to properly extract the components
+    let streetAddress = address.street;
+    const cityValue = address.city;
+    const stateValue = address.state;
+    const zipCodeValue = address.postalCode;
+    
+    // If the street field contains commas, it might be a full address - extract just the street part
+    if (address.street && address.street.includes(',')) {
+      // Keep only the part before the first comma as street address
+      streetAddress = address.street.split(',')[0].trim();
+    }
+    
+    // Format address fields consistently
+    const updatedFormData = {
+      ...formData,
+      address: streetAddress,
+      city: cityValue || formData.city,
+      state: stateValue || formData.state,
+      zipCode: zipCodeValue || formData.zipCode
+    };
+    
+    console.log('Updated form data with address:', updatedFormData);
+    setFormData(updatedFormData);
+    validateForm(updatedFormData);
+  };
+
+  if (cartLoading) {
+    return (
+      <div className="container max-w-2xl mx-auto py-16 px-4 text-center">
+        <Loader2 className="h-8 w-8 animate-spin mx-auto" />
+        <p className="mt-4">Loading cart details...</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="container max-w-2xl mx-auto py-16 px-4 text-center">
+        <ShoppingBag className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+        <h1 className="text-2xl font-bold mb-4">Your Cart is Empty</h1>
+        <p className="text-muted-foreground mb-8">Add some items to your cart to proceed with checkout.</p>
+        <Button asChild>
+          <Link to="/shop">Continue Shopping</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  // Handle Google login
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+      toast({
+        title: "Login Successful",
+        description: "You've been logged in with Google.",
+      });
+    } catch (error) {
+      console.error('Google login error:', error);
+      toast({
+        variant: "destructive",
+        title: "Login Failed",
+        description: "Could not log in with Google. Please try again or continue as guest.",
+      });
+    }
+  };
+
+  // Handle guest checkout selection
+  const handleGuestCheckoutSelect = () => {
+    setIsGuestCheckout(true);
+    setShowLoginOptions(false);
+    toast({
+      title: "Guest Checkout",
+      description: "You can complete your order without creating an account.",
+    });
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Checkout Header with Progress */}
+        <div className="mb-8">
+          {/* Login Options Section */}
+          {showLoginOptions && (
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8 border border-gray-200">
+              <h2 className="text-xl font-semibold mb-4">Complete Your Purchase</h2>
+              <p className="mb-6 text-gray-600">Sign in for faster checkout and to save your information for next time.</p>
+              
+              <div className="flex flex-col md:flex-row gap-4 justify-between items-center">
+                {import.meta.env.VITE_ENABLE_GOOGLE_AUTH === 'true' && (
+                  <>
+                    <Button 
+                      onClick={handleGoogleLogin}
+                      className="w-full md:w-auto flex items-center justify-center gap-2 bg-white text-gray-800 border border-gray-300 hover:bg-gray-50"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 48 48">
+                        <path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/>
+                        <path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/>
+                        <path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/>
+                        <path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/>
+                      </svg>
+                      Continue with Google
+                    </Button>
+                    
+                    <div className="flex items-center w-full md:w-auto">
+                      <div className="border-t border-gray-300 flex-grow md:w-20"></div>
+                      <span className="px-4 text-gray-500 text-sm">or</span>
+                      <div className="border-t border-gray-300 flex-grow md:w-20"></div>
+                    </div>
+                  </>
+                )}
+                
+                <Button 
+                  onClick={handleGuestCheckoutSelect}
+                  className="w-full md:w-auto bg-gray-100 text-gray-800 hover:bg-gray-200 border border-gray-300"
+                >
+                  Continue as Guest
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {offerLoading ? (
+            <div className="flex justify-center items-center py-4 mb-8">
+              <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
+              <span>Loading offers...</span>
+            </div>
+          ) : showOffer && !hideOfferBanner && (
+            <div className="relative">
+              <OfferBanner
+                title={offerTitle || 'Special Offer'}
+                description={offerDescription}
+                imageUrl={offerImageUrl}
+                active={offerMinOrder == null || subtotal >= (offerMinOrder || 0)}
+                minValue={offerMinOrder}
+                currentAmount={subtotal}
+              />
+              <button
+                onClick={() => setHideOfferBanner(true)}
+                className="absolute top-3 right-3 text-current/80 hover:text-current focus:outline-none"
+                aria-label="Close offer banner"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+          )}
+          {showOffer && offerExpiryTime && hideOfferBanner && (
+            <div className="flex justify-end mb-4">
+              <button 
+                onClick={() => setHideOfferBanner(false)} 
+                className="text-sm text-primary hover:text-primary/80 flex items-center gap-1 focus:outline-none"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+                Show Limited Time Offer ({offerDiscount}% discount)
+              </button>
+            </div>
+          )}
+        </div>
+        
+        <div className="max-w-md mx-auto">
+          <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
+            {/* Receipt Header */}
+            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 text-white text-center">
+              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <ShoppingBag className="w-8 h-8" />
+              </div>
+              <p className="text-emerald-100 text-sm">Complete your purchase</p>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {/* Contact Section */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
+                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                    <span className="text-emerald-600 font-semibold text-sm">1</span>
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Contact</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <Input
+                      id="name"
+                      name="name"
+                      value={formData.name}
+                      onChange={handleInputChange}
+                      placeholder="Full Name"
+                      required
+                      className={`rounded-xl border-gray-200 focus:border-emerald-400 focus:ring-emerald-400 ${!formData.name ? "border-red-300" : ""}`}
+                    />
+                    {!formData.name && (
+                      <p className="text-xs text-red-500 mt-1">Full name is required</p>
+                    )}
+                  </div>
+                  <div>
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      placeholder="Email Address"
+                      required
+                      className={`rounded-xl border-gray-200 focus:border-emerald-400 focus:ring-emerald-400 ${!formData.email || (formData.email && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) ? "border-red-300" : ""}`}
+                    />
+                    {!formData.email ? (
+                      <p className="text-xs text-red-500 mt-1">Email is required</p>
+                    ) : formData.email && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/) ? (
+                      <p className="text-xs text-red-500 mt-1">Please enter a valid email address</p>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {/* Shipping Section */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
+                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                    <span className="text-emerald-600 font-semibold text-sm">2</span>
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Shipping</h3>
+                </div>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    {/* Force disable address autocomplete in production to prevent any issues */}
+                    {import.meta.env.MODE === 'development' && import.meta.env.VITE_ENABLE_ADDRESS_AUTOCOMPLETE === 'true' ? (
+                      <AddressAutocomplete
+                        onAddressSelect={handleAddressSelect}
+                        defaultValue={formData.address}
+                        error={errors?.address || (!formData.address ? "Address is required" : undefined)}
+                      />
+                    ) : (
+                      <div>
+                        <Label htmlFor="address">Street Address</Label>
+                        <Input
+                          id="address"
+                          name="address"
+                          value={formData.address}
+                          onChange={handleInputChange}
+                          required
+                          className={!formData.address ? "border-red-300" : ""}
+                        />
+                        {!formData.address && (
+                          <p className="text-xs text-red-500">Address is required</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="city">City</Label>
+                      <Input
+                        id="city"
+                        name="city"
+                        value={formData.city}
+                        onChange={handleInputChange}
+                        required
+                        className={errors?.city || !formData.city ? "border-red-500" : ""}
+                      />
+                      {errors?.city ? (
+                        <p className="text-xs text-red-500">{errors.city}</p>
+                      ) : !formData.city ? (
+                        <p className="text-xs text-red-500">City is required</p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="state">State</Label>
+                      <Input
+                        id="state"
+                        name="state"
+                        value={formData.state}
+                        onChange={handleInputChange}
+                        required
+                        className={errors?.state || !formData.state ? "border-red-500" : ""}
+                      />
+                      {errors?.state ? (
+                        <p className="text-xs text-red-500">{errors.state}</p>
+                      ) : !formData.state ? (
+                        <p className="text-xs text-red-500">State is required</p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="zipCode">ZIP Code</Label>
+                      <Input
+                        id="zipCode"
+                        name="zipCode"
+                        value={formData.zipCode}
+                        onChange={handleInputChange}
+                        required
+                        data-testid="zip-input"
+                        className={errors?.zipCode || !formData.zipCode ? "border-red-500" : ""}
+                      />
+                      {errors?.zipCode ? (
+                        <p className="text-xs text-red-500">{errors.zipCode}</p>
+                      ) : !formData.zipCode ? (
+                        <p className="text-xs text-red-500">ZIP code is required</p>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                    <Input
+                      id="phone"
+                      name="phone"
+                      type="tel"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      required
+                      className={errors?.phone || !formData.phone ? "border-red-500" : ""}
+                      placeholder="10-digit mobile number"
+                    />
+                    {errors?.phone ? (
+                      <p className="text-xs text-red-500">{errors.phone}</p>
+                    ) : !formData.phone ? (
+                      <p className="text-xs text-red-500">Phone number is required</p>
+                    ) : null}
+                    <p className="text-xs text-muted-foreground">Enter a 10-digit Indian mobile number</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Order Summary Section */}
+              <div className="bg-gray-50 rounded-2xl p-4 space-y-3 border border-gray-100">
+                <h3 className="font-semibold text-gray-800 text-sm">Order Items</h3>
+                <div className="space-y-2">
+                  {items.map((item) => (
+                    <div key={`${item.productId}-${item.color}`} className="flex justify-between items-start text-sm">
+                      <span className="text-gray-700 flex flex-wrap items-center gap-2">
+                        <span className="text-gray-600">{item.product.name} × {item.quantity}</span>
+                        {(() => {
+                          const sizeValue = item.options?.size;
+                          if (!sizeValue) return null;
+                          const sizes = (item.product as any)?.variants?.sizes || [];
+                          const match = Array.isArray(sizes) ? sizes.find((s: any) => String(s.value) === String(sizeValue)) : undefined;
+                          const unit = match?.unit ? ` ${match.unit}` : '';
+                          const label = `${sizeValue}${unit}`.trim();
+                          return label ? (
+                            <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-semibold">
+                              {label}
+                            </span>
+                          ) : null;
+                        })()}
+                      </span>
+                      <span className="font-medium">₹{(((typeof (item as any).unitPrice === 'number' ? (item as any).unitPrice : (Number(item.product.price) || 0))) * (Number(item.quantity) || 0)).toFixed(2)}</span>
+                    </div>
+                  ))}
+                </div>
+                
+                <div className="border-t border-gray-200 pt-3 space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-medium text-gray-800">₹{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Shipping</span>
+                    <span className="font-medium text-gray-800">
+                      {formData.state ? 
+                        `₹${calculateFinalTotal().shippingCost.toFixed(2)}` : 
+                        <span className="text-xs text-gray-500">Enter address</span>}
+                    </span>
+                  </div>
+                  {formData.state && (
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Est. Delivery</span>
+                      <span className="text-gray-600">{calculateFinalTotal().estimatedDelivery}</span>
+                    </div>
+                  )}
+                  {appliedCoupon && (
+                    <div className="flex justify-between text-sm text-emerald-600">
+                      <span>Discount ({appliedCoupon.code})</span>
+                      <span className="font-medium">-₹{(appliedCoupon.discountAmount || 0).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="border-t-2 border-gray-300 pt-3 flex justify-between">
+                  <span className="font-bold text-gray-800">Total</span>
+                  <span className="font-bold text-xl text-emerald-600">₹{(calculateFinalTotal()?.finalTotal || 0).toFixed(2)}</span>
+                </div>
+              </div>
+
+              {calculateFinalTotal().finalTotal < 150 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                  <div className="flex items-start space-x-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-600 mt-0.5 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Minimum Order Required</p>
+                      <p className="text-xs text-amber-700">Add ₹{(150 - calculateFinalTotal().finalTotal).toFixed(2)} more to checkout</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Coupon Code Section */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
+                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                    <span className="text-emerald-600 font-semibold text-sm">3</span>
+                  </div>
+                  <h3 className="font-semibold text-gray-800">Promo Code</h3>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <Input
+                      id="couponCode"
+                      name="couponCode"
+                      type="text"
+                      value={couponCode}
+                      onChange={(e) => setCouponCode(e.target.value)}
+                      placeholder="Enter promo code"
+                      data-testid="coupon-input"
+                      className="rounded-xl border-gray-200 focus:border-emerald-400 focus:ring-emerald-400"
+                    />
+                    {couponLoading ? (
+                      <Button disabled className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 shrink-0">
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Applying
+                      </Button>
+                    ) : (
+                      <Button 
+                        type="button" 
+                        onClick={applyCoupon} 
+                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 shrink-0" 
+                        data-testid="apply-coupon-btn"
+                      >
+                        Apply
+                      </Button>
+                    )}
+                  </div>
+                  {couponError && <p className="text-xs text-red-500">{couponError}</p>}
+                  {appliedCoupon && (
+                    <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                      <div className="flex items-center space-x-2">
+                        <Tag className="w-4 h-4 text-emerald-600" />
+                        <span className="text-sm font-medium text-emerald-700">{appliedCoupon.code} applied</span>
+                      </div>
+                      <button 
+                        type="button" 
+                        onClick={removeCoupon}
+                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Suggested Coupons */}
+                {suggestedCouponsLoading ? (
+                  <div className="flex items-center space-x-2 text-sm text-gray-500">
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Loading coupons...</span>
+                  </div>
+                ) : suggestedCoupons.length > 0 ? (
+                  <div className="space-y-2">
+                    <p className="text-xs text-gray-500">Available offers:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {suggestedCoupons.map((coupon) => (
+                        <button
+                          key={coupon.id}
+                          type="button"
+                          onClick={() => handleApplyCoupon(coupon.code)}
+                          className="inline-flex items-center px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-medium text-emerald-700 transition-colors"
+                        >
+                          <Tag className="w-3 h-3 mr-1" />
+                          <span>{coupon.code}</span>
+                          {coupon.description && (
+                            <span className="ml-1 text-emerald-600">· {coupon.description}</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Submit Button */}
+              {isSubmitting || isPaymentProcessing ? (
+                <Button disabled className="w-full py-6 text-lg rounded-2xl bg-gray-300">
+                  <Loader2 className="mr-3 h-5 w-5 animate-spin" />
+                  {isPaymentProcessing ? 'Processing...' : 'Please wait...'}
+                </Button>
+              ) : (
+                <Button 
+                  type="submit" 
+                  className="w-full py-6 text-lg rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200" 
+                  disabled={!isFormValid || items.length === 0 || calculateFinalTotal().finalTotal < 150}
+                >
+                  <LockIcon className="h-5 w-5 mr-2" />
+                  {`Pay ₹${calculateFinalTotal().finalTotal.toFixed(2)}`}
+                </Button>
+              )}
+      </form>
+          </div>
+          
+          {/* Order summary removed for a cleaner checkout experience */}
+        </div>
+      </div>
+    </div>
+  );
+}

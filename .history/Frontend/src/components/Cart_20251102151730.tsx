@@ -1,0 +1,204 @@
+import { useState, ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { ShoppingBag, Minus, Plus, Loader2, Trash2, AlertTriangle } from 'lucide-react';
+import { useCart } from '@/contexts/CartContext';
+import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetDescription } from '@/components/ui/sheet';
+import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { ProductImage } from '@/components/ProductImage';
+import { CartCrossSell } from '@/components/CartCrossSell';
+
+interface CartProps {
+  children?: ReactNode;
+}
+
+export function Cart({ children }: CartProps) {
+  const { items, removeItem, updateQuantity, isLoading, subtotal, total, itemCount } = useCart();
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleQuantityChange = (productId: string, newQuantity: number) => {
+    if (newQuantity < 1) {
+      handleRemoveItem(productId);
+      return;
+    }
+    updateQuantity(productId, newQuantity);
+  };
+
+  const handleRemoveItem = (productId: string) => {
+    removeItem(productId);
+  };
+
+  const handleCheckout = () => {
+    // Save cart state before navigating
+    localStorage.setItem('checkout_cart', JSON.stringify({
+      items,
+      subtotal,
+      total,
+      itemCount
+    }));
+    setIsOpen(false);
+  };
+
+  const handleCloseCart = () => {
+    setIsOpen(false);
+  };
+
+  return (
+    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <SheetTrigger asChild>
+        {children || (
+          <Button variant="outline" size="icon" className="relative">
+            <ShoppingBag className="h-5 w-5" />
+            {itemCount > 0 && (
+              <span className="absolute -top-2 -right-2 h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs flex items-center justify-center">
+                {itemCount}
+              </span>
+            )}
+          </Button>
+        )}
+      </SheetTrigger>
+      <SheetContent className="flex w-full flex-col sm:max-w-md">
+        <SheetHeader className="text-center space-y-1">
+          <SheetTitle className="text-lg">Shopping Cart ({itemCount} items)</SheetTitle>
+          <SheetDescription className="text-muted-foreground">View and manage items in your shopping cart</SheetDescription>
+        </SheetHeader>
+
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
+            <ShoppingBag className="h-12 w-12 text-muted-foreground" />
+            <div>
+              <p className="text-lg font-medium mb-2">Your cart is empty</p>
+              <p className="text-sm text-muted-foreground">
+                Add items to your cart to see them here
+              </p>
+            </div>
+            <Button asChild>
+              <Link to="/shop" onClick={() => setIsOpen(false)}>Continue Shopping</Link>
+            </Button>
+          </div>
+        ) : (
+          <>
+            <ScrollArea className="flex-1 -mx-6 px-6">
+              <div className="space-y-3">
+                {items.map((item, index) => (
+                  <div key={`${item.productId}-${item.color}-${index}`} className="flex gap-3 rounded-xl border border-gray-100 p-3">
+                    <div className="relative aspect-square h-20">
+                      {item.product && item.product.images && item.product.images[0] ? (
+                        <ProductImage
+                          url={item.product.images[0]}
+                          alt={item.product.name}
+                          className="rounded-lg object-cover"
+                        />
+                      ) : (
+                        <div className="bg-muted w-full h-full rounded-lg flex items-center justify-center">
+                          <ShoppingBag className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex justify-between items-start">
+                        <Link
+                          to={`/product/${item.productId}`}
+                          className="font-medium hover:text-primary line-clamp-2"
+                          onClick={() => setIsOpen(false)}
+                        >
+                          {item.product?.name || 'Product'}
+                        </Link>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                          onClick={() => handleRemoveItem(item.productId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-0.5 space-x-2">
+                        <span>{item.color ? `Color: ${item.color}` : 'Default'}</span>
+                        {item.options && Object.keys(item.options).length > 0 && (
+                          <span>
+                            {Object.keys(item.options).sort().map(k => `${k}: ${item.options![k]}`).join(' • ')}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleQuantityChange(item.productId, item.quantity - 1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => handleQuantityChange(item.productId, item.quantity + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <div className="ml-auto font-semibold">
+                          ₹{(((typeof item.unitPrice === 'number' ? item.unitPrice : Number(item.product?.price) || 0)) * (Number(item.quantity) || 0)).toFixed(2)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <div className="pt-2">
+                  <CartCrossSell onClose={handleCloseCart} />
+                </div>
+              </div>
+            </ScrollArea>
+
+            <div className="space-y-4 pt-6">
+              <Separator />
+              <div className="space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-sm">Subtotal</span>
+                  <span className="font-medium">₹{(subtotal || 0).toFixed(2)}</span>
+                </div>
+                {/* Shipping will be calculated at checkout */}
+                <div className="flex justify-between font-medium">
+                  <span>Total</span>
+                  <span>₹{(total || 0).toFixed(2)}</span>
+                </div>
+              </div>
+              
+              {(total || 0) < 150 && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-md mb-3">
+                  <div className="flex items-center">
+                    <AlertTriangle className="h-4 w-4 text-amber-500 mr-2" />
+                    <p className="text-sm font-medium text-amber-800">
+                      Minimum order value is ₹150 (Current: ₹{(total || 0).toFixed(2)})
+                    </p>
+                  </div>
+                </div>
+              )}
+              
+              <Button asChild className="w-full bg-emerald-600 hover:bg-emerald-700" disabled={items.length === 0 || (total || 0) < 150}>
+                <Link to="/checkout" onClick={handleCheckout}>
+                  Proceed to Checkout (₹{(total || 0).toFixed(2)})
+                </Link>
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setIsOpen(false)}
+              >
+                Continue Shopping
+              </Button>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}

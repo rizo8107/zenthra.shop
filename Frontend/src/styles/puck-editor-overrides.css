@@ -1,0 +1,75 @@
+/* Scope all overrides to the editor page only */
+.puck-editor-root {
+  position: relative;
+  isolation: isolate; /* create stacking context, contain overlays */
+  height: 100vh;
+  overflow: hidden; /* prevent body + preview double scroll */
+  display: flex;
+  flex-direction: column;
+}
+
+/* Make visual selection/hover overlays non-blocking */
+.puck-editor-root [data-puck-overlay],
+.puck-editor-root [data-puck-selection],
+.puck-editor-root .puck-selection-overlay,
+.puck-editor-root .puck-hover-overlay,
+.puck-editor-root .puck-droppable-overlay {
+  pointer-events: none !important;
+  z-index: 1; /* behind toolbars */
+}
+
+/* Keep toolbars, handles and buttons interactive */
+.puck-editor-root .puck-toolbar,
+.puck-editor-root [data-puck-toolbar],
+.puck-editor-root .puck-add-button,
+.puck-editor-root [role="toolbar"],
+.puck-editor-root .puck-handle,
+.puck-editor-root .puck-controls,
+.puck-editor-root .puck-menu,
+.puck-editor-root .puck-context-menu {
+  pointer-events: auto !important;
+  z-index: 10;
+}
+
+/* Prevent oversized overlay containers from capturing layout */
+.puck-editor-root [data-puck-block] {
+  position: relative;
+}
+
+/* Ensure overlays respect block bounds */
+.puck-editor-root [data-puck-block] [data-puck-overlay],
+.puck-editor-root [data-puck-block] .puck-selection-overlay,
+.puck-editor-root [data-puck-block] .puck-hover-overlay {
+  position: absolute;
+  inset: 0;
+}
+
+/* Layout: make preview the only scroll container */
+.puck-editor-root > * { min-height: 0; }
+.puck-editor-root main,
+.puck-editor-root .puck-editor { flex: 1 1 auto; min-height: 0; overflow: hidden; }
+.puck-editor-root [data-puck-preview],
+.puck-editor-root .puck-preview,
+.puck-editor-root .puck-canvas {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+
+/* Frame-root specific fixes (as reported) */
+.puck-editor-root #frame-root {
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+}
+.puck-editor-root #frame-root > div,
+.puck-editor-root #frame-root > div > div,
+.puck-editor-root #frame-root > div > div > div,
+.puck-editor-root #frame-root > div > div > div > div {
+  min-height: 0;
+  height: auto;
+  overflow: visible; /* avoid nested scroll areas */
+  position: relative; /* anchor selection overlays */
+}

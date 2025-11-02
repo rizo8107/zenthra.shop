@@ -1,0 +1,119 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  
+[build.environment]
+  # Add Node version to ensure compatibility
+  NODE_VERSION = "18"
+
+# Handle SPA routing by redirecting all paths to index.html
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Set cache headers for static assets
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-XSS-Protection = "1; mode=block"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Enable HTTP/2 server push
+    Link = '''
+    </assets/index-*.js>; rel=preload; as=script,
+    </assets/index-*.css>; rel=preload; as=style
+    '''
+    # Content Security Policy
+    Content-Security-Policy = "default-src 'self'; script-src 'self' https://cdn.gpteng.co https://checkout.razorpay.com; style-src 'self' 'unsafe-inline' https://*.konipai.in; img-src 'self' https://backend-pocketbase.7za6uc.easypanel.host https://*.razorpay.com https://*.konipai.in data:; connect-src 'self' https://backend-pocketbase.7za6uc.easypanel.host https://*.razorpay.com; font-src 'self' https://*.konipai.in data: *; frame-src 'self' https://*.razorpay.com https://api.razorpay.com https://checkout.razorpay.com; object-src 'none'; media-src 'self'; worker-src 'self'; manifest-src 'self';"
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    # Cache assets for 1 year
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    # Don't cache HTML
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/assets/index-*.js"
+  [headers.values]
+    # Cache JS chunks for 1 year
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/assets/index-*.css"
+  [headers.values]
+    # Cache CSS chunks for 1 year
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    # Cache SVGs for 1 week
+    Cache-Control = "public, max-age=604800"
+
+# Enable gzip compression
+[build.processing]
+  skip_processing = false
+[build.processing.css]
+  bundle = true
+  minify = true
+[build.processing.js]
+  bundle = true
+  minify = true
+[build.processing.html]
+  pretty_urls = true
+[build.processing.images]
+  compress = true
+
+# Environment variable configuration - define placeholders
+# Actual values should be set in the Netlify UI or dashboard
+[template.environment]
+  VITE_POCKETBASE_URL = "Your PocketBase backend URL, e.g., https://backend-pocketbase.example.com"
+  VITE_ENABLE_GOOGLE_AUTH = "Set to 'true' to enable Google sign-in, or 'false' to hide it"
+  VITE_LOGO_PATH = "Path to the logo file, e.g., /karigai-logo.webp"
+
+# Image optimization settings
+[[headers]]
+  for = "/*.webp"
+  [headers.values]
+    # Cache WebP images for 1 year
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/images/*"
+  [headers.values]
+    # Cache optimized images for 1 year
+    Cache-Control = "public, max-age=31536000, immutable"
+    # Add WebP content type negotiation
+    Vary = "Accept"
+
+# Cache the serverless function responses (image proxy)
+[[headers]]
+  for = "/.netlify/functions/image-proxy"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+    Vary = "Accept, Accept-Encoding, Origin, Content-Type"
+    
+# Set resource hints for better loading performance
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    # DNS Prefetching
+    Link = '''
+    </assets/index-*.js>; rel=preload; as=script,
+    </assets/index-*.css>; rel=preload; as=style,
+    <https://backend-pocketbase.7za6uc.easypanel.host>; rel=dns-prefetch
+    '''
+
+# Function bundling configuration
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  included_files = ["node_modules/sharp/**/*"] 

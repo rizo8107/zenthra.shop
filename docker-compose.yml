@@ -1,0 +1,54 @@
+version: "3.9"
+
+services:
+  frontend:
+    container_name: ecom-frontend
+    build:
+      context: "./Frontend"
+      dockerfile: Dockerfile
+      args:
+        VITE_POCKETBASE_URL: ${VITE_POCKETBASE_URL}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID}
+        VITE_RAZORPAY_KEY_SECRET: ${VITE_RAZORPAY_KEY_SECRET}
+        VITE_RAZORPAY_PROXY_URL: ${VITE_RAZORPAY_PROXY_URL}
+        VITE_RAZORPAY_PROXY_KEY: ${VITE_RAZORPAY_PROXY_KEY}
+        VITE_CRM_ORDER_ENDPOINT: ${VITE_CRM_ORDER_ENDPOINT}
+        VITE_SITE_TITLE: ${VITE_SITE_TITLE}
+        VITE_SITE_LOGO: ${VITE_SITE_LOGO}
+        VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+  cms:
+    container_name: ecom-cms
+    build:
+      context: "./Backend CMS"
+      dockerfile: Dockerfile
+      args:
+        VITE_POCKETBASE_URL: ${VITE_POCKETBASE_URL}
+        POCKETBASE_ADMIN_EMAIL: ${POCKETBASE_ADMIN_EMAIL}
+        POCKETBASE_ADMIN_PASSWORD: ${POCKETBASE_ADMIN_PASSWORD}
+        VITE_RAZORPAY_KEY_ID: ${VITE_RAZORPAY_KEY_ID}
+        RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
+        VITE_SITE_TITLE: ${VITE_SITE_TITLE}
+        VITE_SITE_LOGO: ${VITE_SITE_LOGO}
+        EMAIL_HOST: ${EMAIL_HOST}
+        EMAIL_PORT: ${EMAIL_PORT}
+        EMAIL_USER: ${EMAIL_USER}
+        EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+        EMAIL_FROM: ${EMAIL_FROM}
+        SMTP_HOST: ${SMTP_HOST}
+        SMTP_PORT: ${SMTP_PORT}
+        SMTP_SECURE: ${SMTP_SECURE}
+        SMTP_USER: ${SMTP_USER}
+        SMTP_PASSWORD: ${SMTP_PASSWORD}
+        VITE_GEMINI_API_KEY: ${VITE_GEMINI_API_KEY}
+        VITE_WHATSAPP_API_URL: ${VITE_WHATSAPP_API_URL}
+    ports:
+      - "8081:8080"
+    restart: unless-stopped
+
+# Usage:
+# 1) Ensure .env at repo root contains all variables referenced above.
+# 2) docker compose up --build -d

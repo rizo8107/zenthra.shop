@@ -1,0 +1,15 @@
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store
+.cache
+.git
+.gitignore
+.vscode
+.DS_Store
+*.local
+.env*
+dist
+build
+coverage

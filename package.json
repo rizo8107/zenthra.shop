@@ -1,0 +1,24 @@
+{
+  "name": "ecom-unified-project",
+  "version": "1.0.0",
+  "description": "Unified E-commerce project with Frontend and Backend CMS",
+  "private": true,
+  "scripts": {
+    "verify": "node verify-setup.js",
+    "install:all": "cd \"Backend CMS\" && npm install && cd ../Frontend && npm install",
+    "dev": "concurrently --names \"FRONTEND,CMS\" -c \"blue,magenta\" \"npm run dev:frontend\" \"npm run dev:cms\"",
+    "dev:frontend": "cd Frontend && npm run dev",
+    "dev:cms": "cd \"Backend CMS\" && npm run dev",
+    "dev:with-servers": "concurrently --names \"FRONTEND,CMS,RAZORPAY,EMAIL\" -c \"blue,magenta,green,yellow\" \"npm run dev:frontend\" \"npm run dev:cms\" \"npm run dev:razorpay-server\" \"npm run dev:email-server\"",
+    "dev:razorpay-server": "cd Frontend && npm run dev:server",
+    "dev:email-server": "cd \"Backend CMS\" && npm run start:email-server",
+    "build": "npm run build:frontend && npm run build:cms",
+    "build:frontend": "cd Frontend && npm run build",
+    "build:cms": "cd \"Backend CMS\" && npm run build",
+    "build:all": "npm run build && npm run build:servers",
+    "build:servers": "cd Frontend && npm run build:server && cd ../\"Backend CMS\" && npm run build:server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}

@@ -1,0 +1,617 @@
+import { createContext, useContext, useEffect, useState } from 'react';
+import { Product, pocketbase } from '@/lib/pocketbase';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { deduplicateCartItems, isValidCartItem } from '@/utils/cartUtils';
+import { trackEcommerceEvent } from '@/utils/analytics';
+
+// Define a PocketBaseError interface to avoid using 'any'
+interface PocketBaseError {
+  message?: string;
+  status?: number;
+  data?: Record<string, unknown>;
+  response?: {
+    code?: number;
+    message?: string;
+    data?: Record<string, unknown>;
+  };
+}
+
+export interface CartItem {
+  productId: string;
+  product: Product;
+  quantity: number;
+  color: string;
+  options?: Record<string, string>;
+  unitPrice?: number;
+}
+
+interface CartContextType {
+  items: CartItem[];
+  addItem: (product: Product, quantity: number, color: string, options?: Record<string, string>, unitPrice?: number) => void;
+  removeItem: (productId: string, color?: string, options?: Record<string, string>, unitPrice?: number) => void;
+  updateQuantity: (productId: string, quantity: number, color?: string, options?: Record<string, string>, unitPrice?: number) => void;
+  clearCart: () => void;
+  getItem: (productId: string, color?: string) => CartItem | undefined;
+  isLoading: boolean;
+  subtotal: number;
+  total: number;
+  itemCount: number;
+  isCartOpen: boolean;
+  setIsCartOpen: (isOpen: boolean) => void;
+}
+
+const CartContext = createContext<CartContextType | undefined>(undefined);
+
+const CART_STORAGE_KEY = 'konipai_cart';
+const SHIPPING_THRESHOLD = 100; // Free shipping over ₹100
+const SHIPPING_COST = 10;
+
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  const [items, setItems] = useState<CartItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const [isCartOpen, setIsCartOpen] = useState(false);
+
+  // Load cart from local storage and sync with server on mount or auth state change
+  useEffect(() => {
+    // Don't load cart while auth state is being determined
+    if (authLoading) return;
+
+    const loadCart = async () => {
+      try {
+        setIsLoading(true);
+        
+        // First, try to load from local storage
+        const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+        let localItems: CartItem[] = [];
+
+        if (savedCart && savedCart.trim() !== '') {
+          try {
+            const parsedCart = JSON.parse(savedCart);
+            if (Array.isArray(parsedCart)) {
+              // Validate cart items
+              localItems = parsedCart.filter(isValidCartItem);
+              
+              // Deduplicate local items based on productId+color
+              localItems = deduplicateCartItems(localItems);
+            } else {
+              console.warn('Local cart is not an array:', parsedCart);
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse local cart:', parseError);
+            localStorage.removeItem(CART_STORAGE_KEY);
+          }
+        }
+
+        // If user is authenticated, try to sync with server
+        if (user?.id) {
+          try {
+            // Catch for invalid or nonexistent cart
+            const serverCart = await pocketbase
+              .collection('carts')
+              .getFirstListItem(`user="${user.id}"`)
+              .catch(error => {
+                console.log('No existing cart found or error:', error);
+                return null;
+              });
+            
+            if (serverCart && serverCart.items && typeof serverCart.items === 'string' && serverCart.items.trim() !== '') {
+              try {
+                const serverItems = JSON.parse(serverCart.items);
+                
+                if (Array.isArray(serverItems)) {
+                  const validItems = serverItems.filter(isValidCartItem);
+                  
+                  // Deduplicate server items
+                  const deduplicatedServerItems = deduplicateCartItems(validItems);
+
+                  // If server has items, use those instead of local items
+                  if (deduplicatedServerItems.length > 0) {
+                    setItems(deduplicatedServerItems);
+                    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(deduplicatedServerItems));
+                    setIsLoading(false);
+                    return;
+                  }
+                } else {
+                  console.warn('Server cart items is not an array:', serverItems);
+                }
+              } catch (parseError) {
+                console.warn('Failed to parse server cart items:', parseError);
+              }
+            }
+          } catch (serverError) {
+            // Handle error but continue with local cart
+            console.warn('Error fetching server cart:', serverError);
+          }
+        }
+
+        // If we get here, either:
+        // 1. User is not authenticated
+        // 2. Server cart fetch failed
+        // 3. Server cart was empty or invalid
+        // Use the local items we loaded earlier
+        setItems(localItems);
+      } catch (error) {
+        console.error('Error loading cart:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load your cart. Please try refreshing the page.",
+        });
+        
+        // Attempt to use local storage cart as fallback
+        try {
+          const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+          if (savedCart) {
+            const parsedCart = JSON.parse(savedCart);
+            if (Array.isArray(parsedCart)) {
+              setItems(parsedCart);
+            }
+          }
+        } catch (e) {
+          console.error('Could not load fallback cart:', e);
+          // Initialize empty cart when all else fails
+          setItems([]);
+        }
+      } finally {
+        // Always set loading to false to prevent UI from being stuck in loading state
+        setIsLoading(false);
+      }
+    };
+
+    // Execute cart loading
+    loadCart();
+  }, [user, authLoading, toast]);
+
+  const calculateTotals = (cartItems: CartItem[]) => {
+    const subtotal = cartItems.reduce((sum, item) => {
+      const price = typeof item.unitPrice === 'number' ? item.unitPrice : (Number(item.product.price) || 0);
+      const quantity = Number(item.quantity) || 0;
+      return sum + (price * quantity);
+    }, 0);
+
+    const shipping = subtotal >= SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+    const total = subtotal + shipping;
+
+    return { subtotal, shipping, total };
+  };
+
+  // Sync cart with server whenever it changes
+  useEffect(() => {
+    // Don't sync while loading auth state
+    if (authLoading) return;
+
+    const syncCart = async () => {
+      // Validate and clean cart items
+      const validItems = items.filter(isValidCartItem);
+
+      // Deduplicate items before saving
+      const deduplicatedItems = deduplicateCartItems(validItems);
+      
+      // Always update local storage
+      try {
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(deduplicatedItems));
+      } catch (error) {
+        console.warn('Failed to save cart to local storage:', error);
+      }
+
+      // Only attempt to sync if user is authenticated
+      if (!user?.id) return;
+
+      try {
+        // Prepare cart items for server storage
+        const cartData = {
+          items: JSON.stringify(deduplicatedItems.map(item => ({
+            productId: item.productId,
+            product: {
+              id: item.product.id,
+              name: item.product.name,
+              price: item.product.price,
+              images: item.product.images,
+            },
+            quantity: item.quantity,
+            color: item.color,
+            options: item.options || {},
+            unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : undefined,
+          }))),
+          user: user.id,
+        };
+
+        // Add unique request key to prevent request cancellation issues
+        const requestOptions = {
+          $autoCancel: false,
+          requestKey: `syncCart_${Date.now()}`
+        };
+
+        // First check if the user has a cart - use the catch method to handle 404 cleanly
+        const userCart = await pocketbase
+          .collection('carts')
+          .getFirstListItem(`user="${user.id}"`, requestOptions)
+          .catch(() => null);
+
+        if (!userCart) {
+          // No cart exists, create a new one with retry logic
+          let retryCount = 0;
+          const maxRetries = 3;
+          
+          const createCartWithRetry = async () => {
+            try {
+              // Verify user exists before creating cart to prevent DrySubmit rule failure
+              try {
+                await pocketbase.collection('users').getOne(user.id);
+              } catch (userError: any) {
+                // User doesn't exist or is invalid - silently exit
+                if (userError?.status === 404) {
+                  console.log('User session is stale, cart sync skipped');
+                }
+                return; // Exit if user doesn't exist
+              }
+              
+              // Ensure cartData follows the exact expected schema
+              const cleanCartData = {
+                user: user.id, // This must be a valid user ID
+                items: JSON.stringify(deduplicatedItems.map(item => ({
+                  productId: item.productId,
+                  product: {
+                    id: item.product.id,
+                    name: item.product.name,
+                    price: item.product.price,
+                    images: Array.isArray(item.product.images) ? item.product.images : []
+                  },
+                  quantity: item.quantity,
+                  color: item.color || "",
+                  options: item.options || {},
+                  unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : undefined
+                })))
+              };
+              
+              // Special validation for DrySubmit
+              if (!cleanCartData.user || typeof cleanCartData.user !== 'string' || cleanCartData.user.trim() === '') {
+                console.error('Cannot create cart: Invalid user ID');
+                return;
+              }
+              
+              if (!cleanCartData.items || typeof cleanCartData.items !== 'string') {
+                console.error('Cannot create cart: Invalid items data');
+                return;
+              }
+              
+              console.log('Attempting to create cart with data:', {
+                user: cleanCartData.user,
+                items: `JSON string with ${deduplicatedItems.length} items`
+              });
+              
+              // Use more detailed error handling
+              await pocketbase.collection('carts').create(cleanCartData, requestOptions);
+              console.log('Created new cart for user');
+            } catch (error) {
+              const createError = error as PocketBaseError;
+              console.error('Cart creation error details:', {
+                message: createError?.message || 'Unknown error',
+                status: createError?.status,
+                data: createError?.data,
+                response: createError?.response
+              });
+              
+              if (retryCount < maxRetries - 1) {
+                retryCount++;
+                // Wait a bit before retrying (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+                return createCartWithRetry();
+              }
+            }
+          };
+          
+          await createCartWithRetry();
+        } else if (userCart.id) {
+          // Cart exists, update it with retry logic
+          let retryCount = 0;
+          const maxRetries = 3;
+          
+          const updateCartWithRetry = async () => {
+            try {
+              // Verify user exists before updating cart
+              try {
+                await pocketbase.collection('users').getOne(user.id);
+              } catch (userError) {
+                console.error('Cannot update cart: User verification failed', userError);
+                return; // Exit if user doesn't exist
+              }
+              
+              // Use the same clean data structure for updates
+              const cleanCartData = {
+                user: user.id,
+                items: JSON.stringify(deduplicatedItems.map(item => ({
+                  productId: item.productId,
+                  product: {
+                    id: item.product.id,
+                    name: item.product.name,
+                    price: item.product.price,
+                    images: Array.isArray(item.product.images) ? item.product.images : []
+                  },
+                  quantity: item.quantity,
+                  color: item.color || "",
+                  options: item.options || {},
+                  unitPrice: typeof item.unitPrice === 'number' ? item.unitPrice : undefined
+                })))
+              };
+              
+              // Special validation for DrySubmit
+              if (!cleanCartData.user || typeof cleanCartData.user !== 'string' || cleanCartData.user.trim() === '') {
+                console.error('Cannot update cart: Invalid user ID');
+                return;
+              }
+              
+              if (!cleanCartData.items || typeof cleanCartData.items !== 'string') {
+                console.error('Cannot update cart: Invalid items data');
+                return;
+              }
+              
+              if (!userCart.id || typeof userCart.id !== 'string' || userCart.id.trim() === '') {
+                console.error('Cannot update cart: Invalid cart ID');
+                return;
+              }
+            
+              console.log('Updating cart with data:', {
+                id: userCart.id,
+                user: cleanCartData.user,
+                items: `JSON string with ${deduplicatedItems.length} items`
+              });
+            
+              await pocketbase.collection('carts').update(userCart.id, cleanCartData, requestOptions);
+              console.log('Updated existing cart');
+            } catch (error) {
+              const updateError = error as PocketBaseError;
+              console.error('Cart update error details:', {
+                message: updateError?.message || 'Unknown error',
+                status: updateError?.status,
+                data: updateError?.data,
+                response: updateError?.response
+              });
+              
+              if (retryCount < maxRetries - 1) {
+                retryCount++;
+                // Wait a bit before retrying (exponential backoff)
+                await new Promise(resolve => setTimeout(resolve, 500 * Math.pow(2, retryCount)));
+                return updateCartWithRetry();
+              }
+            }
+          };
+          
+          await updateCartWithRetry();
+        }
+      } catch (error) {
+        console.warn('Error syncing cart with server:', error);
+      }
+    };
+
+    // Debounce the sync to avoid too many requests
+    const timeoutId = setTimeout(syncCart, 1000);
+    return () => clearTimeout(timeoutId);
+  }, [items, user, authLoading]);
+
+  const addItem = (product: Product, quantity: number, color: string, options: Record<string, string> = {}, unitPrice?: number) => {
+    if (!product || !product.id) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Could not add product to cart. Invalid product.",
+      });
+      return;
+    }
+
+    if (typeof quantity !== 'number' || quantity < 1) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Please select a valid quantity.",
+      });
+      return;
+    }
+
+    setItems((currentItems) => {
+      const optionsKey = (opts?: Record<string, string>) =>
+        Object.keys(opts || {})
+          .sort()
+          .map((k) => `${k}:${(opts as Record<string,string>)[k]}`)
+          .join('|');
+      // Check if item already exists in cart with same color
+      const existingItemIndex = currentItems.findIndex(
+        (item) => item.productId === product.id && item.color === color && optionsKey(item.options) === optionsKey(options) && (item.unitPrice ?? item.product.price) === (unitPrice ?? product.price)
+      );
+
+      let newItems;
+
+      if (existingItemIndex >= 0) {
+        // Update quantity if item exists
+        newItems = [...currentItems];
+        newItems[existingItemIndex] = {
+          ...newItems[existingItemIndex],
+          quantity: newItems[existingItemIndex].quantity + quantity,
+        };
+      } else {
+        // Add new item if it doesn't exist
+        newItems = [
+          ...currentItems,
+          {
+            productId: product.id,
+            product,
+            quantity,
+            color,
+            options,
+            unitPrice: typeof unitPrice === 'number' ? unitPrice : undefined,
+          },
+        ];
+      }
+
+      // Track the add to cart event for Google Analytics
+      const variantStr = [
+        color || '',
+        ...Object.keys(options || {}).sort().map((k) => `${k}:${(options as Record<string,string>)[k]}`)
+      ]
+        .filter(Boolean)
+        .join('|');
+
+      trackEcommerceEvent('add_to_cart', [{
+        item_id: product.id,
+        item_name: product.name,
+        price: typeof unitPrice === 'number' ? unitPrice : (Number(product.price) || 0),
+        quantity: quantity,
+        item_variant: variantStr || undefined
+      }]);
+
+      setIsCartOpen(true);
+
+      toast({
+        variant: "success",
+        title: "Added to Cart",
+        description: `${product.name} x${quantity} added to your cart.`,
+      });
+
+      return newItems;
+    });
+  };
+
+  const removeItem = (productId: string, color?: string, options?: Record<string,string>, unitPrice?: number) => {
+    setItems((currentItems) => {
+      const optionsKey = (opts?: Record<string, string>) =>
+        Object.keys(opts || {}).sort().map(k => `${k}:${(opts as Record<string,string>)[k]}`).join('|');
+      const target = currentItems.find(item => 
+        item.productId === productId && 
+        (color ? item.color === color : true) &&
+        (typeof unitPrice === 'number' ? (item.unitPrice ?? item.product.price) === unitPrice : true) &&
+        optionsKey(item.options) === optionsKey(options)
+      );
+
+      if (target) {
+        const variantStr = [
+          target.color || '',
+          ...Object.keys(target.options || {}).sort().map(k => `${k}:${(target.options as Record<string,string>)[k]}`)
+        ].filter(Boolean).join('|');
+        trackEcommerceEvent('remove_from_cart', [{
+          item_id: target.productId,
+          item_name: target.product.name,
+          price: typeof target.unitPrice === 'number' ? target.unitPrice : (Number(target.product.price) || 0),
+          quantity: target.quantity,
+          item_variant: variantStr || undefined
+        }]);
+      }
+
+      return currentItems.filter(item => {
+        const keyMatch = item.productId === productId &&
+          (color ? item.color === color : true) &&
+          (typeof unitPrice === 'number' ? (item.unitPrice ?? item.product.price) === unitPrice : true) &&
+          optionsKey(item.options) === optionsKey(options);
+        return !keyMatch;
+      });
+    });
+  };
+
+  const updateQuantity = (productId: string, quantity: number, color?: string, options?: Record<string,string>, unitPrice?: number) => {
+    if (quantity < 1) {
+      removeItem(productId, color, options, unitPrice);
+      return;
+    }
+
+    setItems((currentItems) => {
+      const optionsKey = (opts?: Record<string, string>) =>
+        Object.keys(opts || {}).sort().map(k => `${k}:${(opts as Record<string,string>)[k]}`).join('|');
+      const existingItem = currentItems.find(item => 
+        item.productId === productId &&
+        (color ? item.color === color : true) &&
+        (typeof unitPrice === 'number' ? (item.unitPrice ?? item.product.price) === unitPrice : true) &&
+        optionsKey(item.options) === optionsKey(options)
+      );
+      const oldQuantity = existingItem ? existingItem.quantity : 0;
+      
+      const newItems = currentItems.map((item) => {
+        const isTarget = item.productId === productId &&
+          (color ? item.color === color : true) &&
+          (typeof unitPrice === 'number' ? (item.unitPrice ?? item.product.price) === unitPrice : true) &&
+          optionsKey(item.options) === optionsKey(options);
+        return isTarget ? { ...item, quantity } : item;
+      });
+      
+      if (existingItem && quantity !== oldQuantity) {
+        // Track quantity update in Google Analytics
+        if (quantity > oldQuantity) {
+          // Added more items
+          trackEcommerceEvent('add_to_cart', [{
+            item_id: existingItem.productId, 
+            item_name: existingItem.product.name,
+            price: typeof existingItem.unitPrice === 'number' ? existingItem.unitPrice : (Number(existingItem.product.price) || 0),
+            quantity: quantity - oldQuantity,
+            item_variant: [
+              existingItem.color || '',
+              ...Object.keys(existingItem.options || {}).sort().map(k => `${k}:${(existingItem.options as Record<string,string>)[k]}`)
+            ].filter(Boolean).join('|') || undefined
+          }]);
+        } else {
+          // Removed some items
+          trackEcommerceEvent('remove_from_cart', [{
+            item_id: existingItem.productId,
+            item_name: existingItem.product.name,
+            price: typeof existingItem.unitPrice === 'number' ? existingItem.unitPrice : (Number(existingItem.product.price) || 0),
+            quantity: oldQuantity - quantity,
+            item_variant: [
+              existingItem.color || '',
+              ...Object.keys(existingItem.options || {}).sort().map(k => `${k}:${(existingItem.options as Record<string,string>)[k]}`)
+            ].filter(Boolean).join('|') || undefined
+          }]);
+        }
+      }
+      
+      return newItems;
+    });
+  };
+
+  const clearCart = () => {
+    // Don't track this in analytics since it's usually after checkout or other events
+    setItems([]);
+  };
+
+  const getItem = (productId: string, color?: string): CartItem | undefined => {
+    return items.find(item => 
+      item.productId === productId &&
+      (!color || item.color === color)
+    );
+  };
+
+  const { subtotal, total } = calculateTotals(items);
+
+  const itemCount = items.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0),
+    0
+  );
+
+  const value = {
+    items,
+    addItem,
+    removeItem,
+    updateQuantity,
+    clearCart,
+    getItem,
+    isLoading,
+    subtotal,
+    total,
+    itemCount,
+    isCartOpen,
+    setIsCartOpen,
+  };
+
+  return (
+    <CartContext.Provider value={value}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+export function useCart() {
+  const context = useContext(CartContext);
+  if (context === undefined) {
+    throw new Error('useCart must be used within a CartProvider');
+  }
+  return context;
+}
