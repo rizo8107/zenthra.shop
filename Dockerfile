@@ -1,18 +1,12 @@
-# Root Dockerfile building the Frontend app
+########################################
+# Monolithic image: Frontend + CMS
+########################################
 
-# ---------- Build stage ----------
-FROM node:18-alpine AS builder
-
-# Set workdir to the Frontend subfolder
+# ---------- Frontend build ----------
+FROM node:18-alpine AS fe-builder
 WORKDIR /app/Frontend
-
-# Copy only package files first (better cache)
 COPY Frontend/package*.json ./
-
-# Install deps
 RUN npm ci --production=false
-
-# Copy the rest of the Frontend source
 COPY Frontend/ ./
 
 # Build args for Vite
@@ -25,8 +19,6 @@ ARG VITE_CRM_ORDER_ENDPOINT
 ARG VITE_SITE_TITLE
 ARG VITE_SITE_LOGO
 ARG VITE_GOOGLE_MAPS_API_KEY
-
-# Expose as env during build so Vite can pick them up
 ENV VITE_POCKETBASE_URL=${VITE_POCKETBASE_URL}
 ENV VITE_RAZORPAY_KEY_ID=${VITE_RAZORPAY_KEY_ID}
 ENV VITE_RAZORPAY_KEY_SECRET=${VITE_RAZORPAY_KEY_SECRET}
@@ -36,19 +28,40 @@ ENV VITE_CRM_ORDER_ENDPOINT=${VITE_CRM_ORDER_ENDPOINT}
 ENV VITE_SITE_TITLE=${VITE_SITE_TITLE}
 ENV VITE_SITE_LOGO=${VITE_SITE_LOGO}
 ENV VITE_GOOGLE_MAPS_API_KEY=${VITE_GOOGLE_MAPS_API_KEY}
-
-# Build the Vite app
 RUN npm run build
 
-# ---------- Runtime stage ----------
-FROM nginx:alpine
+# ---------- CMS build ----------
+FROM node:20-alpine AS cms-builder
+WORKDIR /app/BackendCMS
+COPY "Backend CMS"/package*.json ./
+RUN npm ci --production=false
+COPY "Backend CMS"/ ./
+RUN npm run build && npm run build:server
+RUN npm prune --production
 
-# Copy build output
-COPY --from=builder /app/Frontend/dist /usr/share/nginx/html
+# ---------- Final runtime ----------
+FROM node:20-alpine
+RUN apk add --no-cache nginx
 
-# Copy Nginx config from the Frontend folder if present, otherwise use default
-# Expect a file named nginx.conf under Frontend/
-COPY Frontend/nginx.conf /etc/nginx/conf.d/default.conf
+# Create dirs
+RUN mkdir -p /usr/share/nginx/html /var/log/nginx /run/nginx /srv/cms
+
+# Copy Frontend build
+COPY --from=fe-builder /app/Frontend/dist /usr/share/nginx/html
+
+# Copy CMS runtime
+COPY --from=cms-builder /app/BackendCMS/dist-server /srv/cms/dist-server
+COPY --from=cms-builder /app/BackendCMS/node_modules /srv/cms/node_modules
+COPY --from=cms-builder /app/BackendCMS/package*.json /srv/cms/
+
+# Nginx config with API proxy
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Environment
+ENV NODE_ENV=production \
+    CMS_PORT=3003
 
 EXPOSE 80
-CMD ["nginx", "-g", "daemon off;"]
+
+# Start CMS (Node) then run Nginx in foreground
+CMD sh -c "node /srv/cms/dist-server/server/index.js --port $CMS_PORT & nginx -g 'daemon off;'"
