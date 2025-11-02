@@ -1,5 +1,5 @@
 import express from 'express';
-import { sendEmail, sendEmailWithAttachment, checkEmailConnection } from '../server/emailService';
+import { sendEmail, sendEmailWithAttachment, checkEmailConnection } from '../server/emailService.js';
 import PocketBase from 'pocketbase';
 import axios from 'axios';
 import { exec } from 'child_process';
