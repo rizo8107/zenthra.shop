@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import { pb, ensureAdminAuth } from '../lib/pocketbase.js';
+import { pb, ensureAdminAuth } from '@/lib/pocketbase';
 const router = express.Router();
 // In-memory storage for demo purposes (replace with database in production)
 let journeyEvents = [];

@@ -5,10 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "prebuild": "npm run optimize:images",
     "build": "vite build",
     "build:prod": "VITE_RAZORPAY_KEY_ID=rzp_live_YOUR_LIVE_KEY_HERE vite build --mode production",
-    "postbuild": "node scripts/optimize-build.js",
     "build:dev": "vite build --mode development",
     "build:type-check": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",

@@ -1,4 +1,4 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
 
@@ -9,7 +9,7 @@ const router = express.Router();
 
 // Get Razorpay credentials from environment variables
 const RAZORPAY_KEY_ID = process.env.VITE_RAZORPAY_KEY_ID || '';
-const RAZORPAY_KEY_SECRET = process.env.VITE_RAZORPAY_KEY_SECRET || '';
+const RAZORPAY_KEY_SECRET = process.env.VITE_RAZORPAY_KEY_SECRET || process.env.RAZORPAY_KEY_SECRET || '';
 
 // Create Basic Auth header for Razorpay API
 const RAZORPAY_AUTH = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).toString('base64');
@@ -18,12 +18,13 @@ const RAZORPAY_AUTH = Buffer.from(`${RAZORPAY_KEY_ID}:${RAZORPAY_KEY_SECRET}`).t
  * Create a new Razorpay order
  * POST /api/razorpay/create-order
  */
-router.post('/create-order', async (req, res) => {
+router.post('/create-order', async (req: Request, res: Response): Promise<void> => {
   try {
     const { amount, currency = 'INR', receipt, notes } = req.body;
     
     if (!amount) {
-      return res.status(400).json({ error: 'Amount is required' });
+      res.status(400).json({ error: 'Amount is required' });
+      return;
     }
     
     // Convert amount to paise if it's not already (Razorpay expects amount in paise)
@@ -71,12 +72,14 @@ router.post('/create-order', async (req, res) => {
     const order = await response.json();
     console.log('Successfully created Razorpay order:', order.id);
     
-    return res.status(200).json(order);
+    res.status(200).json(order);
+    return;
   } catch (error) {
     console.error('Error in create-order endpoint:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to create order'
     });
+    return;
   }
 });
 
@@ -84,12 +87,13 @@ router.post('/create-order', async (req, res) => {
  * Verify a Razorpay payment
  * POST /api/razorpay/verify-payment
  */
-router.post('/verify-payment', async (req, res) => {
+router.post('/verify-payment', async (req: Request, res: Response): Promise<void> => {
   try {
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
     
     if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ error: 'Missing required parameters' });
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
     }
     
     // Create the data string that was used to generate the signature
@@ -105,7 +109,8 @@ router.post('/verify-payment', async (req, res) => {
     const isValid = expectedSignature === razorpay_signature;
     
     if (!isValid) {
-      return res.status(400).json({ error: 'Invalid payment signature' });
+      res.status(400).json({ error: 'Invalid payment signature' });
+      return;
     }
     
     // Get payment details from Razorpay
@@ -129,11 +134,13 @@ router.post('/verify-payment', async (req, res) => {
       success: true,
       payment: paymentDetails
     });
+    return;
   } catch (error) {
     console.error('Error in verify-payment endpoint:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to verify payment'
     });
+    return;
   }
 });
 
@@ -141,14 +148,15 @@ router.post('/verify-payment', async (req, res) => {
  * Capture a Razorpay payment
  * POST /api/razorpay/capture-payment
  */
-router.post('/capture-payment', async (req, res) => {
+router.post('/capture-payment', async (req: Request, res: Response): Promise<void> => {
   try {
     const { payment_id, amount } = req.body;
     
     console.log('Capture payment request received:', { payment_id, amount });
     
     if (!payment_id) {
-      return res.status(400).json({ error: 'Payment ID is required' });
+      res.status(400).json({ error: 'Payment ID is required' });
+      return;
     }
     
     // Convert amount to paise if provided
@@ -195,11 +203,13 @@ router.post('/capture-payment', async (req, res) => {
       status: payment.status,
       payment
     });
+    return;
   } catch (error) {
     console.error('Error in capture-payment endpoint:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to capture payment'
     });
+    return;
   }
 });
 
@@ -207,12 +217,13 @@ router.post('/capture-payment', async (req, res) => {
  * Refund a Razorpay payment
  * POST /api/razorpay/refund-payment
  */
-router.post('/refund-payment', async (req, res) => {
+router.post('/refund-payment', async (req: Request, res: Response): Promise<void> => {
   try {
     const { payment_id, amount } = req.body;
     
     if (!payment_id) {
-      return res.status(400).json({ error: 'Payment ID is required' });
+      res.status(400).json({ error: 'Payment ID is required' });
+      return;
     }
     
     // Convert amount to paise if provided
@@ -247,11 +258,13 @@ router.post('/refund-payment', async (req, res) => {
       success: true,
       refund
     });
+    return;
   } catch (error) {
     console.error('Error in refund-payment endpoint:', error);
     res.status(500).json({
       error: error instanceof Error ? error.message : 'Failed to refund payment'
     });
+    return;
   }
 });
 

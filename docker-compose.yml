@@ -23,7 +23,7 @@ services:
   cms:
     container_name: ecom-cms
     build:
-      context: "./Backend CMS"
+      context: "./Backend"
       dockerfile: Dockerfile
       args:
         VITE_POCKETBASE_URL: ${VITE_POCKETBASE_URL}

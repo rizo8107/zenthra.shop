@@ -60,11 +60,11 @@ if (fs.existsSync(path.join(__dirname, 'Frontend', 'node_modules'))) {
   checks.warnings.push('⚠️  Frontend dependencies not installed - Run: npm run install:all');
 }
 
-// Check Backend CMS
-if (fs.existsSync(path.join(__dirname, 'Backend CMS', 'node_modules'))) {
-  checks.passed.push('✅ Backend CMS dependencies installed');
+// Check Backend
+if (fs.existsSync(path.join(__dirname, 'Backend', 'node_modules'))) {
+  checks.passed.push('✅ Backend dependencies installed');
 } else {
-  checks.warnings.push('⚠️  Backend CMS dependencies not installed - Run: npm run install:all');
+  checks.warnings.push('⚠️  Backend dependencies not installed - Run: npm run install:all');
 }
 
 console.log('\n🔧 Checking Environment Configuration...');
@@ -115,23 +115,23 @@ if (rootEnv) {
 
 // Warn about old individual .env files
 const frontendEnvPath = path.join(__dirname, 'Frontend', '.env');
-const cmsEnvPath = path.join(__dirname, 'Backend CMS', '.env');
+const cmsEnvPath = path.join(__dirname, 'Backend', '.env');
 
 if (fs.existsSync(frontendEnvPath)) {
   checks.warnings.push('⚠️  Frontend/.env file found - please remove it, use root .env instead');
 }
 
 if (fs.existsSync(cmsEnvPath)) {
-  checks.warnings.push('⚠️  Backend CMS/.env file found - please remove it, use root .env instead');
+  checks.warnings.push('⚠️  Backend/.env file found - please remove it, use root .env instead');
 }
 
 console.log('\n📁 Checking Project Structure...');
 
 // Check key directories
 checkFile(path.join(__dirname, 'Frontend', 'src'), 'Frontend source directory exists');
-checkFile(path.join(__dirname, 'Backend CMS', 'src'), 'Backend CMS source directory exists');
+checkFile(path.join(__dirname, 'Backend', 'src'), 'Backend source directory exists');
 checkFile(path.join(__dirname, 'Frontend', 'package.json'), 'Frontend package.json exists');
-checkFile(path.join(__dirname, 'Backend CMS', 'package.json'), 'Backend CMS package.json exists');
+checkFile(path.join(__dirname, 'Backend', 'package.json'), 'Backend package.json exists');
 
 // Check for PocketBase directory
 if (fs.existsSync(path.join(__dirname, 'PocketBase'))) {
@@ -192,5 +192,5 @@ console.log('\n📚 Documentation:');
 console.log('   - Complete setup guide: SETUP.md');
 console.log('   - Project overview: README.md');
 console.log('   - Frontend docs: Frontend/README.md');
-console.log('   - Backend CMS docs: Backend CMS/README.md');
+console.log('   - Backend docs: Backend/README.md');
 console.log('');
