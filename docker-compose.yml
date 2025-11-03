@@ -15,8 +15,8 @@ services:
         VITE_GOOGLE_MAPS_API_KEY: ${VITE_GOOGLE_MAPS_API_KEY}
         VITE_ZENTHRA_FRONTEND_URL: ${VITE_ZENTHRA_FRONTEND_URL}
         VITE_ZENTHRA_AUTH_PATH: ${VITE_ZENTHRA_AUTH_PATH}
-    ports:
-      - "8080:80"
+    expose:
+      - "80"
     restart: unless-stopped
 
   cms:
@@ -31,8 +31,8 @@ services:
         VITE_EVOLUTION_API_KEY: ${VITE_EVOLUTION_API_KEY}
         VITE_EVOLUTION_API_URL: ${VITE_EVOLUTION_API_URL}
         VITE_EVOLUTION_INSTANCE_NAME: ${VITE_EVOLUTION_INSTANCE_NAME}
-    ports:
-      - "4000:8080"
+    expose:
+      - "8080"
     restart: unless-stopped
 
 # Usage:
