@@ -75,5 +75,5 @@ RUN npm prune --production
 ENV PORT=8080
 EXPOSE 8080
 
-# Start static file server only (shell form to expand PORT)
-CMD ["sh", "-c", "npx serve -s dist -l ${PORT}"]
+# Start static file server only (bind to all interfaces for Traefik)
+CMD ["sh", "-c", "npx serve -s dist -l tcp://0.0.0.0:${PORT}"]
