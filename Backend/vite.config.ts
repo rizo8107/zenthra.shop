@@ -24,6 +24,7 @@ export default defineConfig(({ mode }) => {
   // Base config
   const config: UserConfig = {
     envDir: path.resolve(__dirname, '..'), // Use root .env file
+    base: mode === 'production' ? '/cms/' : '/',
     server: {
       host: "::",
       port: 8080,
