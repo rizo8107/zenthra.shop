@@ -24,7 +24,10 @@ export default defineConfig(({ mode }) => {
   // Base config
   const config: UserConfig = {
     envDir: path.resolve(__dirname, '..'), // Use root .env file
-    base: mode === 'production' ? '/cms/' : '/',
+    // Allow overriding base via env var. Defaults:
+    // - production: '/' (served on its own origin)
+    // - development: '/'
+    base: env.VITE_CMS_BASE || '/',
     server: {
       host: "::",
       port: 8080,
