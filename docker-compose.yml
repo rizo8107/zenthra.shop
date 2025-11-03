@@ -18,6 +18,17 @@ services:
     expose:
       - "80"
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.front-web.rule=Host(`karigaistore.in`)
+      - traefik.http.routers.front-web.entrypoints=web
+      - traefik.http.routers.front-websecure.rule=Host(`karigaistore.in`)
+      - traefik.http.routers.front-websecure.entrypoints=websecure
+      - traefik.http.routers.front-websecure.tls.certresolver=letsencrypt
+      - traefik.http.services.front.loadbalancer.server.port=80
+    networks:
+      - dokploy-network
 
   cms:
     build:
@@ -36,7 +47,26 @@ services:
     expose:
       - "8080"
     restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=dokploy-network
+      - traefik.http.routers.cms-web.rule=Host(`admin.karigaistore.in`)
+      - traefik.http.routers.cms-web.entrypoints=web
+      - traefik.http.routers.cms-websecure.rule=Host(`admin.karigaistore.in`)
+      - traefik.http.routers.cms-websecure.entrypoints=websecure
+      - traefik.http.routers.cms-websecure.tls.certresolver=letsencrypt
+      - traefik.http.services.cms.loadbalancer.server.port=8080
+    networks:
+      - dokploy-network
 
+# Usage:
+# 1) Ensure .env at repo root contains all variables referenced above.
+# 2) docker compose up --build -d
+#    Frontend: http://localhost:8080
+#    CMS:      http://localhost:4000
+networks:
+  dokploy-network:
+    external: true
 # Usage:
 # 1) Ensure .env at repo root contains all variables referenced above.
 # 2) docker compose up --build -d
