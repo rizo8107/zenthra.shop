@@ -15,7 +15,8 @@ const joinUrl = (base: string, path: string) => {
 };
 
 export const ZenthraEmbed: React.FC<ZenthraEmbedProps> = ({ path, title, iframeId, maxHeightVh = 86 }) => {
-  const base = (import.meta.env.VITE_ZENTHRA_FRONTEND_URL as string) || 'https://zenthra.shop';
+  const baseEnv = (import.meta.env.VITE_ZENTHRA_FRONTEND_URL as string | undefined);
+  const base = (baseEnv && baseEnv.trim().length > 0) ? baseEnv : (typeof window !== 'undefined' ? window.location.origin : '');
   const src = useMemo(() => joinUrl(base, path), [base, path]);
   const frameRef = useRef<HTMLIFrameElement | null>(null);
 
