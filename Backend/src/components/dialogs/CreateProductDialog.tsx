@@ -948,7 +948,7 @@ export function CreateProductDialog({
                                 </div>
                                 <div className="col-span-12 sm:col-span-2">
                                   {!s.useBasePrice && (
-                                    <Input type="number" value={s.sizePrice ?? '' as any} onChange={(e)=>{ const v=[...sizeRows]; v[i]={...v[i],sizePrice:e.target.value?Number(e.target.value):undefined}; setSizeRows(v); }} placeholder="Price" />
+                                    <Input className="w-28" type="number" value={s.sizePrice ?? '' as any} onChange={(e)=>{ const v=[...sizeRows]; v[i]={...v[i],sizePrice:e.target.value?Number(e.target.value):undefined}; setSizeRows(v); }} placeholder="Price" />
                                   )}
                                 </div>
                                 <div className="hidden sm:block col-span-1 text-xs text-muted-foreground">
