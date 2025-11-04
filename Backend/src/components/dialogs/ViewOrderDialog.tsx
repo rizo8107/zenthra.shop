@@ -342,7 +342,16 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
             <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500 via-green-500 to-lime-500 text-white shadow-sm">
               <CardContent className="p-4">
                 <p className="text-xs uppercase tracking-wide text-white/80">Items</p>
-                <p className="text-2xl font-semibold">{products.reduce((s, i) => s + (i.quantity || 0), 0)}</p>
+                <p className="text-2xl font-semibold">{
+                  products.reduce((s, i) => {
+                    const comboText = ((i as any).comboLabel || (i as any).combo || '') as string;
+                    const m = typeof comboText === 'string' ? comboText.match(/(\d+)\s*-\s*Pack/i) : null;
+                    const pack = m ? parseInt(m[1], 10) : NaN;
+                    const q = Number(i.quantity || 0);
+                    const sets = Number.isFinite(pack) && pack > 1 ? Math.max(1, Math.ceil(q / pack)) : q;
+                    return s + sets;
+                  }, 0)
+                }</p>
                 <p className="text-xs text-white/80">{products.length} SKU(s)</p>
               </CardContent>
             </Card>
@@ -503,7 +512,16 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                             <div>
                               <h4 className="font-medium text-base">{product.product?.name || (product as any).name || "Unknown Product"}</h4>
                               <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-600">Qty {product.quantity}</Badge>
+                                {(() => {
+                                  const comboText = (((product as any).comboLabel || (product as any).combo || '') as string);
+                                  const m = typeof comboText === 'string' ? comboText.match(/(\d+)\s*-\s*Pack/i) : null;
+                                  const pack = m ? parseInt(m[1], 10) : NaN;
+                                  const q = Number(product.quantity || 0);
+                                  const displayQty = Number.isFinite(pack) && pack > 1 ? Math.max(1, Math.round(q / pack)) : q;
+                                  return (
+                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-600">Qty {displayQty}</Badge>
+                                  );
+                                })()}
                                 {product.color && product.color.trim().length > 0 && (
                                   <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-600">{product.color}</Badge>
                                 )}

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, type TouchEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, type PointerEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
@@ -77,11 +77,23 @@ const ProductDetail = () => {
   const [lastVariantPick, setLastVariantPick] = useState<'size' | 'combo' | null>(null);
   const { toast } = useToast();
   const relatedLoaded = useRef(false);
-  // Touch swipe refs for mobile gallery
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-  const touchStartTime = useRef<number>(0);
-  const touchActive = useRef<boolean>(false);
+  // Pointer swipe refs for mobile gallery
+  const swipeStartX = useRef<number | null>(null);
+  const swipeStartY = useRef<number | null>(null);
+  const swipeStartTime = useRef<number>(0);
+  const swipeActive = useRef<boolean>(false);
+  const isSwiping = useRef<boolean>(false);
+  const activePointerId = useRef<number | null>(null);
+
+  // Disable swipe on iOS Safari to avoid scroll locking issues
+  const swipeDisabled = useMemo(() => {
+    if (typeof navigator === 'undefined') return false;
+    const ua = navigator.userAgent || navigator.vendor || '';
+    const isIOSDevice = /iPad|iPhone|iPod/.test(ua);
+    const navCaps = navigator as unknown as { maxTouchPoints?: number };
+    const isMacTouch = ua.includes('Mac') && ((navCaps.maxTouchPoints ?? 0) > 1);
+    return isIOSDevice || isMacTouch;
+  }, []);
 
   // Active image index for pager dots (uses variant-aware images)
   const currentIndex = useMemo(() => {
@@ -568,46 +580,74 @@ const ProductDetail = () => {
     preloadHighRes();
   };
 
-  // Touch handlers to enable swipe on mobile
-  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
-    const t = e.touches[0];
-    touchStartX.current = t.clientX;
-    touchStartY.current = t.clientY;
-    touchStartTime.current = Date.now();
-    touchActive.current = true;
+  // Pointer handlers to enable swipe on mobile
+  const handlePointerDown = (e: PointerEvent<HTMLDivElement>) => {
+    if (swipeDisabled) return;
+    if (e.pointerType !== 'touch') return;
+    const tgt = e.target as HTMLElement;
+    if (tgt && tgt.closest('[data-no-swipe="true"]')) return;
+    swipeStartX.current = e.clientX;
+    swipeStartY.current = e.clientY;
+    swipeStartTime.current = Date.now();
+    swipeActive.current = true;
+    isSwiping.current = false;
+    activePointerId.current = e.pointerId;
   };
 
-  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
-    if (!touchActive.current || touchStartX.current === null || touchStartY.current === null) return;
-    const t = e.touches[0];
-    const dx = t.clientX - touchStartX.current;
-    const dy = t.clientY - touchStartY.current;
-    // If horizontal movement dominates, prevent vertical scroll for a better swipe experience
-    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
-      e.preventDefault();
+  const handlePointerMove = (e: PointerEvent<HTMLDivElement>) => {
+    if (swipeDisabled) return;
+    if (e.pointerType !== 'touch') return;
+    if (!swipeActive.current || swipeStartX.current === null || swipeStartY.current === null) return;
+    if (activePointerId.current !== null && e.pointerId !== activePointerId.current) return;
+    const dx = e.clientX - swipeStartX.current;
+    const dy = e.clientY - swipeStartY.current;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+    // Small deadzone to avoid accidental taps causing jitter
+    if (!isSwiping.current && absX < 6 && absY < 6) {
+      return;
     }
+    // If the user clearly scrolls vertically, abandon swipe
+    if (!isSwiping.current && absY > absX && absY > 16) {
+      swipeActive.current = false;
+      isSwiping.current = false;
+      return;
+    }
+    // Decide swipe only when clearly horizontal and above a sensible threshold
+    if (!isSwiping.current && absX > 24 && absX > absY * 1.5) {
+      isSwiping.current = true;
+    }
+    // Note: no preventDefault; rely on CSS touch-action to keep vertical scroll smooth
   };
 
-  const handleTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
-    if (!touchActive.current || touchStartX.current === null) return;
+  const handlePointerUp = (e: PointerEvent<HTMLDivElement>) => {
+    if (swipeDisabled) return;
+    if (e.pointerType !== 'touch') return;
+    if (!swipeActive.current || swipeStartX.current === null) return;
     const endTime = Date.now();
-    const duration = endTime - touchStartTime.current;
-    const changed = e.changedTouches[0];
-    const dx = changed.clientX - touchStartX.current;
-    const threshold = 50; // pixels
+    const duration = endTime - swipeStartTime.current;
+    const dx = e.clientX - swipeStartX.current;
+    const threshold = 90; // pixels
     const maxDuration = 600; // ms
-    touchActive.current = false;
-    touchStartX.current = null;
-    touchStartY.current = null;
-    if (Math.abs(dx) >= threshold && duration <= maxDuration) {
-      if (dx < 0) {
-        // swipe left -> next image
-        handleNextImage();
-      } else {
-        // swipe right -> prev image
-        handlePrevImage();
-      }
+    const shouldHandle = isSwiping.current && Math.abs(dx) >= threshold && duration <= maxDuration;
+    swipeActive.current = false;
+    isSwiping.current = false;
+    swipeStartX.current = null;
+    swipeStartY.current = null;
+    activePointerId.current = null;
+    if (shouldHandle) {
+      if (dx < 0) handleNextImage();
+      else handlePrevImage();
     }
+  };
+
+  const handlePointerCancel = () => {
+    if (swipeDisabled) return;
+    swipeActive.current = false;
+    isSwiping.current = false;
+    swipeStartX.current = null;
+    swipeStartY.current = null;
+    activePointerId.current = null;
   };
 
   if (loading) {
@@ -871,10 +911,12 @@ const ProductDetail = () => {
           <div className="lg:sticky lg:top-20 space-y-4 pt-0 md:pt-4">
             {/* Main Image View */}
             <div
-              className="relative bg-white lg:bg-card rounded-b-3xl md:rounded-xl overflow-hidden group shadow-md md:shadow-lg transition-shadow duration-300"
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
+              className="relative bg-white lg:bg-card rounded-b-3xl md:rounded-xl overflow-hidden group shadow-md md:shadow-lg transition-shadow duration-300 touch-pan-y overscroll-contain select-none"
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerCancel}
+              onPointerLeave={handlePointerCancel}
             >
               {selectedImage ? (
                 <>
@@ -882,7 +924,7 @@ const ProductDetail = () => {
                     key={selectedImage || 'main-image'}
                     url={selectedImage}
                     alt={product?.name || 'Product image'}
-                    className="w-full h-full object-cover aspect-square"
+                    className="w-full h-full object-cover aspect-square select-none pointer-events-none touch-pan-y"
                     priority={true}
                     width={600}
                     height={600}
@@ -894,13 +936,14 @@ const ProductDetail = () => {
                     type="button"
                     onClick={() => navigate(-1)}
                     className="md:hidden absolute left-3 top-3 h-9 w-9 rounded-full bg-white/90 shadow grid place-items-center text-foreground"
+                    data-no-swipe="true"
                     aria-label="Go back"
                   >
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   {/* Mobile image pager: dots with active rectangle */}
                   {displayImages?.length ? (
-                    <div className="md:hidden absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-white/80 shadow ring-1 ring-black/5 flex items-center gap-1.5">
+                    <div className="md:hidden absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-white/80 shadow ring-1 ring-black/5 flex items-center gap-1.5" data-no-swipe="true">
                       {displayImages.map((img, i) => (
                         <button
                           key={img || i}
@@ -911,6 +954,7 @@ const ProductDetail = () => {
                             "rounded-full transition-all",
                             currentIndex === i ? "h-1.5 w-8 bg-gray-700" : "h-1 w-1 bg-gray-400/80"
                           )}
+                          data-no-swipe="true"
                         />
                       ))}
                     </div>
@@ -922,6 +966,7 @@ const ProductDetail = () => {
                       "hidden md:block absolute top-4 right-4 bg-background/80 text-foreground backdrop-blur-sm p-2 rounded-full shadow-lg hover:bg-background",
                       isWishlisted ? "text-destructive" : "text-muted-foreground hover:text-foreground"
                     )}
+                    data-no-swipe="true"
                     title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
                   >
                     <Heart className="h-5 w-5" fill={isWishlisted ? "currentColor" : "none"} />
@@ -929,6 +974,7 @@ const ProductDetail = () => {
                   <button
                     onClick={handleShare}
                     className="hidden md:block absolute top-4 left-4 bg-background/80 text-foreground backdrop-blur-sm p-2 rounded-full shadow-lg hover:bg-background"
+                    data-no-swipe="true"
                     title="Share product"
                   >
                     <Share2 className="h-5 w-5" />
@@ -944,7 +990,7 @@ const ProductDetail = () => {
             {/* Mobile horizontal thumbnails */}
             {displayImages?.length ? (
               <div className="md:hidden px-3 pt-3">
-                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label="Product thumbnails">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1 touch-pan-x overscroll-x-contain" aria-label="Product thumbnails">
                   {displayImages.map((image, index) => (
                     <button
                       key={image || index}
@@ -959,7 +1005,7 @@ const ProductDetail = () => {
                       <ProductImage
                         url={image}
                         alt={`${product.name} ${index + 1}`}
-                        className="w-16 h-16 object-cover"
+                        className="w-16 h-16 object-cover select-none touch-pan-x"
                         width={64}
                         height={64}
                         size="thumbnail"

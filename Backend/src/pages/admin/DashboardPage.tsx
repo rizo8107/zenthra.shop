@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
-import { MetricsGrid } from '@/components/dashboard/DashboardMetrics';
 import { OrdersTable } from '@/components/orders/OrdersTable';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
 import { DashboardMetrics, Order, OrderStatus, ProductSalesSummary } from '@/lib/types';
@@ -16,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ShoppingBag, Clock, Check, DollarSign, TrendingUp, Calendar } from 'lucide-react';
 
 const DashboardPage: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -186,7 +185,74 @@ const DashboardPage: React.FC = () => {
         </div>
 
         <TabsContent value="overview" className="space-y-6">
-          <MetricsGrid metrics={metrics} isLoading={isLoading} />
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-primary via-primary/90 to-purple-600 text-primary-foreground shadow-lg">
+              <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
+              <CardHeader className="pb-2">
+                <CardDescription className="text-white/70">Total Orders</CardDescription>
+                <CardTitle className="text-3xl font-semibold text-white flex items-center gap-2">
+                  <ShoppingBag className="h-5 w-5 opacity-90" />
+                  {metrics ? metrics.total_orders : '—'}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-white/80">All time orders</CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white shadow-lg">
+              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
+                <Clock className="h-5 w-5" />
+              </div>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-white/70">Pending Orders</CardDescription>
+                <CardTitle className="text-3xl font-semibold">{metrics ? metrics.pending_orders : '—'}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-white/80">Need attention</CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg">
+              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
+                <Check className="h-5 w-5" />
+              </div>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-white/70">Completed Orders</CardDescription>
+                <CardTitle className="text-3xl font-semibold">{metrics ? metrics.completed_orders : '—'}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-white/80">Successfully delivered</CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-600 text-white shadow-lg">
+              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
+                <DollarSign className="h-5 w-5" />
+              </div>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-white/70">Total Revenue</CardDescription>
+                <CardTitle className="text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.total_revenue) : '—'}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-white/80">vs last month</CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-teal-500 via-cyan-500 to-sky-500 text-white shadow-lg">
+              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-white/70">Average Order Value</CardDescription>
+                <CardTitle className="text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.average_order_value) : '—'}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-white/80">vs last month</CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-600 text-white shadow-lg">
+              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
+                <Calendar className="h-5 w-5" />
+              </div>
+              <CardHeader className="pb-2">
+                <CardDescription className="text-white/70">Revenue Today</CardDescription>
+                <CardTitle className="text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.revenue_today) : '—'}</CardTitle>
+              </CardHeader>
+              <CardContent className="text-xs text-white/80">From today's orders</CardContent>
+            </Card>
+          </div>
 
           <Card>
             <CardHeader>
