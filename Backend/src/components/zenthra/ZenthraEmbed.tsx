@@ -32,15 +32,7 @@ export const ZenthraEmbed: React.FC<ZenthraEmbedProps> = ({ path, title, iframeI
         frameRef.current.style.height = `${height}px`;
       }
 
-      if (d.type === 'ZENTHRA_EMBED_READY') {
-        const token = pb.authStore.token;
-        const model = pb.authStore.model;
-        frameRef.current?.contentWindow?.postMessage({ type: 'ZENTHRA_EMBED_AUTH', token, model }, '*');
-      }
-
-      if (d.type === 'ZENTHRA_EMBED_AUTH_OK') {
-        // no-op
-      }
+      // Deliberately no auth hand-off for security; storefront must manage its own session
     };
 
     window.addEventListener('message', handler);
