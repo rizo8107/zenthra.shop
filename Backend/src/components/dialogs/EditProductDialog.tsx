@@ -171,6 +171,22 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
       setCareInstructions(prev => prev);
       setUsageGuidelines(prev => prev);
 
+      // Helpers to resolve variant filenames to actual stored filenames in product.images (PocketBase may rename files)
+      const sanitize = (s: string) => (s || '').toLowerCase().replace(/\.[a-z0-9]+$/i, '').replace(/[^a-z0-9]+/g, '');
+      const resolveStored = (raw: string): string => {
+        if (!raw) return raw;
+        // If looks like a full path or is already present, keep
+        const images = Array.isArray(product?.images) ? product!.images : [];
+        if (images.includes(raw)) return raw;
+        const rawStem = sanitize(raw);
+        if (!rawStem) return raw;
+        const candidates = images.map(fn => ({ fn, st: sanitize(fn) }));
+        let hit = candidates.find(c => c.st === rawStem);
+        if (hit) return hit.fn;
+        hit = candidates.find(c => c.st.includes(rawStem) || rawStem.includes(c.st));
+        return hit ? hit.fn : raw;
+      };
+
       // Handle variants -> populate interactive rows
       try {
         const v = typeof product.variants === 'string' ? JSON.parse(product.variants) : (product.variants || {});
@@ -182,7 +198,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
           if (Array.isArray(v.sizes)) {
             v.sizes.forEach((sz: any) => {
               const k = String(sz.value ?? '');
-              if (k) exSize[k] = Array.isArray(sz.images) ? sz.images.map(String) : [];
+              if (k) exSize[k] = Array.isArray(sz.images) ? sz.images.map((s: any) => resolveStored(String(s))) : [];
             });
           }
           setVariantExistingBySize(exSize);
@@ -190,7 +206,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
           if (Array.isArray(v.combos)) {
             v.combos.forEach((cb: any) => {
               const k = String(cb.value || slugify(cb.name || ''));
-              if (k) exCombo[k] = Array.isArray(cb.images) ? cb.images.map(String) : [];
+              if (k) exCombo[k] = Array.isArray(cb.images) ? cb.images.map((s: any) => resolveStored(String(s))) : [];
             });
           }
           setComboExistingByKey(exCombo);
@@ -536,7 +552,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full h-dvh max-w-full sm:max-w-5xl xl:max-w-7xl sm:h-[90vh] overflow-hidden flex flex-col min-h-0">
+      <DialogContent className="w-full h-[95vh] max-w-[96vw] sm:max-w-[96vw] xl:max-w-[96vw] overflow-hidden flex flex-col min-h-0">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
           <DialogDescription>
@@ -822,11 +838,11 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                       <Label className="text-sm">Sizes</Label>
                       <div className="space-y-2">
                         {sizeRows.map((s, i) => (
-                          <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                            <div className="col-span-3">
+                          <div key={i} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
+                            <div className="col-span-12 sm:col-span-3">
                               <Input value={s.value} onChange={(e)=>{ const v=[...sizeRows]; v[i]={...v[i],value:e.target.value}; setSizeRows(v); }} placeholder="100" />
                             </div>
-                            <div className="col-span-3">
+                            <div className="col-span-12 sm:col-span-3">
                               <Select value={s.unit || 'ml'} onValueChange={(val)=>{ const v=[...sizeRows]; v[i]={...v[i],unit: val}; setSizeRows(v); }}>
                                 <SelectTrigger><SelectValue placeholder="Unit" /></SelectTrigger>
                                 <SelectContent>
@@ -838,18 +854,18 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-3">
+                            <div className="col-span-12 sm:col-span-3">
                               <div className="flex items-center gap-2">
                                 <Switch checked={!!s.useBasePrice} onCheckedChange={(val)=>{ const v=[...sizeRows]; v[i]={...v[i],useBasePrice: val, sizePrice: val ? undefined : v[i].sizePrice}; setSizeRows(v); }} />
                                 <span className="text-sm">Use base price</span>
                               </div>
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-12 sm:col-span-2">
                               {!s.useBasePrice && (
                                 <Input type="number" value={s.sizePrice ?? '' as any} onChange={(e)=>{ const v=[...sizeRows]; v[i]={...v[i],sizePrice:e.target.value?Number(e.target.value):undefined}; setSizeRows(v); }} placeholder="Price" />
                               )}
                             </div>
-                            <div className="col-span-1 text-xs text-muted-foreground">
+                            <div className="hidden sm:block col-span-1 text-xs text-muted-foreground">
                               {s.value && s.unit ? `${s.value} ${s.unit}` : ''}
                             </div>
                             <div className="col-span-12 text-xs text-muted-foreground">
@@ -859,8 +875,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                                 return `Final price for this size will be ₹${final.toFixed(2)}`;
                               })()}
                             </div>
-                            <div className="col-span-1 flex justify-end">
-                              <Button type="button" variant="outline" onClick={()=>{ const v=[...sizeRows]; v.splice(i,1); setSizeRows(v); }}>Remove</Button>
+                            <div className="absolute top-2 right-2">
+                              <Button type="button" size="sm" variant="outline" onClick={()=>{ const v=[...sizeRows]; v.splice(i,1); setSizeRows(v); }}>Remove</Button>
                             </div>
                             <div className="col-span-12 flex items-center gap-2">
                               <label htmlFor={`sz-up-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
@@ -873,7 +889,14 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                 {(variantExistingBySize[String(s.value)] || []).map((fname, idx)=> (
                                   <div key={`ex-${idx}`} className="relative group overflow-hidden rounded-md border">
-                                    <AspectRatio ratio={1/1}><img src={getFullImageUrl(fname)} alt="Variant existing" className="object-cover w-full h-full" /></AspectRatio>
+                                    <AspectRatio ratio={1/1}>
+                                      <img
+                                        src={getFullImageUrl(fname)}
+                                        alt="Variant existing"
+                                        className="object-cover w-full h-full"
+                                        onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found'; }}
+                                      />
+                                    </AspectRatio>
                                     <button type="button" onClick={()=>removeVariantExisting(String(s.value), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove existing variant image"><X className="h-4 w-4" /></button>
                                   </div>
                                 ))}
@@ -883,7 +906,9 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                 {(variantPreviewsBySize[String(s.value)] || []).map((url, idx)=> (
                                   <div key={idx} className="relative group overflow-hidden rounded-md border">
-                                    <AspectRatio ratio={1/1}><img src={url} alt="Variant preview" className="object-cover w-full h-full" /></AspectRatio>
+                                    <AspectRatio ratio={1/1}>
+                                      <img src={url} alt="Variant preview" className="object-cover w-full h-full" onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Preview+Not+Found'; }} />
+                                    </AspectRatio>
                                     <button type="button" onClick={()=>removeVariantNew(String(s.value), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove variant image"><X className="h-4 w-4" /></button>
                                   </div>
                                 ))}
@@ -910,11 +935,11 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                       </div>
                       <div className="space-y-2">
                         {comboRows.map((cb, i) => (
-                          <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                          <div key={i} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
                             <div className="col-span-3">
                               <Input value={cb.name} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],name:e.target.value, value: v[i].value || slugify(e.target.value)}; setComboRows(v); }} placeholder="2-Pack" />
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-12 sm:col-span-2">
                               <Select value={cb.type || 'bundle'} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],type: val as any}; setComboRows(v); }}>
                                 <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                                 <SelectContent>
@@ -924,10 +949,10 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-12 sm:col-span-2">
                               <Input type="number" value={cb.items ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],items: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Items" />
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-12 sm:col-span-2">
                               <Select value={cb.discountType || undefined as any} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],discountType: val as any}; setComboRows(v); }}>
                                 <SelectTrigger><SelectValue placeholder="Discount" /></SelectTrigger>
                                 <SelectContent>
@@ -936,15 +961,15 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                                 </SelectContent>
                               </Select>
                             </div>
-                            <div className="col-span-2">
+                            <div className="col-span-12 sm:col-span-2">
                               <Input type="number" value={cb.discountValue ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],discountValue: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Value" />
                             </div>
-                            <div className="col-span-1">
+                            <div className="col-span-12 sm:col-span-1">
                               <Input type="number" value={cb.priceOverride ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],priceOverride: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Price" />
                             </div>
                             <div className="col-span-0 md:col-span-0 lg:col-span-0"></div>
-                            <div className="col-span-2 flex justify-end">
-                              <Button type="button" variant="outline" onClick={()=>{ const v=[...comboRows]; v.splice(i,1); setComboRows(v); }}>Remove</Button>
+                            <div className="absolute top-2 right-2">
+                              <Button type="button" size="sm" variant="outline" onClick={()=>{ const v=[...comboRows]; v.splice(i,1); setComboRows(v); }}>Remove</Button>
                             </div>
                             <div className="col-span-12 flex items-center gap-2">
                               <label htmlFor={`cb-up-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
@@ -957,7 +982,14 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                 {(comboExistingByKey[String(cb.value || slugify(cb.name))] || []).map((fname, idx)=> (
                                   <div key={`ex-${idx}`} className="relative group overflow-hidden rounded-md border">
-                                    <AspectRatio ratio={1/1}><img src={getFullImageUrl(fname)} alt="Combo existing" className="object-cover w-full h-full" /></AspectRatio>
+                                    <AspectRatio ratio={1/1}>
+                                      <img
+                                        src={getFullImageUrl(fname)}
+                                        alt="Combo existing"
+                                        className="object-cover w-full h-full"
+                                        onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found'; }}
+                                      />
+                                    </AspectRatio>
                                     <button type="button" onClick={()=>removeComboExisting(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove existing combo image"><X className="h-4 w-4" /></button>
                                   </div>
                                 ))}
@@ -967,7 +999,9 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                                 {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).map((url, idx)=> (
                                   <div key={idx} className="relative group overflow-hidden rounded-md border">
-                                    <AspectRatio ratio={1/1}><img src={url} alt="Combo preview" className="object-cover w-full h-full" /></AspectRatio>
+                                    <AspectRatio ratio={1/1}>
+                                      <img src={url} alt="Combo preview" className="object-cover w-full h-full" onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Preview+Not+Found'; }} />
+                                    </AspectRatio>
                                     <button type="button" onClick={()=>removeComboNew(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove combo image"><X className="h-4 w-4" /></button>
                                   </div>
                                 ))}
