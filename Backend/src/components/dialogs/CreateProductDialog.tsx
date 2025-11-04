@@ -82,6 +82,15 @@ export function CreateProductDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  // Variant images state (per size value)
+  const [selectedVariantSize, setSelectedVariantSize] = useState<string>("");
+  const [variantFilesBySize, setVariantFilesBySize] = useState<Record<string, File[]>>({});
+  const [variantPreviewsBySize, setVariantPreviewsBySize] = useState<Record<string, string[]>>({});
+  const [variantFilenamesBySize, setVariantFilenamesBySize] = useState<Record<string, string[]>>({});
+  // Combo images state (per combo value)
+  const [comboFilesByKey, setComboFilesByKey] = useState<Record<string, File[]>>({});
+  const [comboPreviewsByKey, setComboPreviewsByKey] = useState<Record<string, string[]>>({});
+  const [comboFilenamesByKey, setComboFilenamesByKey] = useState<Record<string, string[]>>({});
   
   // Fixed category options
   const CATEGORY_OPTIONS = ['soap', 'powder', 'gel', 'oil', 'other'] as const;
@@ -133,8 +142,15 @@ export function CreateProductDialog({
   const buildVariantsFromRows = () => {
     const variants: any = {};
     if (colorRows.length) variants.colors = colorRows.map(c => ({ name: c.name, value: c.value || slugify(c.name || ''), hex: c.hex, inStock: c.inStock !== false }));
-    if (sizeRows.length) variants.sizes = sizeRows.map(s => ({ name: s.name || (s.unit ? `${s.value} ${s.unit}` : s.value), value: String(s.value), unit: s.unit, inStock: s.inStock !== false, priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined) }));
-    if (comboRows.length) variants.combos = comboRows.map(cb => ({ name: cb.name, value: cb.value || slugify(cb.name), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue }));
+    if (sizeRows.length) variants.sizes = sizeRows.map(s => ({
+      name: s.name || (s.unit ? `${s.value} ${s.unit}` : s.value),
+      value: String(s.value),
+      unit: s.unit,
+      inStock: s.inStock !== false,
+      priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined),
+      images: variantFilenamesBySize[String(s.value)] || [],
+    }));
+    if (comboRows.length) variants.combos = comboRows.map(cb => ({ name: cb.name, value: cb.value || slugify(cb.name), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue, images: comboFilenamesByKey[String(cb.value || slugify(cb.name))] || [] }));
     const json = JSON.stringify(variants);
     form.setValue('variants', json);
   };
@@ -177,7 +193,13 @@ export function CreateProductDialog({
   });
 
   // Rebuild variants JSON when rows change (after form exists)
-  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows]);
+  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows, variantFilenamesBySize]);
+  // Initialize selected variant size when sizes are present
+  useEffect(() => {
+    if (!selectedVariantSize && sizeRows.length > 0) {
+      setSelectedVariantSize(String(sizeRows[0].value));
+    }
+  }, [sizeRows, selectedVariantSize]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -199,6 +221,80 @@ export function CreateProductDialog({
     // Revoke the object URL to prevent memory leaks
     URL.revokeObjectURL(imagePreviewUrls[index]);
     setImagePreviewUrls(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Variant images upload for the chosen size
+  const handleVariantImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const sizeKey = selectedVariantSize.trim();
+    if (!sizeKey) return;
+    if (!e.target.files || e.target.files.length === 0) return;
+    const newFiles = Array.from(e.target.files);
+
+    setVariantFilesBySize(prev => ({
+      ...prev,
+      [sizeKey]: [...(prev[sizeKey] || []), ...newFiles],
+    }));
+
+    const newPreviews = newFiles.map(f => URL.createObjectURL(f));
+    setVariantPreviewsBySize(prev => ({
+      ...prev,
+      [sizeKey]: [...(prev[sizeKey] || []), ...newPreviews],
+    }));
+
+    // Store filenames to embed into variants JSON
+    setVariantFilenamesBySize(prev => ({
+      ...prev,
+      [sizeKey]: [...(prev[sizeKey] || []), ...newFiles.map(f => f.name)],
+    }));
+  };
+
+  // Helper: upload for a specific size row directly
+  const handleSizeRowImageUpload = (sizeKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const key = String(sizeKey || '').trim();
+    if (!key || !e.target.files || e.target.files.length === 0) return;
+    const newFiles = Array.from(e.target.files);
+    setVariantFilesBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles] }));
+    const previews = newFiles.map(f => URL.createObjectURL(f));
+    setVariantPreviewsBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
+    setVariantFilenamesBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles.map(f => f.name)] }));
+  };
+
+  // Combo uploads per-row
+  const handleComboImageUpload = (comboKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const key = String(comboKey || '').trim();
+    if (!key || !e.target.files || e.target.files.length === 0) return;
+    const newFiles = Array.from(e.target.files);
+    setComboFilesByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles] }));
+    const previews = newFiles.map(f => URL.createObjectURL(f));
+    setComboPreviewsByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
+    setComboFilenamesByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles.map(f => f.name)] }));
+  };
+  const removeComboImage = (key: string, index: number) => {
+    setComboFilesByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
+    const url = (comboPreviewsByKey[key] || [])[index];
+    if (url) URL.revokeObjectURL(url);
+    setComboPreviewsByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
+    setComboFilenamesByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
+    buildVariantsFromRows();
+  };
+
+  const removeVariantImage = (sizeKey: string, index: number) => {
+    setVariantFilesBySize(prev => ({
+      ...prev,
+      [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index),
+    }));
+    const url = (variantPreviewsBySize[sizeKey] || [])[index];
+    if (url) URL.revokeObjectURL(url);
+    setVariantPreviewsBySize(prev => ({
+      ...prev,
+      [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index),
+    }));
+    setVariantFilenamesBySize(prev => ({
+      ...prev,
+      [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index),
+    }));
+    // Update variants JSON reflecting removal
+    buildVariantsFromRows();
   };
 
   // Function to convert comma-separated text to JSON array
@@ -329,7 +425,7 @@ export function CreateProductDialog({
       if (processedValues.videoDescription) productData.videoDescription = processedValues.videoDescription;
 
       // If there are images, send multipart/form-data directly to the products collection
-      if (uploadedImages.length > 0) {
+      if (uploadedImages.length > 0 || Object.keys(variantFilesBySize).length > 0) {
         const formData = new FormData();
         // Append scalar fields
         Object.entries(productData).forEach(([key, value]) => {
@@ -338,9 +434,13 @@ export function CreateProductDialog({
           }
         });
         // Append image files under the 'images' field (multiple)
-        uploadedImages.forEach((file) => {
-          formData.append('images', file);
-        });
+        uploadedImages.forEach((file) => { formData.append('images', file); });
+        // Append variant files as well
+        Object.values(variantFilesBySize).forEach(files => { files.forEach(f => formData.append('images', f)); });
+        Object.values(comboFilesByKey).forEach(files => { files.forEach(f => formData.append('images', f)); });
+        // Ensure latest variants JSON with filenames
+        buildVariantsFromRows();
+        formData.set('variants', form.getValues('variants') || '');
         // Pass FormData to onSubmit; the hook will send it as-is
         await onSubmit(formData);
       } else {
@@ -354,24 +454,24 @@ export function CreateProductDialog({
       imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
       setUploadedImages([]);
       setImagePreviewUrls([]);
+      // Clean variant previews
+      Object.values(variantPreviewsBySize).flat().forEach(url => URL.revokeObjectURL(url));
+      setVariantFilesBySize({});
+      setVariantPreviewsBySize({});
+      setVariantFilenamesBySize({});
       onOpenChange(false);
       toast.success('Product created successfully');
     } catch (error) {
       console.error('Error creating product:', error);
       toast.error('Failed to create product');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="w-full h-dvh max-w-full sm:max-w-5xl xl:max-w-7xl sm:h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle>Create Product</DialogTitle>
-          <DialogDescription>
-            Fill in the details to create a new product.
-          </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
@@ -584,17 +684,16 @@ export function CreateProductDialog({
                         Product Images
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {imagePreviewUrls.map((url, index) => (
                           <div key={index} className="relative group overflow-hidden rounded-md border">
                             <AspectRatio ratio={1 / 1}>
-                              <img 
-                                src={url} 
-                                alt={`Product image ${index + 1}`} 
+                              <img
+                                src={url}
+                                alt={`Product image ${index + 1}`}
                                 className="object-cover w-full h-full"
                                 onError={(e) => {
-                                  // Fallback if image fails to load
                                   (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
                                 }}
                               />
@@ -609,7 +708,6 @@ export function CreateProductDialog({
                             </button>
                           </div>
                         ))}
-                        
                         <div className="flex items-center justify-center rounded-md border border-dashed p-4 h-full min-h-[150px]">
                           <label htmlFor="image-upload" className="flex flex-col items-center justify-center cursor-pointer w-full h-full">
                             <div className="flex flex-col items-center justify-center gap-2">
@@ -617,51 +715,83 @@ export function CreateProductDialog({
                               <span className="text-sm font-medium text-muted-foreground">Upload Image</span>
                               <span className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 5MB</span>
                             </div>
-                            <input 
-                              id="image-upload" 
-                              type="file" 
-                              accept="image/*" 
-                              multiple 
-                              className="sr-only" 
+                            <input
+                              id="image-upload"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="sr-only"
                               onChange={handleImageUpload}
                             />
                           </label>
                         </div>
                       </div>
-                      
-                      <FormDescription>
-                        Upload multiple product images. The first image will be used as the main product image.
-                      </FormDescription>
+
+                      <div className="border-t pt-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-medium" htmlFor="variant-size-select">Variant Images — Size</label>
+                          <select
+                            id="variant-size-select"
+                            className="h-8 rounded-md border bg-background px-2 text-sm"
+                            value={selectedVariantSize}
+                            onChange={(e) => setSelectedVariantSize(e.target.value)}
+                          >
+                            <option value="" disabled>Select a size</option>
+                            {sizeRows.map((s, i) => (
+                              <option key={i} value={String(s.value)}>{s.name || (s.unit ? `${s.value} ${s.unit}` : s.value)}</option>
+                            ))}
+                          </select>
+                          <div className="ml-auto">
+                            <label htmlFor="variant-image-upload" className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                              <Upload className="h-4 w-4" /> Upload for size
+                            </label>
+                            <input
+                              id="variant-image-upload"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="sr-only"
+                              onChange={handleVariantImageUpload}
+                              disabled={!selectedVariantSize}
+                            />
+                          </div>
+                        </div>
+                        {selectedVariantSize ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {(variantPreviewsBySize[selectedVariantSize] || []).map((url, index) => (
+                              <div key={index} className="relative group overflow-hidden rounded-md border">
+                                <AspectRatio ratio={1 / 1}>
+                                  <img
+                                    src={url}
+                                    alt={`Variant ${selectedVariantSize} image ${index + 1}`}
+                                    className="object-cover w-full h-full"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
+                                    }}
+                                  />
+                                </AspectRatio>
+                                <button
+                                  type="button"
+                                  onClick={() => removeVariantImage(selectedVariantSize, index)}
+                                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
+                                  aria-label={`Remove variant image ${index + 1}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Alert>
+                            <AlertDescription>Select a size first, then upload images for that variant.</AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
 
                 <TabsContent value="details" className="space-y-4 mt-0">
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="material"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Material</FormLabel>
-                          <Input {...field} placeholder="e.g., 100% Cotton Canvas" />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="dimensions"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dimensions</FormLabel>
-                          <Input {...field} placeholder='e.g., 16"H x 14"W x 4"D' />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -834,6 +964,34 @@ export function CreateProductDialog({
                                 <div className="col-span-1 flex justify-end">
                                   <Button type="button" variant="outline" onClick={()=>{ const v=[...sizeRows]; v.splice(i,1); setSizeRows(v); }}>Remove</Button>
                                 </div>
+                                <div className="col-span-12 flex items-center gap-2">
+                                  <label htmlFor={`size-upload-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                                    <Upload className="h-4 w-4" /> Upload images for {s.name || (s.unit ? `${s.value} ${s.unit}` : s.value) || 'size'}
+                                  </label>
+                                  <input
+                                    id={`size-upload-${i}`}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="sr-only"
+                                    onChange={(e)=>handleSizeRowImageUpload(String(s.value), e)}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{(variantFilenamesBySize[String(s.value)] || []).length} selected</span>
+                                </div>
+                                {(variantPreviewsBySize[String(s.value)] || []).length > 0 && (
+                                  <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {(variantPreviewsBySize[String(s.value)] || []).map((url, idx)=> (
+                                      <div key={idx} className="relative group overflow-hidden rounded-md border">
+                                        <AspectRatio ratio={1/1}>
+                                          <img src={url} alt="Variant preview" className="object-cover w-full h-full" />
+                                        </AspectRatio>
+                                        <button type="button" onClick={()=>removeVariantImage(String(s.value), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70">
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ))}
                             <Button type="button" variant="secondary" onClick={()=>setSizeRows([...sizeRows,{value:'',unit:'ml',useBasePrice:true}])}>Add Size</Button>
@@ -891,6 +1049,118 @@ export function CreateProductDialog({
                                 <div className="col-span-2 flex justify-end">
                                   <Button type="button" variant="outline" onClick={()=>{ const v=[...comboRows]; v.splice(i,1); setComboRows(v); }}>Remove</Button>
                                 </div>
+                                <div className="col-span-12 flex items-center gap-2">
+                                  <label htmlFor={`combo-upload-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                                    <Upload className="h-4 w-4" /> Upload images for {cb.name || cb.value || 'combo'}
+                                  </label>
+                                  <input
+                                    id={`combo-upload-${i}`}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="sr-only"
+                                    onChange={(e)=>handleComboImageUpload(String(cb.value || slugify(cb.name)), e)}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[String(cb.value || slugify(cb.name))] || []).length} selected</span>
+                                </div>
+                                {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).length > 0 && (
+                                  <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).map((url, idx)=> (
+                                      <div key={idx} className="relative group overflow-hidden rounded-md border">
+                                        <AspectRatio ratio={1/1}>
+                                          <img src={url} alt="Combo preview" className="object-cover w-full h-full" />
+                                        </AspectRatio>
+                                        <button type="button" onClick={()=>removeComboImage(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove combo image">
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <FormLabel className="text-sm">Combos</FormLabel>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
+                            <Button type="button" variant="secondary" onClick={()=>setComboRows([...comboRows,{name:'',value:'',type:'bundle'}])}>Add Custom</Button>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
+                          </div>
+                          <div className="space-y-2">
+                            {comboRows.map((cb, i) => (
+                              <div key={i} className="grid grid-cols-12 gap-2 items-center">
+                                <div className="col-span-3">
+                                  <Input value={cb.name} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],name:e.target.value, value: v[i].value || slugify(e.target.value)}; setComboRows(v); }} placeholder="2-Pack" />
+                                </div>
+                                <div className="col-span-2">
+                                  <Select value={cb.type || 'bundle'} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],type: val as any}; setComboRows(v); }}>
+                                    <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="bundle">bundle</SelectItem>
+                                      <SelectItem value="bogo">bogo</SelectItem>
+                                      <SelectItem value="custom">custom</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="col-span-2">
+                                  <Input type="number" value={cb.items ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],items: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Items" />
+                                </div>
+                                <div className="col-span-2">
+                                  <Select value={cb.discountType || undefined as any} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],discountType: val as any}; setComboRows(v); }}>
+                                    <SelectTrigger><SelectValue placeholder="Discount" /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="amount">Amount</SelectItem>
+                                      <SelectItem value="percent">Percent</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="col-span-2">
+                                  <Input type="number" value={cb.discountValue ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],discountValue: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Value" />
+                                </div>
+                                <div className="col-span-1">
+                                  <Input type="number" value={cb.priceOverride ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],priceOverride: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Price" />
+                                </div>
+                                <div className="col-span-0 md:col-span-0 lg:col-span-0"></div>
+                                <div className="col-span-2 flex justify-end">
+                                  <Button type="button" variant="outline" onClick={()=>{ const v=[...comboRows]; v.splice(i,1); setComboRows(v); }}>Remove</Button>
+                                </div>
+                                <div className="col-span-12 flex items-center gap-2">
+                                  <label htmlFor={`combo-upload-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                                    <Upload className="h-4 w-4" /> Upload images for {cb.name || cb.value || 'combo'}
+                                  </label>
+                                  <input
+                                    id={`combo-upload-${i}`}
+                                    type="file"
+                                    accept="image/*"
+                                    multiple
+                                    className="sr-only"
+                                    onChange={(e)=>handleComboImageUpload(String(cb.value || slugify(cb.name)), e)}
+                                  />
+                                  <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[String(cb.value || slugify(cb.name))] || []).length} selected</span>
+                                </div>
+                                {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).length > 0 && (
+                                  <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                    {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).map((url, idx)=> (
+                                      <div key={idx} className="relative group overflow-hidden rounded-md border">
+                                        <AspectRatio ratio={1/1}>
+                                          <img src={url} alt="Combo preview" className="object-cover w-full h-full" />
+                                        </AspectRatio>
+                                        <button type="button" onClick={()=>removeComboImage(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove combo image">
+                                          <X className="h-4 w-4" />
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             ))}
                           </div>

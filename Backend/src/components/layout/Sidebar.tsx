@@ -15,7 +15,8 @@ import {
   MapPin,
   FileText,
   Palette,
-  Puzzle
+  Puzzle,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -68,10 +69,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { title: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { title: 'Orders', path: '/admin/orders', icon: ShoppingCart },
     { title: 'Customers', path: '/admin/customers', icon: Users },
+    { title: 'Abandoned carts', path: '/admin/abandoned-carts', icon: AlertTriangle },
     { title: 'Products', path: '/admin/products', icon: Package },
-    { title: 'Payments', path: '/admin/payments', icon: CreditCard },
-    { title: 'Customer Journey', path: '/admin/customer-journey', icon: MapPin },
-    { title: 'Campaigns', path: '/admin/campaigns', icon: MessageSquare },
     { title: 'Pages', path: '/admin/pages', icon: FileText },
     { title: 'Themes', path: '/admin/themes', icon: Palette },
     { title: 'Plugins', path: '/admin/plugins', icon: Puzzle },
@@ -88,10 +87,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     >
       {/* Logo */}
       <div className={cn(
-        "h-16 flex items-center border-b px-4",
+        "h-16 flex items-center border-b px-4 gap-3",
         collapsed ? "justify-center" : "justify-between"
       )}>
-        {!collapsed && <span className="text-xl font-bold text-foreground">Zenthra Shop</span>}
+        <Link to="/admin" className="flex items-center gap-2" onClick={onNavigate}>
+          <img
+            src="/logo.svg"
+            alt="Zenthra Shop"
+            className={cn(
+              "transition-all brightness-0 dark:invert",
+              collapsed ? "h-10 w-10" : "h-10 w-auto"
+            )}
+          />
+        </Link>
         {!isMobile && (
           <Button 
             variant="ghost" 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -48,10 +48,12 @@ type Specifications = {
   pattern?: string;
   closure?: string;
   waterResistant?: boolean;
-  [key: string]: any;
+  [key: string]: unknown;
 };
 
 export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDialogProps) {
+  // Selected size for viewing variant images (keep hook unconditional)
+  const [selectedSize, setSelectedSize] = useState<string | null>(null);
   // If no product is selected, don't render the dialog content
   if (!product) {
     return (
@@ -142,9 +144,18 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
       (Array.isArray(product.images) ? product.images : [product.images]) : 
       [];
 
+    // Parse variants for sizes (with optional images per size)
+    type VariantSize = { value: string; name?: string; images?: string[] };
+    const variants = parseJsonField<{ sizes?: VariantSize[] }>(product.variants as any, {} as { sizes?: VariantSize[] });
+    const sizeOptions: VariantSize[] = Array.isArray(variants?.sizes) ? variants!.sizes! : [];
+    const effectiveSize = selectedSize ?? (sizeOptions[0]?.value ?? null);
+    const selectedVariant = sizeOptions.find((s) => s.value === effectiveSize);
+    const variantImages: string[] = Array.isArray(selectedVariant?.images) ? selectedVariant!.images : [];
+    const displayImages: string[] = (variantImages.length > 0 ? variantImages : images) as string[];
+
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="w-full h-dvh max-w-full sm:max-w-5xl xl:max-w-7xl sm:h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <div className="flex justify-between items-center">
               <div>
@@ -273,14 +284,29 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
               </TabsContent>
 
               <TabsContent value="images" className="space-y-4 p-1">
+                {sizeOptions.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm">Size</Label>
+                    <select
+                      aria-label="Select size"
+                      className="h-8 rounded-md border bg-background px-2 text-sm"
+                      value={effectiveSize ?? ''}
+                      onChange={(e) => setSelectedSize(e.target.value || null)}
+                    >
+                      {sizeOptions.map((s, i) => (
+                        <option key={i} value={s.value}>{s.name || `${s.value}`}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
                 <Card>
                   <CardHeader>
                     <CardTitle className="text-lg">Product Images</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    {images && images.length > 0 ? (
+                    {displayImages && displayImages.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {images.map((image: string, index: number) => (
+                        {displayImages.map((image: string, index: number) => (
                           <div key={index} className="overflow-hidden rounded-md border">
                             <AspectRatio ratio={1 / 1}>
                               <img 

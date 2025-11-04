@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Table,
   TableBody,
@@ -139,6 +139,8 @@ export const OrdersTable: FC<OrdersTableProps> = ({
   const [selectedOrders, setSelectedOrders] = useState<Order[]>([]);
   const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [showFilters, setShowFilters] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Webhook target for status changes
   const WEBHOOK_URL =
@@ -396,8 +398,53 @@ export const OrdersTable: FC<OrdersTableProps> = ({
     return matchesSearch && matchesStatus && matchesPayment && matchesDateRange;
   });
 
+  // Pagination + KPIs (must be outside any helper function)
+  useEffect(() => {
+    setPage(1);
+  }, [searchQuery, statusFilter, paymentStatusFilter, dateRange, orders.length]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / pageSize));
+  const startIdx = (page - 1) * pageSize;
+  const endIdx = Math.min(startIdx + pageSize, filteredOrders.length);
+  const pageOrders = useMemo(() => filteredOrders.slice(startIdx, endIdx), [filteredOrders, startIdx, endIdx]);
+
+  const kpis = useMemo(() => {
+    const total = filteredOrders.length;
+    const paid = filteredOrders.filter((o) => o.payment_status === "paid").length;
+    const pending = filteredOrders.filter((o) => o.payment_status === "pending").length;
+    const revenue = filteredOrders.reduce((s, o) => s + (Number((o as any).total) || 0), 0);
+    return { total, paid, pending, revenue };
+  }, [filteredOrders]);
+
   return (
     <div className="space-y-4">
+      {/* KPI cards */}
+      <div className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Orders (filtered)</p>
+            <p className="text-2xl font-semibold">{kpis.total}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Paid</p>
+            <p className="text-2xl font-semibold text-green-600">{kpis.paid}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Pending</p>
+            <p className="text-2xl font-semibold text-yellow-600">{kpis.pending}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <p className="text-xs text-muted-foreground">Revenue (₹)</p>
+            <p className="text-2xl font-semibold">{(kpis.revenue || 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</p>
+          </CardContent>
+        </Card>
+      </div>
       {/* Top controls */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -538,7 +585,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
       {(statusFilter !== "all" ||
         paymentStatusFilter !== "all" ||
         dateRange?.from) && (
-        <div className="flex flex-wrap gap-2 text-sm">
+        <div className="flex flex-wrap gap-2 text-sm px-2 sm:px-4">
           <span className="font-medium">Active filters:</span>
           {statusFilter !== "all" && (
             <Badge variant="secondary">Status: {statusFilter}</Badge>
@@ -556,7 +603,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
       )}
 
       {/* MOBILE: Card list */}
-      <div className="grid gap-2 sm:hidden">
+      <div className="grid gap-2 sm:hidden px-2">
         {isLoading ? (
           Array(5)
             .fill(0)
@@ -577,7 +624,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
             </CardContent>
           </Card>
         ) : (
-          filteredOrders.map((order) => (
+          pageOrders.map((order) => (
             <Card
               key={order.id}
               className={`rounded-2xl border-0 shadow-sm ring-1 ring-black/5`}
@@ -690,7 +737,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
       </div>
 
       {/* DESKTOP/TABLET: Keep original table UX */}
-      <div className="hidden sm:block border rounded-md overflow-x-auto">
+      <div className="hidden sm:block border rounded-md overflow-x-auto p-2 sm:p-3">
         <Table className="w-full min-w-[1100px]">
           <TableHeader>
             <TableRow>
@@ -740,19 +787,17 @@ export const OrdersTable: FC<OrdersTableProps> = ({
                 </TableCell>
               </TableRow>
             ) : (
-              filteredOrders.map((order) => (
+              pageOrders.map((order) => (
                 <TableRow
                   key={order.id}
-                  className={
-                    selectedOrders.some((o) => o.id === order.id)
-                      ? "bg-primary/5"
-                      : ""
-                  }
+                  className={`${selectedOrders.some((o) => o.id === order.id) ? "bg-primary/5" : ""} cursor-pointer hover:bg-muted/40`}
+                  onClick={() => onViewOrder(order)}
                 >
                   <TableCell>
                     <Checkbox
                       checked={selectedOrders.some((o) => o.id === order.id)}
                       onCheckedChange={() => toggleOrderSelection(order)}
+                      onClick={(e) => e.stopPropagation()}
                     />
                   </TableCell>
                   <TableCell className="font-medium">
@@ -773,7 +818,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
                       defaultValue={order.status as OrderStatus}
                       onValueChange={(val) => handleStatusChange(order, val)}
                     >
-                      <SelectTrigger className="w-[220px] h-8">
+                      <SelectTrigger className="w-[220px] h-8" onClick={(e) => e.stopPropagation()}>
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
@@ -801,18 +846,18 @@ export const OrdersTable: FC<OrdersTableProps> = ({
                       <Button
                         variant="ghost"
                         size="icon"
-                        onClick={() => onViewOrder(order)}
+                        onClick={(e) => { e.stopPropagation(); onViewOrder(order); }}
                       >
                         <Eye size={16} />
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
+                          <Button variant="ghost" size="icon" onClick={(e) => e.stopPropagation()}>
                             <MoreHorizontal size={16} />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => onViewOrder(order)}>
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onViewOrder(order); }}>
                             <Eye size={14} className="mr-2" /> View Details
                           </DropdownMenuItem>
                           <DropdownMenuItem>
@@ -820,7 +865,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
-                            onClick={() => handlePrintSingleOrder(order)}
+                            onClick={(e) => { e.stopPropagation(); handlePrintSingleOrder(order); }}
                           >
                             <Printer size={14} className="mr-2" /> Print Slip
                           </DropdownMenuItem>
@@ -833,6 +878,31 @@ export const OrdersTable: FC<OrdersTableProps> = ({
             )}
           </TableBody>
         </Table>
+      </div>
+
+      {/* Pagination controls */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm">
+        <div className="text-muted-foreground">
+          Showing {filteredOrders.length === 0 ? 0 : startIdx + 1}-{endIdx} of {filteredOrders.length}
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs text-muted-foreground">Per page</label>
+          <Select value={String(pageSize)} onValueChange={(v) => setPageSize(Number(v))}>
+            <SelectTrigger className="w-[88px] h-8"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="10">10</SelectItem>
+              <SelectItem value="25">25</SelectItem>
+              <SelectItem value="50">50</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+            Previous
+          </Button>
+          <span className="px-2">Page {page} / {totalPages}</span>
+          <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+            Next
+          </Button>
+        </div>
       </div>
     </div>
   );

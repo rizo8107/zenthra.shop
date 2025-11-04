@@ -95,6 +95,18 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   const [existingImages, setExistingImages] = useState<string[]>([]);
+  // Variant images (sizes)
+  const [selectedVariantSize, setSelectedVariantSize] = useState<string>('');
+  const [variantFilesBySize, setVariantFilesBySize] = useState<Record<string, File[]>>({});
+  const [variantPreviewsBySize, setVariantPreviewsBySize] = useState<Record<string, string[]>>({});
+  const [variantFilenamesBySize, setVariantFilenamesBySize] = useState<Record<string, string[]>>({});
+  const [variantExistingBySize, setVariantExistingBySize] = useState<Record<string, string[]>>({});
+  // Combo images
+  const [selectedComboKey, setSelectedComboKey] = useState<string>('');
+  const [comboFilesByKey, setComboFilesByKey] = useState<Record<string, File[]>>({});
+  const [comboPreviewsByKey, setComboPreviewsByKey] = useState<Record<string, string[]>>({});
+  const [comboFilenamesByKey, setComboFilenamesByKey] = useState<Record<string, string[]>>({});
+  const [comboExistingByKey, setComboExistingByKey] = useState<Record<string, string[]>>({});
   
   // Interactive rows for variants
   const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
@@ -116,11 +128,27 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const buildVariantsFromRows = () => {
     const result: any = {};
     if (colorRows.length) result.colors = colorRows.map(c => ({ name: c.name, value: c.value || slugify(c.name || ''), hex: c.hex, inStock: c.inStock !== false }));
-    if (sizeRows.length) result.sizes = sizeRows.map(s => ({ name: s.name || (s.unit ? `${s.value} ${s.unit}` : s.value), value: String(s.value), unit: s.unit, inStock: s.inStock !== false, priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined) }));
-    if (comboRows.length) result.combos = comboRows.map(cb => ({ name: cb.name, value: cb.value || slugify(cb.name), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue }));
+    if (sizeRows.length) result.sizes = sizeRows.map(s => ({
+      name: s.name || (s.unit ? `${s.value} ${s.unit}` : s.value),
+      value: String(s.value),
+      unit: s.unit,
+      inStock: s.inStock !== false,
+      priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined),
+      images: [
+        ...((variantExistingBySize[String(s.value)] || [])),
+        ...((variantFilenamesBySize[String(s.value)] || [])),
+      ],
+    }));
+    if (comboRows.length) result.combos = comboRows.map(cb => ({
+      name: cb.name, value: cb.value || slugify(cb.name), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue,
+      images: [
+        ...((comboExistingByKey[String(cb.value || slugify(cb.name))] || [])),
+        ...((comboFilenamesByKey[String(cb.value || slugify(cb.name))] || [])),
+      ],
+    }));
     setVariants(Object.keys(result).length ? JSON.stringify(result) : '');
   };
-  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows]);
+  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows, variantExistingBySize, variantFilenamesBySize, comboExistingByKey, comboFilenamesByKey]);
 
   // Reset form when product changes
   useEffect(() => {
@@ -150,6 +178,22 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
           setColorRows(Array.isArray(v.colors) ? v.colors.map((col: any) => ({ name: col.name || '', hex: col.hex || '#ffffff', value: col.value || slugify(col.name || '') })) : []);
           setSizeRows(Array.isArray(v.sizes) ? v.sizes.map((sz: any) => ({ name: sz.name, value: String(sz.value ?? ''), unit: sz.unit, useBasePrice: typeof sz.priceOverride !== 'number', sizePrice: typeof sz.priceOverride === 'number' ? sz.priceOverride : undefined })) : []);
           setComboRows(Array.isArray(v.combos) ? v.combos.map((cb: any) => ({ name: cb.name || '', value: cb.value || slugify(cb.name || ''), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue })) : []);
+          const exSize: Record<string, string[]> = {};
+          if (Array.isArray(v.sizes)) {
+            v.sizes.forEach((sz: any) => {
+              const k = String(sz.value ?? '');
+              if (k) exSize[k] = Array.isArray(sz.images) ? sz.images.map(String) : [];
+            });
+          }
+          setVariantExistingBySize(exSize);
+          const exCombo: Record<string, string[]> = {};
+          if (Array.isArray(v.combos)) {
+            v.combos.forEach((cb: any) => {
+              const k = String(cb.value || slugify(cb.name || ''));
+              if (k) exCombo[k] = Array.isArray(cb.images) ? cb.images.map(String) : [];
+            });
+          }
+          setComboExistingByKey(exCombo);
           setVariants(JSON.stringify(v));
         }
       } catch {
@@ -390,13 +434,46 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         updateData.images = [];
       }
 
-      // Submit the form
-      await onSubmit({ id: product.id, data: updateData });
-      
-      // If we have new uploaded images, we would handle them here
-      if (uploadedImages.length > 0) {
-        // Note: In a real implementation, we would need to upload these files
-        console.log(`${uploadedImages.length} new images ready for upload`);
+      const hasVariantFiles = Object.values(variantFilesBySize).some(arr => arr && arr.length);
+      const hasComboFiles = Object.values(comboFilesByKey).some(arr => arr && arr.length);
+      const needFormData = uploadedImages.length > 0 || hasVariantFiles || hasComboFiles;
+
+      if (needFormData) {
+        const fd = new FormData();
+        Object.entries(updateData).forEach(([k, v]) => {
+          if (v === undefined) return;
+          if (k === 'variants') return;
+          fd.append(k, String(v));
+        });
+        uploadedImages.forEach(f => fd.append('images', f));
+        Object.values(variantFilesBySize).forEach(files => files?.forEach(f => fd.append('images', f)));
+        Object.values(comboFilesByKey).forEach(files => files?.forEach(f => fd.append('images', f)));
+
+        const finalVariants: any = {};
+        if (colorRows.length) finalVariants.colors = colorRows.map(c => ({ name: c.name, value: c.value || slugify(c.name || ''), hex: c.hex, inStock: c.inStock !== false }));
+        if (sizeRows.length) finalVariants.sizes = sizeRows.map(s => ({
+          name: s.name || (s.unit ? `${s.value} ${s.unit}` : s.value),
+          value: String(s.value),
+          unit: s.unit,
+          inStock: s.inStock !== false,
+          priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined),
+          images: [
+            ...((variantExistingBySize[String(s.value)] || [])),
+            ...((variantFilenamesBySize[String(s.value)] || [])),
+          ],
+        }));
+        if (comboRows.length) finalVariants.combos = comboRows.map(cb => ({
+          name: cb.name, value: cb.value || slugify(cb.name || ''), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue,
+          images: [
+            ...((comboExistingByKey[String(cb.value || slugify(cb.name))] || [])),
+            ...((comboFilenamesByKey[String(cb.value || slugify(cb.name))] || [])),
+          ],
+        }));
+        fd.set('variants', JSON.stringify(finalVariants));
+
+        await onSubmit({ id: product.id, data: fd as unknown as UpdateProductData });
+      } else {
+        await onSubmit({ id: product.id, data: updateData });
       }
       
       onOpenChange(false);
@@ -409,9 +486,57 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
     }
   };
 
+  // Handlers for variant images (sizes)
+  const handleVariantImageUpload = (sizeKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const key = String(sizeKey || '').trim();
+    if (!key || !e.target.files || e.target.files.length === 0) return;
+    const newFiles = Array.from(e.target.files);
+    setVariantFilesBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles] }));
+    const previews = newFiles.map(f => URL.createObjectURL(f));
+    setVariantPreviewsBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
+    setVariantFilenamesBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles.map(f => f.name)] }));
+  };
+  const removeVariantNew = (sizeKey: string, index: number) => {
+    setVariantFilesBySize(prev => ({ ...prev, [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index) }));
+    const url = (variantPreviewsBySize[sizeKey] || [])[index];
+    if (url) URL.revokeObjectURL(url);
+    setVariantPreviewsBySize(prev => ({ ...prev, [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index) }));
+    setVariantFilenamesBySize(prev => ({ ...prev, [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index) }));
+  };
+  const removeVariantExisting = (sizeKey: string, index: number) => {
+    setVariantExistingBySize(prev => ({ ...prev, [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index) }));
+  };
+  // Handlers for combo images
+  const handleComboImageUpload = (comboKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const key = String(comboKey || '').trim();
+    if (!key || !e.target.files || e.target.files.length === 0) return;
+    const newFiles = Array.from(e.target.files);
+    setComboFilesByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles] }));
+    const previews = newFiles.map(f => URL.createObjectURL(f));
+    setComboPreviewsByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
+    setComboFilenamesByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles.map(f => f.name)] }));
+  };
+  const removeComboNew = (key: string, index: number) => {
+    setComboFilesByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
+    const url = (comboPreviewsByKey[key] || [])[index];
+    if (url) URL.revokeObjectURL(url);
+    setComboPreviewsByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
+    setComboFilenamesByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
+  };
+  const removeComboExisting = (key: string, index: number) => {
+    setComboExistingByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
+  };
+
+  useEffect(() => {
+    if (!selectedVariantSize && sizeRows.length) setSelectedVariantSize(String(sizeRows[0].value || ''));
+  }, [sizeRows, selectedVariantSize]);
+  useEffect(() => {
+    if (!selectedComboKey && comboRows.length) setSelectedComboKey(String(comboRows[0].value || slugify(comboRows[0].name || '')));
+  }, [comboRows, selectedComboKey]);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl h-[90vh] overflow-hidden flex flex-col min-h-0">
+      <DialogContent className="w-full h-dvh max-w-full sm:max-w-5xl xl:max-w-7xl sm:h-[90vh] overflow-hidden flex flex-col min-h-0">
         <DialogHeader>
           <DialogTitle>Edit Product</DialogTitle>
           <DialogDescription>
@@ -737,6 +862,33 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                             <div className="col-span-1 flex justify-end">
                               <Button type="button" variant="outline" onClick={()=>{ const v=[...sizeRows]; v.splice(i,1); setSizeRows(v); }}>Remove</Button>
                             </div>
+                            <div className="col-span-12 flex items-center gap-2">
+                              <label htmlFor={`sz-up-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                                <Upload className="h-4 w-4" /> Upload images for {s.name || (s.unit ? `${s.value} ${s.unit}` : s.value) || 'size'}
+                              </label>
+                              <input id={`sz-up-${i}`} type="file" accept="image/*" multiple className="sr-only" onChange={(e)=>handleVariantImageUpload(String(s.value), e)} />
+                              <span className="text-xs text-muted-foreground">{(variantFilenamesBySize[String(s.value)] || []).length} selected</span>
+                            </div>
+                            {(variantExistingBySize[String(s.value)] || []).length > 0 && (
+                              <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {(variantExistingBySize[String(s.value)] || []).map((fname, idx)=> (
+                                  <div key={`ex-${idx}`} className="relative group overflow-hidden rounded-md border">
+                                    <AspectRatio ratio={1/1}><img src={getFullImageUrl(fname)} alt="Variant existing" className="object-cover w-full h-full" /></AspectRatio>
+                                    <button type="button" onClick={()=>removeVariantExisting(String(s.value), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove existing variant image"><X className="h-4 w-4" /></button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {(variantPreviewsBySize[String(s.value)] || []).length > 0 && (
+                              <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {(variantPreviewsBySize[String(s.value)] || []).map((url, idx)=> (
+                                  <div key={idx} className="relative group overflow-hidden rounded-md border">
+                                    <AspectRatio ratio={1/1}><img src={url} alt="Variant preview" className="object-cover w-full h-full" /></AspectRatio>
+                                    <button type="button" onClick={()=>removeVariantNew(String(s.value), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove variant image"><X className="h-4 w-4" /></button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                         <Button type="button" variant="secondary" onClick={()=>setSizeRows([...sizeRows,{value:'',unit:'ml',useBasePrice:true}])}>Add Size</Button>
@@ -794,6 +946,33 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                             <div className="col-span-2 flex justify-end">
                               <Button type="button" variant="outline" onClick={()=>{ const v=[...comboRows]; v.splice(i,1); setComboRows(v); }}>Remove</Button>
                             </div>
+                            <div className="col-span-12 flex items-center gap-2">
+                              <label htmlFor={`cb-up-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                                <Upload className="h-4 w-4" /> Upload images for {cb.name || cb.value || 'combo'}
+                              </label>
+                              <input id={`cb-up-${i}`} type="file" accept="image/*" multiple className="sr-only" onChange={(e)=>handleComboImageUpload(String(cb.value || slugify(cb.name)), e)} />
+                              <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[String(cb.value || slugify(cb.name))] || []).length} selected</span>
+                            </div>
+                            {(comboExistingByKey[String(cb.value || slugify(cb.name))] || []).length > 0 && (
+                              <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {(comboExistingByKey[String(cb.value || slugify(cb.name))] || []).map((fname, idx)=> (
+                                  <div key={`ex-${idx}`} className="relative group overflow-hidden rounded-md border">
+                                    <AspectRatio ratio={1/1}><img src={getFullImageUrl(fname)} alt="Combo existing" className="object-cover w-full h-full" /></AspectRatio>
+                                    <button type="button" onClick={()=>removeComboExisting(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove existing combo image"><X className="h-4 w-4" /></button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).length > 0 && (
+                              <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).map((url, idx)=> (
+                                  <div key={idx} className="relative group overflow-hidden rounded-md border">
+                                    <AspectRatio ratio={1/1}><img src={url} alt="Combo preview" className="object-cover w-full h-full" /></AspectRatio>
+                                    <button type="button" onClick={()=>removeComboNew(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove combo image"><X className="h-4 w-4" /></button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                           </div>
                         ))}
                       </div>

@@ -81,3 +81,105 @@ export interface DashboardMetrics {
   average_order_value: number;
   revenue_today: number;
 }
+
+export interface ProductSalesMetric {
+  productId: string;
+  name: string;
+  totalQuantity: number;
+  totalRevenue: number;
+}
+
+export interface ProductSalesSummary {
+  items: ProductSalesMetric[];
+  totalProductsSold: number;
+  totalItemsSold: number;
+}
+
+export interface CustomerOrderSummary {
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  pbUserId?: string;
+  totalOrders: number;
+  totalSpend: number;
+  averageOrderValue: number;
+  firstOrderDate: string | null;
+  lastOrderDate: string | null;
+  averageGapDays: number | null;
+  daysSinceLastOrder: number | null;
+  topProducts: CustomerOrderProductSummary[];
+}
+
+export interface CustomerOrderAnalytics {
+  customers: CustomerOrderSummary[];
+  totalCustomers: number;
+  totalOrders: number;
+  totalRevenue: number;
+  topCustomersBySpend: CustomerOrderSummary[];
+  topCustomersByOrders: CustomerOrderSummary[];
+  orderDetails: Record<string, CustomerOrderDetail[]>;
+  chart: CustomerOrdersChartPoint[];
+}
+
+export interface CustomerOrderDetail {
+  id: string;
+  total: number;
+  status: string;
+  paymentStatus?: string;
+  created: string;
+  itemsCount: number;
+  email: string;
+  phone: string;
+  products: CustomerOrderProductSummary[];
+}
+
+export interface CustomerOrderProductSummary {
+  productId: string;
+  name: string;
+  quantity: number;
+}
+
+export interface CustomerOrdersChartPoint {
+  month: string;
+  orders: number;
+  revenue: number;
+}
+
+export interface AbandonedCartSummary {
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  pbUserId?: string;
+  pendingOrders: number;
+  totalValue: number;
+  averageOrderValue: number;
+  firstPendingDate: string | null;
+  lastPendingDate: string | null;
+  daysSinceLastPending: number | null;
+  topProducts: CustomerOrderProductSummary[];
+}
+
+export interface AbandonedCartDetail {
+  id: string;
+  total: number;
+  status: string;
+  paymentStatus?: string;
+  created: string;
+  itemsCount: number;
+  email: string;
+  phone: string;
+  products: CustomerOrderProductSummary[];
+}
+
+export interface AbandonedCartAnalytics {
+  customers: AbandonedCartSummary[];
+  totalCustomers: number;
+  totalPendingOrders: number;
+  totalPendingValue: number;
+  topCustomersByValue: AbandonedCartSummary[];
+  topCustomersByOrders: AbandonedCartSummary[];
+  orderDetails: Record<string, AbandonedCartDetail[]>;
+  chart: CustomerOrdersChartPoint[];
+}

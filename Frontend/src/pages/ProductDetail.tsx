@@ -64,6 +64,7 @@ const ProductDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [displayImages, setDisplayImages] = useState<string[]>([]);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [imagesPreloaded, setImagesPreloaded] = useState(false);
   const [productDescription, setProductDescription] = useState<Record<string, unknown> | null>(null);
@@ -73,15 +74,17 @@ const ProductDetail = () => {
   const [selectedColor, setSelectedColor] = useState<ProductColor | null>(null);
   const [selectedSize, setSelectedSize] = useState<{ name: string; value: string; unit?: string; inStock?: boolean; priceOverride?: number; priceDelta?: number } | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<{ name: string; value: string; type?: 'bogo' | 'bundle' | 'custom'; items?: number; priceOverride?: number; description?: string; discountType?: 'amount' | 'percent'; discountValue?: number } | null>(null);
+  const [lastVariantPick, setLastVariantPick] = useState<'size' | 'combo' | null>(null);
   const { toast } = useToast();
   const relatedLoaded = useRef(false);
 
-  // Active image index for pager dots
+  // Active image index for pager dots (uses variant-aware images)
   const currentIndex = useMemo(() => {
-    if (!product?.images || !selectedImage) return 0;
-    const idx = product.images.indexOf(selectedImage);
+    if (!displayImages || !selectedImage) return 0;
+    const idx = displayImages.indexOf(selectedImage);
     return idx >= 0 ? idx : 0;
-  }, [product?.images, selectedImage]);
+  }, [displayImages, selectedImage]);
+
   // Track last add to cart time to prevent duplicate events
   const lastAddToCartRef = useRef<number>(0);
   // Track last wishlist action time to prevent duplicate events
@@ -150,6 +153,73 @@ const ProductDetail = () => {
     window.scrollTo(0, 0);
   }, [id]);
 
+  // When a variant (size/combo) is selected, update the gallery to show its images first
+  useEffect(() => {
+    if (!product) return;
+    const base = Array.isArray(product.images) ? [...product.images] : [];
+    const extractName = (path: string) => path?.split('/')?.pop() || path;
+    const stem = (name: string) => (name || '')
+      .toLowerCase()
+      .replace(/\.[a-z0-9]+$/i, '') // remove extension
+      .replace(/[^a-z0-9]+/g, ''); // strip non-alnum
+    // Try to resolve raw filename to an actually stored filename in product.images
+    const resolveToStored = (raw: string): string | null => {
+      if (!raw) return null;
+      // If already full path id/filename
+      if (raw.includes('/')) {
+        // Ensure it exists in base list; if not, still return for best-effort
+        return raw;
+      }
+      const rawStem = stem(raw);
+      if (!rawStem) return null;
+      // Find best match in stored images by stem containment either way
+      const candidates = base.map((b) => ({ full: b, name: extractName(b), st: stem(extractName(b)) }));
+      // Exact stem
+      let hit = candidates.find(c => c.st === rawStem);
+      if (hit) return hit.full;
+      // Containment checks
+      hit = candidates.find(c => c.st.includes(rawStem) || rawStem.includes(c.st));
+      if (hit) return hit.full;
+      return null;
+    };
+    const norm = (img: string) => {
+      if (!img) return '';
+      if (img.startsWith('http')) return img;
+      // If already has a slash, assume it's id/filename shape
+      if (img.includes('/')) return img;
+      // Prefer resolving to actually stored filename to handle PocketBase renames
+      const stored = resolveToStored(img);
+      if (stored) return stored;
+      // Fallback to id/filename (may 404 if PB renamed, but we tried)
+      return `${product.id}/${img}`;
+    };
+    const v: any = (product as any).variants || {};
+    const variantImgs: string[] = [];
+    if (selectedSize && Array.isArray(v.sizes)) {
+      const match = v.sizes.find((s: any) => String(s.value) === String(selectedSize.value));
+      if (match && Array.isArray(match.images)) {
+        match.images.forEach((m: string) => variantImgs.push(norm(m)));
+      }
+    }
+    const comboImgs: string[] = [];
+    if (selectedCombo && Array.isArray(v.combos)) {
+      const match = v.combos.find((c: any) => String(c.value) === String(selectedCombo.value));
+      if (match && Array.isArray(match.images)) {
+        match.images.forEach((m: string) => comboImgs.push(norm(m)));
+      }
+    }
+    // Choose order by the most recent click: size or combo
+    const first = lastVariantPick === 'combo' ? comboImgs : variantImgs;
+    const second = lastVariantPick === 'combo' ? variantImgs : comboImgs;
+    const combined = [...first, ...second, ...base].filter(Boolean);
+    const unique: string[] = [];
+    combined.forEach((img) => { if (!unique.includes(img)) unique.push(img); });
+    setDisplayImages(unique);
+    // Prefer the first from the most recently clicked bucket, then the other, then base
+    const preferred = (first[0] || second[0] || unique[0] || null) as string | null;
+    setSelectedImage(preferred);
+  }, [product, selectedSize, selectedCombo, lastVariantPick]);
+
   // Load order configuration from PocketBase
   useEffect(() => {
     const loadOrderConfig = async () => {
@@ -171,22 +241,22 @@ const ProductDetail = () => {
     loadOrderConfig();
   }, []);
 
-  // Preload images for better performance
+  // Preload images for better performance (uses variant-aware images)
   useEffect(() => {
-    if (product && product.images && product.images.length > 0 && !imagesPreloaded) {
+    if (displayImages && displayImages.length > 0 && !imagesPreloaded) {
       // Create a function to preload all product images
       const preloadProductImages = async () => {
         try {
           // Immediately show thumbnail quality for all images
-          product.images.forEach(image => {
+          displayImages.forEach(image => {
             const img = new Image();
             img.src = getPocketBaseImageUrl(image, Collections.PRODUCTS, "thumbnail", "webp");
             img.loading = 'eager'; // Load thumbnails immediately
           });
 
           // Preload main image at medium quality immediately
-          if (product.images[0]) {
-            const mainImage = product.images[0];
+          if (displayImages[0]) {
+            const mainImage = displayImages[0];
             const mediumQualityLink = document.createElement('link');
             mediumQualityLink.rel = 'preload';
             mediumQualityLink.as = 'image';
@@ -207,10 +277,10 @@ const ProductDetail = () => {
           }
 
           // Load medium quality versions of other images when idle
-          if (product.images.length > 1) {
+          if (displayImages.length > 1) {
             if ('requestIdleCallback' in window) {
               requestIdleCallback(() => {
-                product.images.slice(1).forEach(image => {
+                displayImages.slice(1).forEach(image => {
                   const img = new Image();
                   img.src = getPocketBaseImageUrl(image, Collections.PRODUCTS, "medium", "webp");
                   img.loading = 'lazy';
@@ -219,7 +289,7 @@ const ProductDetail = () => {
             } else {
               // Fallback for browsers that don't support requestIdleCallback
               setTimeout(() => {
-                product.images.slice(1).forEach(image => {
+                displayImages.slice(1).forEach(image => {
                   const img = new Image();
                   img.src = getPocketBaseImageUrl(image, Collections.PRODUCTS, "medium", "webp");
                   img.loading = 'lazy';
@@ -236,7 +306,7 @@ const ProductDetail = () => {
 
       preloadProductImages();
     }
-  }, [product, imagesPreloaded]);
+  }, [displayImages, imagesPreloaded]);
 
   // Optimize related products image loading
   useEffect(() => {
@@ -365,6 +435,7 @@ const ProductDetail = () => {
         if (data.images?.length > 0) {
           const mainImage = data.images[0];
           setSelectedImage(mainImage);
+          setDisplayImages(data.images);
         }
         const initColors = (data as any).variants?.colors && (data as any).variants.colors.length > 0
           ? (data as any).variants.colors
@@ -450,17 +521,17 @@ const ProductDetail = () => {
 
   // Mobile gallery navigation
   const handlePrevImage = () => {
-    if (!product?.images || product.images.length === 0 || !selectedImage) return;
-    const idx = product.images.indexOf(selectedImage);
-    const prevIdx = (idx <= 0 ? product.images.length - 1 : idx - 1);
-    handleImageSelect(product.images[prevIdx]);
+    if (!displayImages || displayImages.length === 0 || !selectedImage) return;
+    const idx = displayImages.indexOf(selectedImage);
+    const prevIdx = (idx <= 0 ? displayImages.length - 1 : idx - 1);
+    handleImageSelect(displayImages[prevIdx]);
   };
 
   const handleNextImage = () => {
-    if (!product?.images || product.images.length === 0 || !selectedImage) return;
-    const idx = product.images.indexOf(selectedImage);
-    const nextIdx = (idx >= product.images.length - 1 ? 0 : idx + 1);
-    handleImageSelect(product.images[nextIdx]);
+    if (!displayImages || displayImages.length === 0 || !selectedImage) return;
+    const idx = displayImages.indexOf(selectedImage);
+    const nextIdx = (idx >= displayImages.length - 1 ? 0 : idx + 1);
+    handleImageSelect(displayImages[nextIdx]);
   };
 
   // Optimize image selection handling
@@ -736,7 +807,6 @@ const ProductDetail = () => {
     }
   }
 
-
   return (
     <div className="pb-32 md:pb-8 bg-gray-50/50 min-h-screen">
       <div className="konipai-container max-w-7xl mx-auto">
@@ -757,6 +827,7 @@ const ProductDetail = () => {
               {selectedImage ? (
                 <>
                   <ProductImage
+                    key={selectedImage || 'main-image'}
                     url={selectedImage}
                     alt={product?.name || 'Product image'}
                     className="w-full h-full object-cover aspect-square"
@@ -776,9 +847,9 @@ const ProductDetail = () => {
                     <ArrowLeft className="h-5 w-5" />
                   </button>
                   {/* Mobile image pager: dots with active rectangle */}
-                  {product?.images?.length ? (
+                  {displayImages?.length ? (
                     <div className="md:hidden absolute bottom-2 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-white/80 shadow ring-1 ring-black/5 flex items-center gap-1.5">
-                      {product.images.map((img, i) => (
+                      {displayImages.map((img, i) => (
                         <button
                           key={img || i}
                           type="button"
@@ -820,7 +891,7 @@ const ProductDetail = () => {
 
             {/* Thumbnail Grid */}
             <div className="hidden md:grid grid-cols-4 gap-4 px-4 lg:px-0">
-              {product?.images?.map((image, index) => (
+              {displayImages?.map((image, index) => (
                 <button
                   key={image || index}
                   type="button"
@@ -1024,7 +1095,7 @@ const ProductDetail = () => {
                           <button
                             key={sz.value}
                             type="button"
-                            onClick={() => setSelectedSize(sz)}
+                            onClick={() => { setSelectedSize(sz); setLastVariantPick('size'); }}
                             disabled={sz.inStock === false}
                             className={cn(
                               "px-3 py-1.5 rounded-full text-sm border transition-all",
@@ -1057,7 +1128,7 @@ const ProductDetail = () => {
                           <button
                             key={cb.value}
                             type="button"
-                            onClick={() => setSelectedCombo(cb)}
+                            onClick={() => { setSelectedCombo(cb); setLastVariantPick('combo'); }}
                             className={cn(
                               "px-3 py-1.5 rounded-full text-sm border transition-all",
                               selectedCombo?.value === cb.value 

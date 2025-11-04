@@ -9,13 +9,11 @@ import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import DashboardPage from "./pages/admin/DashboardPage";
 import OrdersPage from "./pages/admin/OrdersPage";
 import CustomersPage from "./pages/admin/CustomersPage";
+import AbandonedCartsPage from "./pages/admin/AbandonedCartsPage";
 import ProductsPage from "./pages/admin/ProductsPage";
-import PaymentsPage from "./pages/admin/PaymentsPage";
 import SettingsPage from "./pages/admin/SettingsPage";
-import CustomerJourneyPage from "./pages/admin/CustomerJourneyPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
-import CampaignsPage from "./pages/admin/CampaignsPage";
 import PwaUpdateNotification from "./components/PwaUpdateNotification";
 import ZenthraPagesManager from "./pages/admin/ZenthraPagesManager";
 import ZenthraPageEditor from "./pages/admin/ZenthraPageEditor";
@@ -72,11 +70,9 @@ const App = () => {
             <Route path="/admin" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
             <Route path="/admin/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
             <Route path="/admin/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
+            <Route path="/admin/abandoned-carts" element={<ProtectedRoute><AbandonedCartsPage /></ProtectedRoute>} />
             <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
-            <Route path="/admin/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path="/admin/customer-journey" element={<ProtectedRoute><CustomerJourneyPage /></ProtectedRoute>} />
-            <Route path="/admin/campaigns" element={<ProtectedRoute><CampaignsPage /></ProtectedRoute>} />
             <Route path="/admin/pages" element={<ProtectedRoute><ZenthraPagesManager /></ProtectedRoute>} />
             <Route path="/admin/pages/:pageId/edit" element={<ProtectedRoute><ZenthraPageEditor /></ProtectedRoute>} />
             <Route path="/admin/themes" element={<ProtectedRoute><ZenthraThemes /></ProtectedRoute>} />

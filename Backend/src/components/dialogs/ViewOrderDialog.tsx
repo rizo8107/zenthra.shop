@@ -9,17 +9,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { Order } from "@/types/schema";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Label } from "@/components/ui/label";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
-import { useWhatsAppActivities } from "@/hooks/useWhatsAppActivities";
-import { WhatsAppActivities } from "@/components/orders/WhatsAppActivities";
-import { SendWhatsAppMessage } from "@/components/orders/SendWhatsAppMessage";
-import { MessageSquare, Printer, PencilLine, Check, X, Trash2 } from "lucide-react";
+import { Printer, PencilLine, Check, X, Trash2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -285,7 +281,7 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
   if (!order) return null;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full h-dvh max-w-full sm:max-w-3xl sm:h-[90vh] rounded-none sm:rounded-xl p-0 overflow-hidden flex flex-col">
+      <DialogContent className="w-full h-dvh max-w-full sm:max-w-6xl xl:max-w-7xl sm:h-[90vh] rounded-none sm:rounded-xl p-0 overflow-hidden flex flex-col">
         {/* Sticky header with compact summary */}
         <DialogHeader className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur px-4 py-3 sm:px-6">
           <div className="flex items-start justify-between gap-3">
@@ -300,7 +296,7 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                 Created on {safeFormatDate(order.created)} • Total ₹{order.total?.toFixed(2) || "0.00"}
               </DialogDescription>
             </div>
-            <div className="flex items-center gap-2 flex-wrap justify-end">
+            <div className="flex items-center gap-2 flex-wrap justify-end pr-10 sm:pr-12">
               <Badge variant={paymentStatusVariant[form.payment_status] || "outline"} className="px-2 py-1 text-xs">
                 Payment: {form.payment_status.replace(/^(.)/, (c) => c.toUpperCase())}
               </Badge>
@@ -334,36 +330,47 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
           </div>
         </DialogHeader>
 
-        {/* Tabs */}
-        <Tabs defaultValue="details" className="flex-1 flex flex-col min-h-0">
-          <div className="px-3 pt-3 sm:px-6">
-            <TabsList className="w-full justify-start flex-wrap gap-2">
-              <TabsTrigger value="details" className="text-sm">Details</TabsTrigger>
-              <TabsTrigger value="products" className="text-sm">Products</TabsTrigger>
-              <TabsTrigger value="payment" className="text-sm">Payment</TabsTrigger>
-              <TabsTrigger value="whatsapp" className="text-sm flex items-center gap-1">
-                <MessageSquare className="h-4 w-4" /> WhatsApp
-              </TabsTrigger>
-            </TabsList>
+        <ScrollArea className="sm:flex-1 px-3 sm:px-6 pb-24">
+          {/* KPI cards */}
+          <div className="grid gap-3 pt-3 sm:grid-cols-2 xl:grid-cols-3">
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-500 text-white shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-xs uppercase tracking-wide text-white/80">Order value</p>
+                <p className="text-2xl font-semibold">₹{(order.total ?? 0).toFixed(2)}</p>
+              </CardContent>
+            </Card>
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500 via-green-500 to-lime-500 text-white shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-xs uppercase tracking-wide text-white/80">Items</p>
+                <p className="text-2xl font-semibold">{products.reduce((s, i) => s + (i.quantity || 0), 0)}</p>
+                <p className="text-xs text-white/80">{products.length} SKU(s)</p>
+              </CardContent>
+            </Card>
+            <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-500 text-white shadow-sm">
+              <CardContent className="p-4">
+                <p className="text-xs uppercase tracking-wide text-white/80">Fulfilment</p>
+                <p className="text-lg font-semibold capitalize">{form.status.replace(/_/g, " ")}</p>
+                <p className="text-xs text-white/80">Payment {form.payment_status}</p>
+              </CardContent>
+            </Card>
           </div>
 
-          <ScrollArea className="sm:flex-1 px-3 sm:px-6 pb-24">
-            {/* DETAILS */}
-            <TabsContent value="details" className="space-y-3 sm:space-y-4 pt-3">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                <Card>
-                  <CardHeader className="px-4 py-3 sm:px-5">
-                    <CardTitle className="text-base sm:text-lg">Customer</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 px-4 pb-4 sm:px-5">
-                    <div>
-                      <Label className="font-semibold">Name</Label>
-                      {isEditing ? (
-                        <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
-                      ) : (
-                        <p>{form.customer_name}</p>
-                      )}
-                    </div>
+          {/* DETAILS */}
+          <div className="space-y-3 sm:space-y-4 pt-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+              <Card>
+                <CardHeader className="px-4 py-3 sm:px-5">
+                  <CardTitle className="text-base sm:text-lg">Customer</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 px-4 pb-4 sm:px-5">
+                  <div>
+                    <Label className="font-semibold">Name</Label>
+                    {isEditing ? (
+                      <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
+                    ) : (
+                      <p>{form.customer_name}</p>
+                    )}
+                  </div>
                     <div>
                       <Label className="font-semibold">Email</Label>
                       {isEditing ? (
@@ -466,10 +473,9 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                   </CardContent>
                 </Card>
               </div>
-            </TabsContent>
 
             {/* PRODUCTS */}
-            <TabsContent value="products" className="pt-3">
+            <div className="pt-3">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base sm:text-lg">Product Details</CardTitle>
@@ -496,18 +502,29 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                           <div className="md:col-span-3 flex flex-col justify-between">
                             <div>
                               <h4 className="font-medium text-base">{product.product?.name || (product as any).name || "Unknown Product"}</h4>
-                              {product.color && (
-                                <span className="text-sm text-muted-foreground">Color: {product.color}</span>
-                              )}
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-600">Qty {product.quantity}</Badge>
+                                {product.color && product.color.trim().length > 0 && (
+                                  <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-600">{product.color}</Badge>
+                                )}
+                                {(product as any).sizeLabel && (
+                                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-600">{(product as any).sizeLabel}</Badge>
+                                )}
+                                {!((product as any).sizeLabel) && (product as any).size && (
+                                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-600">{(product as any).size}</Badge>
+                                )}
+                                {(product as any).comboLabel && (
+                                  <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-600">{(product as any).comboLabel}</Badge>
+                                )}
+                                {!((product as any).comboLabel) && (product as any).combo && (
+                                  <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-600">{(product as any).combo}</Badge>
+                                )}
+                              </div>
                               {product.product?.description && (
                                 <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{product.product.description}</p>
                               )}
                             </div>
                             <div className="grid grid-cols-3 mt-2 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Qty</span>
-                                <p className="font-medium">{product.quantity}</p>
-                              </div>
                               <div>
                                 <span className="text-muted-foreground">Price</span>
                                 <p className="font-medium">₹{((product.product?.price ?? (product as any).price ?? 0) as number).toFixed(2)}</p>
@@ -534,10 +551,10 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                   )}
                 </CardContent>
               </Card>
-            </TabsContent>
+            </div>
 
             {/* PAYMENT */}
-            <TabsContent value="payment" className="pt-3">
+            <div className="pt-3">
               <Card>
                 <CardHeader>
                   <CardTitle className="text-base sm:text-lg">Payment</CardTitle>
@@ -579,34 +596,9 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            {/* WHATSAPP */}
-            <TabsContent value="whatsapp" className="pt-3 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base sm:text-lg">Send WhatsApp Message</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <SendWhatsAppMessage
-                    order={order}
-                    onMessageSent={() => {
-                      queryClient.invalidateQueries({ queryKey: ["whatsapp_activities", order.id] });
-                    }}
-                  />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base sm:text-lg">Message History</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <WhatsAppActivitiesTab orderId={order.id} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </ScrollArea>
-        </Tabs>
+            </div>
+          </div>
+        </ScrollArea>
 
         {/* Sticky footer actions (mobile-friendly) */}
         <div className="sticky bottom-0 z-20 border-t bg-background/95 backdrop-blur px-4 py-3 sm:px-6 flex items-center justify-end gap-2">
@@ -618,9 +610,4 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
       </DialogContent>
     </Dialog>
   );
-}
-
-function WhatsAppActivitiesTab({ orderId }: { orderId: string }) {
-  const { activities, isLoading } = useWhatsAppActivities(orderId);
-  return <WhatsAppActivities activities={activities} isLoading={isLoading} orderId={orderId} />;
 }
