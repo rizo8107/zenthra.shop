@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { pb, ensureAdminAuth } from '@/lib/pocketbase';
+import { pb, ensureAdminAuth, getCustomerOrderAnalytics } from '@/lib/pocketbase';
 import { User } from '@/types/schema';
+import type { CustomerOrderAnalytics } from '@/lib/types';
 import { toast } from 'sonner';
 
 export interface CreateUserData {
@@ -123,6 +124,19 @@ export function useUsers() {
     },
   });
 
+  const { data: analytics, isLoading: isAnalyticsLoading } = useQuery<CustomerOrderAnalytics>({
+    queryKey: ['customer-order-analytics'],
+    queryFn: async () => {
+      try {
+        return await getCustomerOrderAnalytics();
+      } catch (error) {
+        console.error('Error fetching customer order analytics:', error);
+        throw error;
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+
   return {
     users: data?.items ?? [],
     totalUsers: data?.totalItems ?? 0,
@@ -131,5 +145,7 @@ export function useUsers() {
     createUser,
     updateUser,
     deleteUser,
+    analytics,
+    isAnalyticsLoading,
   };
 }

@@ -1556,12 +1556,52 @@ export default function CheckoutPage() {
           country: "India",
         }), // Store address in the exact format your system expects
         products: JSON.stringify(
-          items.map((item) => ({
-            productId: item.productId,
-            product: item.product,
-            quantity: item.quantity,
-            color: item.color,
-          })),
+          items.map((item) => {
+            interface SizeVariant {
+              value: string | number;
+              unit?: string;
+            }
+            interface ComboVariant {
+              value: string | number;
+              name?: string;
+            }
+
+            const sizeValue = item.options?.size;
+            const comboValue = item.options?.combo;
+
+            const sizeVariants =
+              ((item.product as { variants?: { sizes?: SizeVariant[] } })
+                ?.variants?.sizes ?? []) as SizeVariant[];
+            const comboVariants =
+              ((item.product as { variants?: { combos?: ComboVariant[] } })
+                ?.variants?.combos ?? []) as ComboVariant[];
+
+            const sizeMatch = sizeVariants.find(
+              (variant) => String(variant.value) === String(sizeValue),
+            );
+            const comboMatch = comboVariants.find(
+              (variant) => String(variant.value) === String(comboValue),
+            );
+
+            const unit = sizeMatch?.unit ? ` ${sizeMatch.unit}` : "";
+
+            return {
+              productId: item.productId,
+              product: item.product,
+              quantity: item.quantity,
+              color: item.color,
+              size: sizeValue ?? null,
+              sizeLabel: sizeValue
+                ? `${sizeValue}${unit}`.trim() || null
+                : null,
+              combo: comboValue ?? null,
+              comboLabel: comboMatch?.name?.toString() || comboValue || null,
+              unitPrice:
+                typeof (item as { unitPrice?: number }).unitPrice === "number"
+                  ? (item as { unitPrice?: number }).unitPrice
+                  : undefined,
+            };
+          }),
         ),
         subtotal: Number(totals.finalSubtotal),
         // Shipping and discount come directly from calculateFinalTotal() which uses PocketBase config
@@ -2427,20 +2467,43 @@ export default function CheckoutPage() {
                           {item.product.name} × {item.quantity}
                         </span>
                         {(() => {
+                          interface SizeVariant {
+                            value: string | number;
+                            unit?: string;
+                          }
                           const sizeValue = item.options?.size;
                           if (!sizeValue) return null;
-                          const sizes =
-                            (item.product as any)?.variants?.sizes || [];
-                          const match = Array.isArray(sizes)
-                            ? sizes.find(
-                                (s: any) =>
-                                  String(s.value) === String(sizeValue),
-                              )
-                            : undefined;
+                          const variants =
+                            ((item.product as { variants?: { sizes?: SizeVariant[] } })
+                              ?.variants?.sizes ?? []) as SizeVariant[];
+                          const match = variants.find((variant) =>
+                            String(variant.value) === String(sizeValue),
+                          );
                           const unit = match?.unit ? ` ${match.unit}` : "";
                           const label = `${sizeValue}${unit}`.trim();
                           return label ? (
                             <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-semibold">
+                              {label}
+                            </span>
+                          ) : null;
+                        })()}
+                        {(() => {
+                          interface ComboVariant {
+                            value: string | number;
+                            name?: string;
+                          }
+                          const comboValue = item.options?.combo;
+                          if (!comboValue) return null;
+                          const variants =
+                            ((item.product as { variants?: { combos?: ComboVariant[] } })
+                              ?.variants?.combos ?? []) as ComboVariant[];
+                          const match = variants.find((variant) =>
+                            String(variant.value) === String(comboValue),
+                          );
+                          const rawLabel = match?.name ?? comboValue;
+                          const label = rawLabel?.toString().trim();
+                          return label ? (
+                            <span className="rounded-full bg-emerald-500 text-white px-2 py-0.5 text-[10px] font-semibold">
                               {label}
                             </span>
                           ) : null;

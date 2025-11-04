@@ -70,12 +70,25 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   };
 
   // ---- Derive products from order.products (fallback when expand.items is empty) ----
-  type OrderProductRow = { product_id: string; quantity: number; price: number; name?: string };
+  interface OrderProductRow {
+    product_id?: string;
+    productId?: string;
+    product?: unknown;
+    quantity: number;
+    price: number;
+    unitPrice?: number;
+    name?: string;
+    color?: string | null;
+    size?: string | null;
+    sizeLabel?: string | null;
+    combo?: string | null;
+    comboLabel?: string | null;
+  }
   const [rows, setRows] = useState<OrderProductRow[]>([]);
   const [productsById, setProductsById] = useState<Record<string, any>>({});
   const [productDialog, setProductDialog] = useState<{open: boolean; product: any | null}>({open: false, product: null});
 
-  const safeParseProducts = (value: unknown): OrderProductRow[] => {
+  const safeParseProducts = (value: unknown): unknown[] => {
     try {
       if (!value) return [];
       let s = value as string;
@@ -91,7 +104,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       }
       // Final parse
       const arr = JSON.parse(s);
-      if (Array.isArray(arr)) return arr as OrderProductRow[];
+      if (Array.isArray(arr)) return arr;
       return [];
     } catch (e) {
       console.warn('Failed to parse order.products', e, value);
@@ -110,18 +123,43 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     if (expandedItems && expandedItems.length > 0) {
       const mapped: OrderProductRow[] = expandedItems.map((it: any) => ({
         product_id: it.product_id,
+        productId: it.product_id,
         quantity: Number(it.quantity) || 0,
         price: Number(it.price) || 0,
+        unitPrice: Number(it.price) || undefined,
         name: it.expand?.product_id?.name,
+        color: it.color ?? null,
+        size: it.size ?? null,
+        sizeLabel: it.sizeLabel ?? null,
+        combo: it.combo ?? null,
+        comboLabel: it.comboLabel ?? null,
       }));
       setRows(mapped);
       // Fetch missing product records if needed
-      const ids = mapped.map(r => r.product_id).filter(Boolean);
+      const ids = mapped.map(r => r.product_id || r.productId).filter(Boolean) as string[];
       void fetchProducts(ids);
     } else {
       const parsed = safeParseProducts((order as any).products);
-      setRows(parsed);
-      const ids = parsed.map(r => r.product_id).filter(Boolean);
+      const normalized: OrderProductRow[] = parsed.map((raw: any) => {
+        const productId = raw?.product_id ?? raw?.productId ?? '';
+        const unitPrice = raw?.unitPrice ?? raw?.price ?? raw?.product?.price;
+        return {
+          product_id: productId || undefined,
+          productId: productId || undefined,
+          product: raw?.product,
+          quantity: Number(raw?.quantity) || 0,
+          price: Number(unitPrice) || 0,
+          unitPrice: Number(unitPrice) || undefined,
+          name: raw?.product?.name ?? raw?.name,
+          color: raw?.color ?? null,
+          size: raw?.size ?? null,
+          sizeLabel: raw?.sizeLabel ?? null,
+          combo: raw?.combo ?? null,
+          comboLabel: raw?.comboLabel ?? null,
+        };
+      });
+      setRows(normalized);
+      const ids = normalized.map(r => r.product_id || r.productId).filter(Boolean) as string[];
       void fetchProducts(ids);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -146,10 +184,21 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     }
   };
 
-  const itemsToRender = useMemo(() => rows.map(r => ({
-    ...r,
-    product: productsById[r.product_id],
-  })), [rows, productsById]);
+  const itemsToRender = useMemo(() => rows.map(r => {
+    const product = productsById[r.product_id || r.productId || ''] ?? r.product;
+    return {
+      ...r,
+      product,
+    };
+  }), [rows, productsById]);
+
+  const renderBadge = (label: string, tone: 'emerald' | 'sky' = 'emerald') => (
+    <span
+      className={`inline-flex items-center rounded-full bg-${tone}-600/15 text-${tone}-600 px-2 py-0.5 text-[11px] font-medium`}
+    >
+      {label}
+    </span>
+  );
   
   const orderId = order?.id || '';
   return (
@@ -216,8 +265,20 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       >
                         {displayName}
                       </button>
+                      <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-gray-600">
+                        {item.color && item.color.trim().length > 0 && (
+                          <span className="inline-flex items-center gap-1">
+                            <span className="font-medium">Color:</span>
+                            <span>{item.color}</span>
+                          </span>
+                        )}
+                        {item.sizeLabel && renderBadge(item.sizeLabel, 'emerald')}
+                        {!item.sizeLabel && item.size && renderBadge(item.size, 'emerald')}
+                        {item.comboLabel && renderBadge(item.comboLabel, 'sky')}
+                        {!item.comboLabel && item.combo && renderBadge(item.combo, 'sky')}
+                      </div>
                       <div className="text-sm text-gray-500">
-                        {item.quantity} x â‚¹{Number(item.price || 0).toFixed(2)}
+                        {item.quantity} x â‚¹{Number(item.price || item.unitPrice || 0).toFixed(2)}
                       </div>
                     </div>
                     <div className="text-right font-medium">â‚¹{total.toFixed(2)}</div>

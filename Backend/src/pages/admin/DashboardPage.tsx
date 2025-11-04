@@ -1,23 +1,36 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { MetricsGrid } from '@/components/dashboard/DashboardMetrics';
 import { OrdersTable } from '@/components/orders/OrdersTable';
 import { OrderDetailsModal } from '@/components/orders/OrderDetailsModal';
-import { DashboardMetrics, Order, OrderStatus } from '@/lib/types';
+import { DashboardMetrics, Order, OrderStatus, ProductSalesSummary } from '@/lib/types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
-import { getDashboardMetrics, getMonthlyRevenueData, getOrders, updateOrderStatus } from '@/lib/pocketbase';
+import { getDashboardMetrics, getMonthlyRevenueData, getOrders, getProductSalesSummary, updateOrderStatus } from '@/lib/pocketbase';
 import { mapPocketBaseOrderToOrder } from '@/lib/mapper';
+import { DateRangePicker } from '@/components/ui/date-range-picker';
+import type { DateRange } from 'react-day-picker';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 const DashboardPage: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [revenueData, setRevenueData] = useState<{ month: string; revenue: number }[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [productSales, setProductSales] = useState<ProductSalesSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isProductLoading, setIsProductLoading] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { toast } = useToast();
+  const [productDateRange, setProductDateRange] = useState<DateRange | undefined>(undefined);
+  const [productSearch, setProductSearch] = useState('');
+  const [productTopN, setProductTopN] = useState<number>(15);
 
   // Fetch dashboard data
   useEffect(() => {
@@ -31,6 +44,10 @@ const DashboardPage: React.FC = () => {
         // Fetch revenue data for chart
         const revenueDataResponse = await getMonthlyRevenueData();
         setRevenueData(revenueDataResponse);
+
+        // Fetch product sales summary
+        const productSalesResponse = await getProductSalesSummary();
+        setProductSales(productSalesResponse);
 
         // Fetch recent orders
         const ordersResponse = await getOrders(10); // Limit to 10 recent orders
@@ -51,6 +68,34 @@ const DashboardPage: React.FC = () => {
 
     fetchDashboardData();
   }, [toast]);
+
+  useEffect(() => {
+    const fetchProductSales = async () => {
+      setIsProductLoading(true);
+      try {
+        const startDate = productDateRange?.from
+          ? new Date(productDateRange.from.setHours(0, 0, 0, 0)).toISOString()
+          : undefined;
+        const endDate = productDateRange?.to
+          ? new Date(productDateRange.to.setHours(23, 59, 59, 999)).toISOString()
+          : undefined;
+
+        const response = await getProductSalesSummary({ startDate, endDate });
+        setProductSales(response);
+      } catch (error) {
+        console.error('Error fetching product sales:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load product sales data. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsProductLoading(false);
+      }
+    };
+
+    void fetchProductSales();
+  }, [productDateRange, toast]);
 
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
@@ -93,66 +138,291 @@ const DashboardPage: React.FC = () => {
     }
   };
 
+  const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+
+  const topNValue = productTopN > 0 ? String(productTopN) : 'all';
+
+  const visibleProductItems = useMemo(() => {
+    if (!productSales) return [] as ProductSalesSummary['items'];
+    const search = productSearch.trim().toLowerCase();
+    const filtered = productSales.items.filter((item) =>
+      item.name.toLowerCase().includes(search)
+    );
+    if (productTopN > 0) {
+      return filtered.slice(0, productTopN);
+    }
+    return filtered;
+  }, [productSales, productSearch, productTopN]);
+
+  const visibleSummary = useMemo(() => {
+    const totalUnits = visibleProductItems.reduce((sum, item) => sum + item.totalQuantity, 0);
+    const totalRevenue = visibleProductItems.reduce((sum, item) => sum + item.totalRevenue, 0);
+    return {
+      products: visibleProductItems.length,
+      units: totalUnits,
+      revenue: totalRevenue,
+    };
+  }, [visibleProductItems]);
+
+  const resetProductFilters = () => {
+    setProductDateRange(undefined);
+    setProductSearch('');
+    setProductTopN(15);
+  };
+
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">Overview of your store performance</p>
+      <Tabs defaultValue="overview" className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+            <p className="text-muted-foreground">Overview of your store performance</p>
+          </div>
+          <TabsList>
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="products">Product Sales</TabsTrigger>
+          </TabsList>
         </div>
-        
-        {/* Metrics Cards */}
-        <MetricsGrid metrics={metrics} isLoading={isLoading} />
-        
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Revenue Overview</CardTitle>
-            <CardDescription>Monthly revenue for the current year</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart 
-                  data={revenueData} 
-                  margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis />
-                  <Tooltip 
-                    formatter={(value) => [`₹${value}`, 'Revenue']}
-                  />
-                  <Bar 
-                    dataKey="revenue" 
-                    fill="#0c8ee8" 
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Recent Orders */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Recent Orders</h2>
-          <OrdersTable 
-            orders={orders} 
-            isLoading={isLoading}
-            onViewOrder={handleViewOrder}
-            onUpdateStatus={handleUpdateOrderStatus}
-          />
-        </div>
-        
-        {/* Order Details Modal */}
-        <OrderDetailsModal 
+
+        <TabsContent value="overview" className="space-y-6">
+          <MetricsGrid metrics={metrics} isLoading={isLoading} />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Revenue Overview</CardTitle>
+              <CardDescription>Monthly revenue for the current year</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-80">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={revenueData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <Tooltip formatter={(value) => [`₹${value}`, 'Revenue']} />
+                    <Bar dataKey="revenue" fill="#0c8ee8" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div>
+            <h2 className="text-xl font-semibold mb-4">Recent Orders</h2>
+            <OrdersTable
+              orders={orders}
+              isLoading={isLoading}
+              onViewOrder={handleViewOrder}
+              onUpdateStatus={handleUpdateOrderStatus}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="products" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Filters</CardTitle>
+              <CardDescription>Refine product performance by timeframe or keyword.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 flex-1">
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium">Date range</Label>
+                    <DateRangePicker value={productDateRange} onChange={setProductDateRange} />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium">Search products</Label>
+                    <Input
+                      placeholder="Search by product name"
+                      value={productSearch}
+                      onChange={(event) => setProductSearch(event.target.value)}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-medium">Show top</Label>
+                    <Select
+                      value={topNValue}
+                      onValueChange={(value) =>
+                        setProductTopN(value === 'all' ? 0 : Number(value))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Top products" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">Top 10</SelectItem>
+                        <SelectItem value="15">Top 15</SelectItem>
+                        <SelectItem value="25">Top 25</SelectItem>
+                        <SelectItem value="50">Top 50</SelectItem>
+                        <SelectItem value="all">Show All</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" onClick={resetProductFilters}>Reset</Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Sales Summary</CardTitle>
+              <CardDescription>Aggregated performance across all orders</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isLoading ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {Array.from({ length: 3 }).map((_, idx) => (
+                    <Card key={idx} className="animate-pulse">
+                      <CardContent className="space-y-3 py-6">
+                        <div className="h-4 w-32 bg-gray-200 rounded" />
+                        <div className="h-6 w-24 bg-gray-200 rounded" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : productSales ? (
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Products Shown
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-semibold">{visibleSummary.products}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {productSales.totalProductsSold} total within selected range
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Units Sold (visible)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-3xl font-semibold">{visibleSummary.units}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {productSales.totalItemsSold} total units in date range
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Top Product
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {visibleProductItems.length > 0 ? (
+                        <div>
+                          <p className="text-lg font-semibold">{visibleProductItems[0].name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {visibleProductItems[0].totalQuantity} units • {formatCurrency(visibleProductItems[0].totalRevenue)}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">No sales recorded yet.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No product sales data available yet.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Units Sold by Product</CardTitle>
+              <CardDescription>Visual breakdown of quantities sold</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {isProductLoading ? (
+                <div className="flex h-48 items-center justify-center">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : visibleProductItems.length > 0 ? (
+                <div className="h-[480px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={visibleProductItems}
+                      layout="vertical"
+                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis type="number" allowDecimals={false} />
+                      <YAxis
+                        type="category"
+                        dataKey="name"
+                        width={200}
+                        tick={{ fontSize: 12 }}
+                      />
+                      <Tooltip
+                        formatter={(value, name) => [
+                          name === 'totalRevenue' ? formatCurrency(Number(value)) : value,
+                          name === 'totalRevenue' ? 'Revenue' : 'Units',
+                        ]}
+                      />
+                      <Bar dataKey="totalQuantity" fill="#6366f1" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No products match the current filters.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Product Performance Details</CardTitle>
+              <CardDescription>Comprehensive view of quantities and revenue</CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              {visibleProductItems.length > 0 ? (
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-muted-foreground">
+                      <th className="py-2 pr-6">Product</th>
+                      <th className="py-2 pr-6">Units Sold</th>
+                      <th className="py-2">Revenue</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visibleProductItems.map((item) => (
+                      <tr key={item.productId} className="border-t">
+                        <td className="py-2 pr-6 font-medium">{item.name}</td>
+                        <td className="py-2 pr-6">{item.totalQuantity}</td>
+                        <td className="py-2">{formatCurrency(item.totalRevenue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-muted-foreground">No product sales recorded yet.</p>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <OrderDetailsModal
           order={selectedOrder}
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           onUpdateStatus={handleUpdateOrderStatus}
         />
-      </div>
+      </Tabs>
     </AdminLayout>
   );
 };

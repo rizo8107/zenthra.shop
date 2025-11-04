@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
@@ -236,10 +237,10 @@ const SettingsPage = () => {
               <CardContent>
                 <div className="flex items-center justify-between rounded-lg border p-3">
                   <div className="space-y-0.5">
-                    <FormLabel>Browser Notifications</FormLabel>
-                    <FormDescription>
+                    <Label>Browser Notifications</Label>
+                    <p className="text-sm text-muted-foreground">
                       Receive alerts for new orders and important updates directly in your browser.
-                    </FormDescription>
+                    </p>
                   </div>
                   <Button onClick={handleEnablePushNotifications}>Enable</Button>
                 </div>
