@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, type TouchEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
@@ -77,6 +77,11 @@ const ProductDetail = () => {
   const [lastVariantPick, setLastVariantPick] = useState<'size' | 'combo' | null>(null);
   const { toast } = useToast();
   const relatedLoaded = useRef(false);
+  // Touch swipe refs for mobile gallery
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const touchStartTime = useRef<number>(0);
+  const touchActive = useRef<boolean>(false);
 
   // Active image index for pager dots (uses variant-aware images)
   const currentIndex = useMemo(() => {
@@ -563,6 +568,48 @@ const ProductDetail = () => {
     preloadHighRes();
   };
 
+  // Touch handlers to enable swipe on mobile
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const t = e.touches[0];
+    touchStartX.current = t.clientX;
+    touchStartY.current = t.clientY;
+    touchStartTime.current = Date.now();
+    touchActive.current = true;
+  };
+
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    if (!touchActive.current || touchStartX.current === null || touchStartY.current === null) return;
+    const t = e.touches[0];
+    const dx = t.clientX - touchStartX.current;
+    const dy = t.clientY - touchStartY.current;
+    // If horizontal movement dominates, prevent vertical scroll for a better swipe experience
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 10) {
+      e.preventDefault();
+    }
+  };
+
+  const handleTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+    if (!touchActive.current || touchStartX.current === null) return;
+    const endTime = Date.now();
+    const duration = endTime - touchStartTime.current;
+    const changed = e.changedTouches[0];
+    const dx = changed.clientX - touchStartX.current;
+    const threshold = 50; // pixels
+    const maxDuration = 600; // ms
+    touchActive.current = false;
+    touchStartX.current = null;
+    touchStartY.current = null;
+    if (Math.abs(dx) >= threshold && duration <= maxDuration) {
+      if (dx < 0) {
+        // swipe left -> next image
+        handleNextImage();
+      } else {
+        // swipe right -> prev image
+        handlePrevImage();
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="konipai-container py-8">
@@ -823,7 +870,12 @@ const ProductDetail = () => {
           {/* Column 1: Image Gallery (Mobile: Top, Desktop: Left) */}
           <div className="lg:sticky lg:top-20 space-y-4 pt-0 md:pt-4">
             {/* Main Image View */}
-            <div className="relative bg-white lg:bg-card rounded-b-3xl md:rounded-xl overflow-hidden group shadow-md md:shadow-lg transition-shadow duration-300">
+            <div
+              className="relative bg-white lg:bg-card rounded-b-3xl md:rounded-xl overflow-hidden group shadow-md md:shadow-lg transition-shadow duration-300"
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
               {selectedImage ? (
                 <>
                   <ProductImage
@@ -889,7 +941,38 @@ const ProductDetail = () => {
               )}
             </div>
 
-            {/* Thumbnail Grid */}
+            {/* Mobile horizontal thumbnails */}
+            {displayImages?.length ? (
+              <div className="md:hidden px-3 pt-3">
+                <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1" role="tablist" aria-label="Product thumbnails">
+                  {displayImages.map((image, index) => (
+                    <button
+                      key={image || index}
+                      type="button"
+                      onClick={() => handleImageSelect(image)}
+                      className={cn(
+                        "relative shrink-0 rounded-lg overflow-hidden border",
+                        selectedImage === image ? "border-primary ring-2 ring-primary/30" : "border-transparent"
+                      )}
+                      aria-label={`View ${product.name} image ${index + 1}`}
+                    >
+                      <ProductImage
+                        url={image}
+                        alt={`${product.name} ${index + 1}`}
+                        className="w-16 h-16 object-cover"
+                        width={64}
+                        height={64}
+                        size="thumbnail"
+                        priority={index < 2}
+                        aspectRatio="square"
+                      />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+
+            {/* Desktop Thumbnail Grid */}
             <div className="hidden md:grid grid-cols-4 gap-4 px-4 lg:px-0">
               {displayImages?.map((image, index) => (
                 <button

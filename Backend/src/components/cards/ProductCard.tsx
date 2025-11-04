@@ -44,13 +44,16 @@ export function ProductCard({ product, onView, onEdit }: ProductCardProps) {
   };
 
   return (
-    <Card className="h-full flex flex-col overflow-hidden hover:shadow-md transition-shadow duration-200">
+    <Card className="h-full flex flex-col overflow-hidden hover:shadow-md transition-shadow duration-200 touch-pan-y">
       <div className="relative">
         <AspectRatio ratio={1}>
           <img
             src={getProductImageUrl(product)}
             alt={product.name || 'Product'}
-            className="object-cover w-full h-full"
+            className="object-cover w-full h-full select-none pointer-events-none"
+            draggable={false}
+            onDragStart={(e) => e.preventDefault()}
+            loading="lazy"
             onError={(e) => {
               (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
             }}
