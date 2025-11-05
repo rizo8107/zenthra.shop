@@ -6,6 +6,17 @@ console.log('Initializing PocketBase client with URL:', import.meta.env.VITE_POC
 // Initialize PocketBase instance without auto-authenticating an admin
 export const pocketbase = new PocketBase(import.meta.env.VITE_POCKETBASE_URL || 'http://localhost:8090');
 
+export async function ensureAdminAuth() {
+    if (!pocketbase.authStore.isValid) {
+        const email = import.meta.env.VITE_PB_ADMIN_EMAIL;
+        const password = import.meta.env.VITE_PB_ADMIN_PASSWORD;
+        if (!email || !password) {
+            throw new Error('PocketBase admin credentials missing. Ensure VITE_PB_ADMIN_EMAIL and VITE_PB_ADMIN_PASSWORD are set.');
+        }
+        await pocketbase.admins.authWithPassword(email, password);
+    }
+}
+
 // Export collection names as constants
 export enum Collections {
     PRODUCTS = 'products',
