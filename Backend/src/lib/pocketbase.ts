@@ -10,8 +10,14 @@ import type {
   AbandonedCartDetail,
 } from '@/lib/types';
 
-// Initialize PocketBase with the URL from environment variables
-export const pb = new PocketBase(import.meta.env.VITE_POCKETBASE_URL || 'https://backend-pocketbase.7za6uc.easypanel.host');
+// Initialize PocketBase with the URL from environment variables (supports Vite and Node)
+const VITE_ENV = (typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {};
+const POCKETBASE_URL =
+  (VITE_ENV as any).VITE_POCKETBASE_URL ||
+  process.env.VITE_POCKETBASE_URL ||
+  'https://backend-pocketbase.7za6uc.easypanel.host';
+
+export const pb = new PocketBase(POCKETBASE_URL);
 
 // Disable auto-cancellation of requests which is causing issues
 pb.autoCancellation(false);

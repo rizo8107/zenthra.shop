@@ -4,6 +4,7 @@ import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import webpush from 'web-push';
 import evolutionRoutes from './evolutionService';
+import webhooksRouter from './webhooks';
 import customerJourneyRoutes from '../api/customerJourney';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -15,25 +16,19 @@ const __dirname = dirname(__filename);
 // Load environment variables
 dotenv.config();
 
-// VAPID keys for web push
+// VAPID keys for web push (optional in dev)
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
 
-if (!vapidPublicKey || !vapidPrivateKey) {
-  console.log('VAPID keys not found. Generating new keys...');
-  const vapidKeys = webpush.generateVAPIDKeys();
-  console.log('Please add these keys to your .env file:');
-  console.log('VAPID_PUBLIC_KEY=' + vapidKeys.publicKey);
-  console.log('VAPID_PRIVATE_KEY=' + vapidKeys.privateKey);
-  // For now, we will exit. Add the keys and restart the server.
-  process.exit(0);
+if (vapidPublicKey && vapidPrivateKey) {
+  webpush.setVapidDetails(
+    'mailto:your-email@example.com',
+    vapidPublicKey,
+    vapidPrivateKey
+  );
+} else {
+  console.log('VAPID keys not configured. Push notifications API will be disabled.');
 }
-
-webpush.setVapidDetails(
-  'mailto:your-email@example.com', // Replace with your email
-  vapidPublicKey,
-  vapidPrivateKey
-);
 
 const app = express();
 
@@ -66,6 +61,7 @@ app.use((req, res, next) => {
 // Routes (email routes removed)
 app.use('/evolution', evolutionRoutes);
 app.use('/api', customerJourneyRoutes);
+app.use('/api/webhooks', webhooksRouter);
 
 // In-memory store for push subscriptions
 const subscriptions: webpush.PushSubscription[] = [];
