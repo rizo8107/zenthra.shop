@@ -84,6 +84,8 @@ const SettingsPage = () => {
   });
 
   const [webhooks, setWebhooks] = useState<Array<{ id: string; url: string; events: string[]; secret: string; active: boolean }>>([]);
+  // Base URL for webhook API (handled by Vite proxies in dev, absolute URL in prod)
+  const API_BASE = (import.meta as any).env?.VITE_WEBHOOKS_API_BASE || '/api/webhooks';
   const [newWebhook, setNewWebhook] = useState<{ url: string; events: string; secret: string; active: boolean }>({ url: "", events: "order.created,payment.succeeded", secret: "", active: true });
   const [adminKey, setAdminKey] = useState<string>(localStorage.getItem('WEBHOOKS_ADMIN_API_KEY') || '');
   const [seedUrl, setSeedUrl] = useState<string>('');
@@ -133,7 +135,7 @@ const SettingsPage = () => {
     // Persist via API
     const headers: Record<string,string> = { 'Content-Type': 'application/json' };
     if (adminKey) headers['x-api-key'] = adminKey;
-    void fetch(`/api/webhooks/subscriptions/${id}`, {
+    void fetch(`${API_BASE}/subscriptions/${id}`, {
       method: 'PUT',
       headers,
       body: JSON.stringify({ active: v })
@@ -144,7 +146,7 @@ const SettingsPage = () => {
     setWebhooks((list) => list.filter((w) => w.id !== id));
     const headers: Record<string,string> = {} as any;
     if (adminKey) headers['x-api-key'] = adminKey;
-    void fetch(`/api/webhooks/subscriptions/${id}`, {
+    void fetch(`${API_BASE}/subscriptions/${id}`, {
       method: 'DELETE',
       headers
     }).catch(() => {});
@@ -168,7 +170,7 @@ const SettingsPage = () => {
       try {
         const headers: Record<string,string> = {} as any;
         if (adminKey) headers['x-api-key'] = adminKey;
-        const res = await fetch('/api/webhooks/subscriptions', { headers });
+        const res = await fetch(`${API_BASE}/subscriptions`, { headers });
         if (!res.ok) return;
         const data = await res.json();
         const items = Array.isArray(data.items) ? data.items : [];
@@ -181,7 +183,7 @@ const SettingsPage = () => {
   async function createViaApi(entry: { url: string; events: string[]; secret: string; active: boolean }) {
     const headers: Record<string,string> = { 'Content-Type': 'application/json' };
     if (adminKey) headers['x-api-key'] = adminKey;
-    const res = await fetch('/api/webhooks/subscriptions', {
+    const res = await fetch(`${API_BASE}/subscriptions`, {
       method: 'POST',
       headers,
       body: JSON.stringify(entry)
@@ -660,7 +662,7 @@ const SettingsPage = () => {
                           console.error('Invalid JSON payload');
                           return;
                         }
-                        const res = await fetch('/api/webhooks/emit', {
+                        const res = await fetch(`${API_BASE}/emit`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ type: testEvent, data, source: 'admin' })

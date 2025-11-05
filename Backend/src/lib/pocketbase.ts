@@ -20,8 +20,8 @@ const VITE_ENV = (() => {
 })();
 const POCKETBASE_URL =
   (VITE_ENV as any).VITE_POCKETBASE_URL ||
-  process.env.VITE_POCKETBASE_URL ||
-  'https://backend-pocketbase.7za6uc.easypanel.host';
+  (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
+  'https://backend-pocketbase.p3ibd8.easypanel.host';
 
 export const pb = new PocketBase(POCKETBASE_URL);
 
