@@ -1367,13 +1367,7 @@ export default function CheckoutPage() {
       // Create order in PocketBase
       // Compute final totals once to keep UI, DB, and Razorpay in sync
       const totals = calculateFinalTotal();
-      
-      // Generate formatted order ID
-      const { generateUniqueOrderId } = await import('@/utils/orderIdGenerator');
-      const orderNumber = await generateUniqueOrderId();
-      
       const orderData = {
-        order_number: orderNumber,
         // Only include user reference if user is logged in
         ...(user ? { user: user.id } : {}),
         customer_name: formData.name,
@@ -1482,7 +1476,6 @@ export default function CheckoutPage() {
         type: 'order.created',
         data: {
           order_id: order.id,
-          order_number: (order as any).order_number || orderNumber,
           total: order.total,
         },
         metadata: { page: 'checkout' }
