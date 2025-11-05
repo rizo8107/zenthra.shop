@@ -8,6 +8,7 @@ import {
   fallbackRecordFailure,
   fallbackUpdateWebhook,
 } from './webhookStoreFallback.js';
+import { ensureWebhookCollections } from './webhookCollections.js';
 
 dotenv.config();
 
@@ -29,6 +30,7 @@ export type WebhookSubscription = {
 export async function listWebhooks(): Promise<WebhookSubscription[]> {
   try {
     const { token } = await adminAuth();
+    await ensureWebhookCollections(token);
     const res = await axios.get(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records`, {
       headers: { Authorization: `Bearer ${token}` },
       params: { perPage: 200, sort: '-created' }
@@ -64,6 +66,7 @@ export async function listWebhooks(): Promise<WebhookSubscription[]> {
 export async function createWebhook(data: WebhookSubscription): Promise<WebhookSubscription> {
   try {
     const { token } = await adminAuth();
+    await ensureWebhookCollections(token);
     const payload = {
       url: data.url,
       events: data.events,
@@ -89,6 +92,7 @@ export async function createWebhook(data: WebhookSubscription): Promise<WebhookS
 export async function updateWebhook(id: string, data: Partial<WebhookSubscription>): Promise<void> {
   try {
     const { token } = await adminAuth();
+    await ensureWebhookCollections(token);
     const payload: any = { ...data };
     if (Array.isArray(payload.events)) payload.events = payload.events;
     await axios.patch(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records/${id}`, payload, {
@@ -107,6 +111,7 @@ export async function updateWebhook(id: string, data: Partial<WebhookSubscriptio
 export async function deleteWebhook(id: string): Promise<void> {
   try {
     const { token } = await adminAuth();
+    await ensureWebhookCollections(token);
     await axios.delete(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records/${id}`, {
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -132,6 +137,7 @@ export async function recordWebhookFailure(data: {
 }): Promise<void> {
   try {
     const { token } = await adminAuth();
+    await ensureWebhookCollections(token);
     const payload = {
       ...data,
       timestamp: new Date().toISOString()
