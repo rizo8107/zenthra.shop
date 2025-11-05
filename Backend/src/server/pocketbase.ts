@@ -25,13 +25,31 @@ export const adminAuth = async (): Promise<{ token: string; model: any }> => {
     console.log('📧 Email:', POCKETBASE_ADMIN_EMAIL);
     console.log('🔗 URL:', `${POCKETBASE_URL}/api/admins/auth-with-password`);
     
-    const res = await axios.post(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
-      identity: POCKETBASE_ADMIN_EMAIL,
-      password: POCKETBASE_ADMIN_PASSWORD,
-    }, {
-      headers: { 'Content-Type': 'application/json' },
-      timeout: 10000, // 10 second timeout
-    });
+    // Try admin authentication first, then fall back to regular user auth
+    let res;
+    try {
+      console.log('🔐 Trying admin authentication...');
+      res = await axios.post(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
+        identity: POCKETBASE_ADMIN_EMAIL,
+        password: POCKETBASE_ADMIN_PASSWORD,
+      }, {
+        headers: { 'Content-Type': 'application/json' },
+        timeout: 10000,
+      });
+    } catch (adminError: any) {
+      if (adminError?.response?.status === 404) {
+        console.log('⚠️ Admin endpoint not found, trying regular user authentication...');
+        res = await axios.post(`${POCKETBASE_URL}/api/collections/users/auth-with-password`, {
+          identity: POCKETBASE_ADMIN_EMAIL,
+          password: POCKETBASE_ADMIN_PASSWORD,
+        }, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 10000,
+        });
+      } else {
+        throw adminError;
+      }
+    }
     
     console.log('✅ PocketBase auth response status:', res.status);
     const { token, admin } = res.data || {};
@@ -41,11 +59,22 @@ export const adminAuth = async (): Promise<{ token: string; model: any }> => {
     console.log('✅ PocketBase admin token obtained successfully');
     return { token, model: admin };
   } catch (error: any) {
+    console.error('❌ PocketBase authentication failed:', error?.message);
+    console.error('Error details:', {
+      status: error?.response?.status,
+      data: error?.response?.data,
+      code: error?.code,
+      url: error?.config?.url
+    });
+    
     if (error?.code === 'ECONNREFUSED' || error?.code === 'ETIMEDOUT') {
       throw new Error(`Cannot connect to PocketBase at ${POCKETBASE_URL}. Please ensure PocketBase is running.`);
     }
     if (error?.response?.status === 400 || error?.response?.status === 401) {
       throw new Error('Invalid PocketBase admin credentials. Please check your VITE_POCKETBASE_ADMIN_EMAIL and VITE_POCKETBASE_ADMIN_PASSWORD.');
+    }
+    if (error?.response?.status === 404) {
+      throw new Error(`PocketBase admin endpoint not found at ${POCKETBASE_URL}/api/admins/auth-with-password. Please check your VITE_POCKETBASE_URL.`);
     }
     throw error;
   }
