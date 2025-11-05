@@ -11,7 +11,13 @@ import type {
 } from '@/lib/types';
 
 // Initialize PocketBase with the URL from environment variables (supports Vite and Node)
-const VITE_ENV = (typeof import.meta !== 'undefined' && (import.meta as any)?.env) || {};
+const VITE_ENV = (() => {
+  try {
+    return (import.meta as any)?.env ?? {};
+  } catch {
+    return {};
+  }
+})();
 const POCKETBASE_URL =
   (VITE_ENV as any).VITE_POCKETBASE_URL ||
   process.env.VITE_POCKETBASE_URL ||
@@ -712,8 +718,12 @@ export const getImageUrl = (collectionId: string, recordId: string, fileName: st
     console.warn('Missing parameters for getImageUrl', { collectionId, recordId, fileName });
     return 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
   }
-  const envBase = import.meta.env.VITE_POCKETBASE_URL as string | undefined;
-  const fallbackEnv = (import.meta.env.VITE_PB_FALLBACK_URL as string | undefined) || (import.meta.env.PUBLIC_PB_URL as string | undefined);
+  const envBase = (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined)
+    || ((import.meta as any)?.env?.VITE_POCKETBASE_URL as string | undefined);
+  const fallbackEnv = (typeof process !== 'undefined' ? process.env?.VITE_PB_FALLBACK_URL : undefined)
+    || ((import.meta as any)?.env?.VITE_PB_FALLBACK_URL as string | undefined)
+    || (typeof process !== 'undefined' ? process.env?.PUBLIC_PB_URL : undefined)
+    || ((import.meta as any)?.env?.PUBLIC_PB_URL as string | undefined);
   // Last-resort hardcoded fallback (update if backend host changes)
   const hardcoded = 'https://backend-pocketbase.p3ibd8.easypanel.host';
   const base = envBase || fallbackEnv || hardcoded;
