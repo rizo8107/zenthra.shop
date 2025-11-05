@@ -7,6 +7,19 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => {
   // Load env from root directory (parent folder)
   const env = loadEnv(mode, path.resolve(__dirname, '..'), '');
+  // Normalize webhook server origin for prod; fallback to localhost for dev
+  const serverPort = env.SERVER_PORT || '3001';
+  const rawWebhookUrl = (env.WEBHOOK_SERVER_URL || '').trim();
+  let webhookOrigin = '';
+  if (rawWebhookUrl) {
+    try {
+      const u = new URL(rawWebhookUrl);
+      webhookOrigin = u.origin;
+    } catch {
+      console.warn(`Invalid WEBHOOK_SERVER_URL for Frontend: ${rawWebhookUrl}. Falling back to http://localhost:${serverPort}`);
+    }
+  }
+  if (!webhookOrigin) webhookOrigin = `http://localhost:${serverPort}`;
   
   return {
   envDir: path.resolve(__dirname, '..'), // Use root .env file
@@ -14,6 +27,11 @@ export default defineConfig(({ mode }) => {
     host: "::",
     port: 8080,
     proxy: {
+      '/api/webhooks': {
+        target: webhookOrigin,
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/razorpay': {
         target: 'http://localhost:3000',
         changeOrigin: true,
@@ -30,6 +48,11 @@ export default defineConfig(({ mode }) => {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  define: {
+    'import.meta.env.VITE_WEBHOOKS_API_BASE': JSON.stringify(
+      mode === 'development' ? '/api/webhooks' : new URL('/api/webhooks', webhookOrigin).toString()
+    ),
   },
   build: {
     // Generate sourcemaps for debugging in production

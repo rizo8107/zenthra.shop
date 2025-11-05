@@ -7,9 +7,11 @@ export type WebhookEvent = {
   metadata?: Record<string, any>;
 };
 
+const API_BASE = (import.meta as any).env?.VITE_WEBHOOKS_API_BASE || 'http://localhost:3001/api/webhooks';
+
 export async function sendWebhookEvent(evt: WebhookEvent): Promise<{ ok: boolean; id?: string }> {
   try {
-    const res = await fetch('/api/webhooks/emit', {
+    const res = await fetch(`${API_BASE}/emit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
