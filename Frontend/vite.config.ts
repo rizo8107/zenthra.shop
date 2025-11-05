@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
   }
   if (!webhookOrigin) webhookOrigin = `http://localhost:${serverPort}`;
   
+  const useAbsoluteInDev = !!rawWebhookUrl;
+
   return {
   envDir: path.resolve(__dirname, '..'), // Use root .env file
   server: {
@@ -51,7 +53,9 @@ export default defineConfig(({ mode }) => {
   },
   define: {
     'import.meta.env.VITE_WEBHOOKS_API_BASE': JSON.stringify(
-      mode === 'development' ? '/api/webhooks' : new URL('/api/webhooks', webhookOrigin).toString()
+      mode === 'development'
+        ? (useAbsoluteInDev ? new URL('/api/webhooks', webhookOrigin).toString() : '/api/webhooks')
+        : new URL('/api/webhooks', webhookOrigin).toString()
     ),
   },
   build: {

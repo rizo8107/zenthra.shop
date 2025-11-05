@@ -1472,6 +1472,15 @@ export default function CheckoutPage() {
         .create(orderData)) as unknown as OrderData;
       console.log("Order created successfully with ID:", order.id);
 
+      await sendWebhookEvent({
+        type: 'order.created',
+        data: {
+          order_id: order.id,
+          total: order.total,
+        },
+        metadata: { page: 'checkout' }
+      });
+
       // Track form completion
       trackFormCompletion("checkout_form", "checkout-form");
 
@@ -1741,6 +1750,16 @@ export default function CheckoutPage() {
       );
       console.log("Using Razorpay order ID:", razorpayOrderResponse.id);
       console.log("Amount to charge:", expectedAmountInPaise, "paise");
+
+      await sendWebhookEvent({
+        type: 'payment.started',
+        data: {
+          order_id: order.id,
+          razorpay_order_id: razorpayOrderResponse.id,
+          amount_paise: expectedAmountInPaise,
+        },
+        metadata: { page: 'checkout' }
+      });
 
       // Final validation before opening checkout
       if (
