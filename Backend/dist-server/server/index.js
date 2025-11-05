@@ -3,9 +3,9 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import webpush from 'web-push';
-import emailRoutes from '../api/email';
-import evolutionRoutes from './evolutionService';
-import customerJourneyRoutes from '../api/customerJourney';
+import evolutionRoutes from './evolutionService.js';
+import webhooksRouter from './webhooks.js';
+import customerJourneyRoutes from '../api/customerJourney.js';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 // Handle ESM in TypeScript
@@ -13,20 +13,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 // Load environment variables
 dotenv.config();
-// VAPID keys for web push
+// VAPID keys for web push (optional in dev)
 const vapidPublicKey = process.env.VAPID_PUBLIC_KEY;
 const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
-if (!vapidPublicKey || !vapidPrivateKey) {
-    console.log('VAPID keys not found. Generating new keys...');
-    const vapidKeys = webpush.generateVAPIDKeys();
-    console.log('Please add these keys to your .env file:');
-    console.log('VAPID_PUBLIC_KEY=' + vapidKeys.publicKey);
-    console.log('VAPID_PRIVATE_KEY=' + vapidKeys.privateKey);
-    // For now, we will exit. Add the keys and restart the server.
-    process.exit(0);
+if (vapidPublicKey && vapidPrivateKey) {
+    webpush.setVapidDetails('mailto:your-email@example.com', vapidPublicKey, vapidPrivateKey);
 }
-webpush.setVapidDetails('mailto:your-email@example.com', // Replace with your email
-vapidPublicKey, vapidPrivateKey);
+else {
+    console.log('VAPID keys not configured. Push notifications API will be disabled.');
+}
 const app = express();
 // Middleware
 app.use(cors());
@@ -49,10 +44,10 @@ app.use((req, res, next) => {
     };
     next();
 });
-// Routes
-app.use('/email', emailRoutes);
+// Routes (email routes removed)
 app.use('/evolution', evolutionRoutes);
 app.use('/api', customerJourneyRoutes);
+app.use('/api/webhooks', webhooksRouter);
 // In-memory store for push subscriptions
 const subscriptions = [];
 // Route to subscribe to push notifications

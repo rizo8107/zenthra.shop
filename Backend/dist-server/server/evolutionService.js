@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { createWhatsAppActivity } from './pocketbase';
+import { createWhatsAppActivity } from './pocketbase.js';
 dotenv.config();
 const router = Router();
 const EVOLUTION_API_URL = process.env.EVOLUTION_API_URL;

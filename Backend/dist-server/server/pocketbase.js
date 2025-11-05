@@ -9,19 +9,33 @@ console.log('PocketBase URL:', POCKETBASE_URL);
 // Perform admin authentication and return token + admin model
 export const adminAuth = async () => {
     if (!POCKETBASE_ADMIN_EMAIL || !POCKETBASE_ADMIN_PASSWORD) {
-        throw new Error('Missing PocketBase admin credentials in environment');
+        const errorMsg = 'Missing PocketBase admin credentials. Please set VITE_POCKETBASE_ADMIN_EMAIL and VITE_POCKETBASE_ADMIN_PASSWORD in your .env file.';
+        console.error(errorMsg);
+        throw new Error(errorMsg);
     }
-    const res = await axios.post(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
-        identity: POCKETBASE_ADMIN_EMAIL,
-        password: POCKETBASE_ADMIN_PASSWORD,
-    }, {
-        headers: { 'Content-Type': 'application/json' },
-    });
-    const { token, admin } = res.data || {};
-    if (!token) {
-        throw new Error('Failed to obtain PocketBase admin token');
+    try {
+        const res = await axios.post(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
+            identity: POCKETBASE_ADMIN_EMAIL,
+            password: POCKETBASE_ADMIN_PASSWORD,
+        }, {
+            headers: { 'Content-Type': 'application/json' },
+            timeout: 10000, // 10 second timeout
+        });
+        const { token, admin } = res.data || {};
+        if (!token) {
+            throw new Error('Failed to obtain PocketBase admin token');
+        }
+        return { token, model: admin };
     }
-    return { token, model: admin };
+    catch (error) {
+        if (error?.code === 'ECONNREFUSED' || error?.code === 'ETIMEDOUT') {
+            throw new Error(`Cannot connect to PocketBase at ${POCKETBASE_URL}. Please ensure PocketBase is running.`);
+        }
+        if (error?.response?.status === 400 || error?.response?.status === 401) {
+            throw new Error('Invalid PocketBase admin credentials. Please check your VITE_POCKETBASE_ADMIN_EMAIL and VITE_POCKETBASE_ADMIN_PASSWORD.');
+        }
+        throw error;
+    }
 };
 export const getAuthToken = async () => {
     const { token } = await adminAuth();
