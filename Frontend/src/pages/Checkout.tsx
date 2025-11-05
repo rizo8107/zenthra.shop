@@ -31,6 +31,7 @@ import {
   getRazorpayKeySecret,
   loadRazorpayScript,
 } from "@/lib/razorpay-client";
+import { sendWebhookEvent } from '@/lib/webhooks';
 import { trackEcommerceEvent } from "@/utils/analytics";
 import {
   trackBeginCheckout,
@@ -791,162 +792,10 @@ export default function CheckoutPage() {
         });
       }
 
-      // Send webhook to n8n
-      try {
-        // First get the complete order details with expanded products
-        const orderDetails = await pocketbase
-          .collection("orders")
-          .getOne(orderId);
-
-        // Parse the products from the order
-        interface OrderProduct {
-          product: {
-            id: string;
-            name: string;
-            price: number;
-            images: string[];
-            [key: string]: unknown;
-          };
-          quantity: number;
-          price: number;
-          [key: string]: unknown;
-        }
-        let orderProducts: OrderProduct[] = [];
-        try {
-          if (typeof orderDetails.products === "string") {
-            orderProducts = JSON.parse(orderDetails.products);
-          } else {
-            orderProducts = orderDetails.products;
-          }
-        } catch (parseError) {
-          console.error("Error parsing order products:", parseError);
-          orderProducts = [];
-        }
-
-        // Get the shipping address
-        interface ShippingAddress {
-          street: string;
-          city: string;
-          state: string;
-          postalCode: string;
-          country: string;
-          [key: string]: string;
-        }
-        let shippingAddress: ShippingAddress = {
-          street: "",
-          city: "",
-          state: "",
-          postalCode: "",
-          country: "",
-        };
-        try {
-          if (orderDetails.shipping_address_text) {
-            shippingAddress = JSON.parse(orderDetails.shipping_address_text);
-          } else if (orderDetails.shipping_address) {
-            // Try to fetch the address
-            try {
-              const addressRecord = await pocketbase
-                .collection("addresses")
-                .getOne(orderDetails.shipping_address);
-              shippingAddress = {
-                street: addressRecord.street,
-                city: addressRecord.city,
-                state: addressRecord.state,
-                postalCode: addressRecord.postalCode,
-                country: addressRecord.country,
-              };
-            } catch (addressError) {
-              console.error("Error fetching shipping address:", addressError);
-            }
-          }
-        } catch (addressParseError) {
-          console.error("Error parsing shipping address:", addressParseError);
-        }
-
-        // Prepare product details with image URLs
-        const productsWithImages = orderProducts.map(
-          (product: OrderProduct) => {
-            // Construct image URLs for each product
-            let imageUrls: string[] = [];
-            if (product.product && product.product.images) {
-              imageUrls = product.product.images.map((img: string) => {
-                // Use the exact PocketBase URL format provided
-                // The product ID should only be included once in the URL
-                return `${import.meta.env.VITE_POCKETBASE_URL || "http://localhost:8090"}/api/files/pbc_4092854851/${img}`;
-              });
-            }
-
-            return {
-              id: product.productId,
-              name: product.product?.name || "Unknown Product",
-              price: product.product?.price || 0,
-              quantity: product.quantity,
-              color: product.color || "Default",
-              images: imageUrls,
-              imageUrl: imageUrls[0] || "", // First image as the main image
-            };
-          },
-        );
-
-        // Prepare the webhook data
-        const n8nWebhookData = {
-          event: "order.payment_success",
-          order: {
-            id: orderId,
-            order_link: `https://shop.karigaistore.in/orders/${orderId}`,
-            customer: {
-              name: orderDetails.customer_name,
-              email: orderDetails.customer_email,
-              phone: orderDetails.customer_phone,
-              is_guest: orderDetails.is_guest_order || false,
-              user_id: orderDetails.user || "guest",
-            },
-            payment: {
-              id: paymentId,
-              status: captureSuccess ? "captured" : "authorized",
-              method: "Razorpay",
-            },
-            shipping_address: shippingAddress,
-            products: productsWithImages,
-            totals: {
-              subtotal: orderDetails.subtotal,
-              shipping: orderDetails.shipping_cost,
-              discount: orderDetails.discount_amount || 0,
-              total: orderDetails.total,
-            },
-            created_at: orderDetails.created,
-            status: orderDetails.status,
-            is_guest_order: orderDetails.is_guest_order || false,
-          },
-        };
-
-        // Send to the n8n webhook
-        console.log("Sending order details to n8n webhook:", n8nWebhookData);
-        const n8nWebhookUrl = import.meta.env.VITE_N8N_WEBHOOK_URL;
-        if (!n8nWebhookUrl) {
-          console.error(
-            "VITE_N8N_WEBHOOK_URL is not set. Skipping order webhook dispatch.",
-          );
-        }
-        const n8nWebhookResponse = await fetch(n8nWebhookUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(n8nWebhookData),
-        });
-
-        if (n8nWebhookResponse.ok) {
-          console.log("Successfully sent order details to n8n webhook");
-        } else {
-          console.error(
-            "Failed to send order details to n8n webhook:",
-            await n8nWebhookResponse.text(),
-          );
-        }
-
-        // Original webhook code continues below
-        const webhookData = {
+      // Emit payment.succeeded webhook via backend dispatcher
+      await sendWebhookEvent({
+        type: 'payment.succeeded',
+        data: {
           event: captureSuccess ? "payment.captured" : "payment.authorized",
           payload: {
             payment: {
@@ -966,60 +815,38 @@ export default function CheckoutPage() {
               manually_captured: captureSuccess,
             },
           },
-        };
+        },
+        metadata: { page: 'checkout' }
+      });
 
-        // Send to n8n webhook with correct credentials
-        const webhookResponse = await fetch(
-          "https://backend-n8n.7za6uc.easypanel.host/webhook/razorpay",
+      // Also update Razorpay payment with notes
+      try {
+        const razorpayUpdateResponse = await fetch(
+          `https://api.razorpay.com/v1/payments/${paymentId}/notes`,
           {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               Authorization:
-                "Basic " + btoa("nnirmal7107@gmail.com:Kamala@7107"),
+                "Basic " +
+                btoa(`${getRazorpayKeyId()}:${getRazorpayKeySecret()}`),
             },
-            body: JSON.stringify(webhookData),
+            body: JSON.stringify({
+              pocketbase_order_id: orderId,
+              order_status: "processing",
+              webhook_sent: "true",
+              customer_email: "",
+              customer_name: "",
+            }),
           },
         );
 
-        console.log("Webhook response:", await webhookResponse.text());
-
-        if (!webhookResponse.ok) {
-          console.error("Failed to send webhook:", webhookResponse.statusText);
-        }
-
-        // Also update Razorpay payment with notes
-        try {
-          const razorpayUpdateResponse = await fetch(
-            `https://api.razorpay.com/v1/payments/${paymentId}/notes`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization:
-                  "Basic " +
-                  btoa(`${getRazorpayKeyId()}:${getRazorpayKeySecret()}`),
-              },
-              body: JSON.stringify({
-                pocketbase_order_id: orderId,
-                order_status: "processing",
-                webhook_sent: "true",
-                customer_email: "",
-                customer_name: "",
-              }),
-            },
-          );
-
-          console.log(
-            "Razorpay update response:",
-            await razorpayUpdateResponse.text(),
-          );
-        } catch (razorpayError) {
-          console.error("Error updating Razorpay payment:", razorpayError);
-          // Don't fail the order just because the webhook failed
-        }
-      } catch (webhookError) {
-        console.error("Error sending webhook:", webhookError);
+        console.log(
+          "Razorpay update response:",
+          await razorpayUpdateResponse.text(),
+        );
+      } catch (razorpayError) {
+        console.error("Error updating Razorpay payment:", razorpayError);
         // Don't fail the order just because the webhook failed
       }
 

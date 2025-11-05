@@ -4,6 +4,7 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from 'vite-plugin-pwa';
 import type { IncomingMessage, ServerResponse, ClientRequest } from 'http';
+import { existsSync, readFileSync } from 'fs';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -13,9 +14,25 @@ export default defineConfig(({ mode }) => {
   // Get API URLs from .env or use defaults
   const whatsAppApiUrl = env.WHATSAPP_API_URL || 'https://backend-whatsappapi.7za6uc.easypanel.host';
   const emailApiUrl = env.EMAIL_API_URL || 'https://backend-email.7za6uc.easypanel.host/api/email';
+  
+  // Try to read port from port-info.json, fallback to env or default
+  let serverPort = env.SERVER_PORT || '3001';
+  const portInfoPath = path.resolve(__dirname, 'port-info.json');
+  if (existsSync(portInfoPath)) {
+    try {
+      const portInfo = JSON.parse(readFileSync(portInfoPath, 'utf-8'));
+      if (portInfo.port) {
+        serverPort = String(portInfo.port);
+      }
+    } catch (e) {
+      console.warn('Could not read port-info.json, using default port');
+    }
+  }
+  const webhookServerUrl = env.WEBHOOK_SERVER_URL || `http://localhost:${serverPort}`;
 
   console.log(`WhatsApp API URL: ${whatsAppApiUrl}`);
   console.log(`Email API URL: ${emailApiUrl}`);
+  console.log(`Webhook Server URL: ${webhookServerUrl}`);
 
   // Determine if we need proxies for development mode
   const useProxies = mode === 'development';
@@ -90,6 +107,22 @@ export default defineConfig(({ mode }) => {
   // Add proxies only for development mode
   if (useProxies && config.server?.proxy) {
     config.server.proxy = {
+      '/api/webhooks': {
+        target: webhookServerUrl,
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('error', (err: Error) => {
+            console.log('Webhook proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq: ClientRequest, req: IncomingMessage) => {
+            console.log('Sending Webhook Request:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes: IncomingMessage, req: IncomingMessage) => {
+            console.log('Received Webhook Response:', proxyRes.statusCode, req.url);
+          });
+        }
+      },
       '/whatsapp-api': {
         target: whatsAppApiUrl,
         changeOrigin: true,

@@ -4,14 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently --kill-others --restart-tries 3 --names \"VITE,API\" -c \"magenta,green\" \"vite\" \"npm run start:server\"",
     "build": "npx vite build",
     "build:dev": "npx vite build --mode development",
     "build:server": "npx tsc -p tsconfig.server.json && cp -r src/server dist-server/",
     "lint": "eslint .",
     "preview": "vite preview",
     "start:server": "tsx src/server/local.ts",
-    "dev:all": "concurrently \"npm run dev\"",
+    "init:webhooks": "tsx scripts/init-webhooks-collections.ts",
+    "dev:all": "npm run dev",
     "build:all": "npm run build && npm run build:server"
   },
   "dependencies": {
