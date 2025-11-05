@@ -10,6 +10,7 @@ export interface CreateOrderData {
   total_amount: number;
   shipping_address?: string;
   items?: string[];
+  order_number?: string; // Formatted order ID like O1234
 }
 
 // Extend the UpdateOrderData interface to include all properties used in this file
@@ -52,6 +53,13 @@ export function useOrders() {
     mutationFn: async (data: CreateOrderData) => {
       try {
         await ensureAdminAuth();
+        
+        // Generate formatted order ID if not provided
+        if (!data.order_number) {
+          const { generateUniqueOrderId } = await import('@/utils/orderIdGenerator');
+          data.order_number = await generateUniqueOrderId();
+        }
+        
         const record = await pb.collection('orders').create(data);
         return record;
       } catch (error) {
@@ -67,7 +75,7 @@ export function useOrders() {
       try {
         const order = data as unknown as Order;
         if (order && order.customer_phone) {
-          const confirmationMessage = `🎉 *Order Confirmed* 🎉\n\nHi ${order.customer_name},\n\nYour order #${order.id.slice(0, 8)} has been confirmed!\n\nThank you for shopping with us.\n\nWe'll update you when your order ships.`;
+          const confirmationMessage = `🎉 *Order Confirmed* 🎉\n\nHi ${order.customer_name},\n\nYour order #${(order as any).order_number || order.id.slice(0, 8)} has been confirmed!\n\nThank you for shopping with us.\n\nWe'll update you when your order ships.`;
           sendWhatsAppMessage({
             phone: order.customer_phone,
             message: confirmationMessage,

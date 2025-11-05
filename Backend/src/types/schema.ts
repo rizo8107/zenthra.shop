@@ -195,6 +195,7 @@ export type CreateOrderData = {
   customer_name: string;
   customer_email: string;
   customer_phone: string;
+  order_number?: string; // Formatted order ID like O1234
   notes?: string;
   razorpay_order_id?: string;
   razorpay_payment_id?: string;
