@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import type { WebhookSubscription } from './webhookStore';
+import type { WebhookSubscription } from './webhookStore.js';
 
 type StoredWebhook = WebhookSubscription & { id: string };
 
