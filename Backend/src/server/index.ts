@@ -3,9 +3,9 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import dotenv from 'dotenv';
 import webpush from 'web-push';
-import evolutionRoutes from './evolutionService';
-import webhooksRouter from './webhooks';
-import customerJourneyRoutes from '../api/customerJourney';
+import evolutionRoutes from './evolutionService.js';
+import webhooksRouter from './webhooks.js';
+import customerJourneyRoutes from '../api/customerJourney.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 

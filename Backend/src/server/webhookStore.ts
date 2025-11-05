@@ -1,13 +1,13 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { adminAuth } from './pocketbase';
+import { adminAuth } from './pocketbase.js';
 import {
   fallbackCreateWebhook,
   fallbackDeleteWebhook,
   fallbackListWebhooks,
   fallbackRecordFailure,
   fallbackUpdateWebhook,
-} from './webhookStoreFallback';
+} from './webhookStoreFallback.js';
 
 dotenv.config();
 

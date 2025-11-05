@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 import axios from 'axios';
-import { listWebhooks, recordWebhookFailure, WebhookSubscription } from './webhookStore';
+import { listWebhooks, recordWebhookFailure, WebhookSubscription } from './webhookStore.js';
 
 export type OutgoingEvent = {
   id: string;

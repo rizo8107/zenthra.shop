@@ -1,7 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
-import { createWebhook, deleteWebhook, listWebhooks, updateWebhook, WebhookSubscription } from './webhookStore';
-import { emitEvent, OutgoingEvent } from './webhookDispatcher';
+import { createWebhook, deleteWebhook, listWebhooks, updateWebhook, WebhookSubscription } from './webhookStore.js';
+import { emitEvent, OutgoingEvent } from './webhookDispatcher.js';
 
 const router = express.Router();
 
