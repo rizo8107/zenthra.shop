@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ClientResponseError, RecordModel } from 'pocketbase';
+
 import { pb, ensureAdminAuth } from '@/lib/pocketbase';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card } from '@/components/ui/card';
@@ -44,15 +45,23 @@ import {
   Loader2,
   PlusCircle,
   ArrowLeft,
+  ShoppingBag,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 
-type PaletteNodeKey = 'start' | 'wait' | 'message' | 'condition' | 'webhook';
+type PaletteNodeKey =
+  | 'start'
+  | 'wait'
+  | 'message'
+  | 'condition'
+  | 'webhook'
+  | 'order'
+  | 'cart';
 
 type WaitUnit = 'minutes' | 'hours' | 'days';
-type MessageChannel = 'whatsapp' | 'email' | 'sms';
+type MessageChannel = 'whatsapp' | 'email' | 'sms' | 'evolution_text' | 'evolution_media';
 type MessageTemplateId = 'payment_reminder' | 'cart_followup' | 'shipping_update' | 'custom';
 type WebhookMethod = 'GET' | 'POST';
 
@@ -68,6 +77,9 @@ type AutomationNodeData = {
   ctaUrl?: string;
   sendFollowUp?: boolean;
   customMessage?: string;
+  recipientPath?: string;
+  fallbackRecipient?: string;
+  eventFields?: string[];
   condition?: string;
   conditionTrueLabel?: string;
   conditionFalseLabel?: string;
@@ -76,6 +88,19 @@ type AutomationNodeData = {
   webhookMethod?: WebhookMethod;
   webhookSecret?: string;
   verifySSL?: boolean;
+  orderTrigger?: 'created' | 'paid' | 'cancelled' | 'fulfilled';
+  cartTrigger?: 'new_abandon' | 'reminder' | 'recovered';
+  evolutionMessage?: {
+    text?: string;
+    mediaUrl?: string;
+    mediaType?: 'image' | 'video' | 'audio' | 'document';
+    caption?: string;
+    delayMs?: number;
+  };
+  activityEventKey?: string;
+  activityEventLabel?: string;
+  activityStage?: string;
+  activityPreview?: Record<string, any>;
 };
 
 const messageTemplates: { id: MessageTemplateId; label: string }[] = [
@@ -95,7 +120,232 @@ const channelOptions: { value: MessageChannel; label: string; helper: string }[]
   { value: 'whatsapp', label: 'WhatsApp', helper: 'Send via WhatsApp Business templates.' },
   { value: 'email', label: 'Email', helper: 'Deliver transactional emails through SMTP.' },
   { value: 'sms', label: 'SMS', helper: 'Short text follow-ups to phone numbers.' },
+  { value: 'evolution_text', label: 'Evolution API · Text', helper: 'Send a text message through Evolution.' },
+  { value: 'evolution_media', label: 'Evolution API · Media', helper: 'Send media with Evolution API.' },
 ];
+
+const RECIPIENT_PATH_OPTIONS: { value: string; label: string; helper: string }[] = [
+  { value: 'order.customer_phone', label: 'Order · customer_phone', helper: 'Uses the enriched order record phone number.' },
+  { value: 'data.customer_phone', label: 'Event payload · customer_phone', helper: 'Reads customer_phone from the webhook payload root.' },
+  { value: 'data.payload.customer_phone', label: 'Payload · customer_phone', helper: 'Looks up customer_phone nested inside payload.' },
+  { value: 'customer.phone', label: 'Customer record · phone', helper: 'Falls back to the loaded PocketBase customer profile.' },
+  { value: 'metadata.customer_phone', label: 'Metadata · customer_phone', helper: 'Uses metadata from the incoming event.' },
+];
+
+const CUSTOM_RECIPIENT_OPTION = '__custom__';
+
+type JourneyEvent = {
+  id?: string;
+  event?: string;
+  stage?: string;
+  timestamp?: string;
+  metadata?: Record<string, any>;
+  customer_id?: string;
+  customer_name?: string;
+  customer_email?: string;
+};
+
+type ActivityEventOption = {
+  key: string;
+  label: string;
+  stage?: string;
+  description?: string;
+  example?: JourneyEvent | null;
+};
+
+const FALLBACK_ACTIVITY_OPTIONS: ActivityEventOption[] = [
+  { key: 'order.created', label: 'Order Created', stage: 'Purchase' },
+  { key: 'order.paid', label: 'Order Paid', stage: 'Purchase' },
+  { key: 'order.fulfilled', label: 'Order Fulfilled', stage: 'Retention' },
+  { key: 'payment.succeeded', label: 'Payment Succeeded', stage: 'Purchase' },
+  { key: 'payment.failed', label: 'Payment Failed', stage: 'Consideration' },
+  { key: 'cart.abandoned', label: 'Cart Abandoned', stage: 'Consideration' },
+  { key: 'cart.recovered', label: 'Cart Recovered', stage: 'Purchase' },
+  { key: 'email.opened', label: 'Email Opened', stage: 'Awareness' },
+  { key: 'link.clicked', label: 'Link Clicked', stage: 'Awareness' },
+];
+
+const formatActivityLabel = (value: string): string =>
+  value
+    .split(/[-_.]/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    return window.location.origin;
+  }
+  if (typeof process !== 'undefined' && process.env?.PB_BASE_URL) {
+    return process.env.PB_BASE_URL.replace(/\/$/, '');
+  }
+  return '';
+};
+
+const buildJourneyEndpoint = (path: string): string => {
+  if (path.startsWith('http')) return path;
+  const base = getApiBaseUrl();
+  if (!base) return path;
+  const sanitized = path.startsWith('/') ? path : `/${path}`;
+  return `${base}${sanitized}`;
+};
+
+const getDeepValue = (obj: unknown, rawPath: string): unknown => {
+  if (!obj || typeof rawPath !== 'string') return undefined;
+  const segments = rawPath
+    .replace(/\[(\w+)\]/g, '.$1')
+    .split('.')
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  if (segments.length === 0) return undefined;
+
+  let current: unknown = obj;
+  for (const key of segments) {
+    if (current === undefined || current === null) return undefined;
+    if (Array.isArray(current)) {
+      const index = Number.parseInt(key, 10);
+      if (Number.isNaN(index) || index < 0 || index >= current.length) return undefined;
+      current = current[index];
+      continue;
+    }
+    if (typeof current === 'object' && key in (current as Record<string, unknown>)) {
+      current = (current as Record<string, unknown>)[key];
+      continue;
+    }
+    return undefined;
+  }
+
+  return current;
+};
+
+const collectPlaceholderPaths = (value: unknown, prefix = '', acc: Set<string> = new Set()): string[] => {
+  if (value === undefined || value === null) {
+    return Array.from(acc).sort();
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => {
+      const path = prefix ? `${prefix}[${index}]` : `[${index}]`;
+      collectPlaceholderPaths(item, path, acc);
+    });
+  } else if (typeof value === 'object') {
+    Object.entries(value as Record<string, unknown>).forEach(([key, val]) => {
+      const trimmed = key.trim();
+      if (!trimmed) return;
+      const path = prefix ? `${prefix}.${trimmed}` : trimmed;
+      if (val !== null && typeof val === 'object') {
+        collectPlaceholderPaths(val, path, acc);
+      } else {
+        acc.add(path);
+      }
+    });
+  } else if (prefix) {
+    acc.add(prefix);
+  }
+
+  return Array.from(acc).sort();
+};
+
+const buildPreviewContext = (eventPreview?: Record<string, unknown> | null): Record<string, unknown> => {
+  if (!eventPreview || typeof eventPreview !== 'object') {
+    return {};
+  }
+
+  const event = { ...eventPreview };
+  const payload = (eventPreview as any).payload ?? (eventPreview as any).data ?? eventPreview;
+  const metadata = (eventPreview as any).metadata ?? {};
+
+  const context: Record<string, unknown> = {
+    event,
+    data: typeof payload === 'object' && payload !== null ? payload : {},
+    metadata: typeof metadata === 'object' && metadata !== null ? metadata : {},
+  };
+
+  const order = (payload as any)?.order ?? (eventPreview as any)?.order;
+  if (order && typeof order === 'object') {
+    context.order = order;
+  }
+
+  const customer = (payload as any)?.customer ?? (eventPreview as any)?.customer;
+  if (customer && typeof customer === 'object') {
+    context.customer = customer;
+  }
+
+  return context;
+};
+
+type RecipientPreviewProps = {
+  context: Record<string, unknown>;
+  path?: string | null;
+  fallback?: string | null;
+  messageTemplate: string;
+  availableFields: string[];
+};
+
+const RecipientPreview = ({ context, path, fallback, messageTemplate, availableFields }: RecipientPreviewProps) => {
+  const resolved = (path ? getDeepValue(context, path) : undefined) ?? undefined;
+  const value = typeof resolved === 'string' && resolved.trim() ? resolved.trim() : undefined;
+  const usedFallback = !value && fallback ? fallback.trim() : undefined;
+  const finalRecipient = value || usedFallback || '';
+
+  const renderedMessage = useMemo(() => {
+    if (!messageTemplate) return '';
+    return messageTemplate.replace(/{{\s*([^}]+)\s*}}/g, (_match, rawPath) => {
+      const lookup = String(rawPath).trim();
+      const actual = getDeepValue(context, lookup);
+      if (actual === undefined || actual === null) return '';
+      return String(actual);
+    });
+  }, [context, messageTemplate]);
+
+  return (
+    <div className="space-y-2 rounded-lg bg-muted/40 p-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Preview</p>
+        {path ? (
+          <code className="rounded bg-background px-1.5 py-0.5 text-[10px] text-muted-foreground">{path}</code>
+        ) : (
+          <span className="text-[10px] text-muted-foreground">No path selected</span>
+        )}
+      </div>
+      <div className="rounded border bg-background px-3 py-2 text-sm">
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">Recipient</p>
+        <p className="text-sm font-medium text-foreground">
+          {finalRecipient || '—'}
+        </p>
+        {usedFallback && !value && (
+          <p className="text-[11px] text-muted-foreground">Using fallback: {usedFallback}</p>
+        )}
+        {!finalRecipient && (
+          <p className="text-[11px] text-destructive">Value is empty — message will be skipped.</p>
+        )}
+      </div>
+      {messageTemplate && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Message preview</p>
+          <div className="rounded border bg-background px-3 py-2 text-sm whitespace-pre-wrap break-words">
+            {renderedMessage || 'Message will be empty'}
+          </div>
+        </div>
+      )}
+      {availableFields.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Available fields</p>
+          <div className="flex flex-wrap gap-1">
+            {availableFields.slice(0, 30).map((field) => (
+              <span key={field} className="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+                {field}
+              </span>
+            ))}
+            {availableFields.length > 30 && (
+              <span className="text-[11px] text-muted-foreground">+{availableFields.length - 30} more</span>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 
 const webhookMethodOptions: { value: WebhookMethod; label: string }[] = [
   { value: 'POST', label: 'POST' },
@@ -172,6 +422,9 @@ const palette: Record<Exclude<PaletteNodeKey, 'start'>, {
       ctaUrl: '',
       sendFollowUp: true,
       customMessage: '',
+      recipientPath: 'order.customer_phone',
+      fallbackRecipient: '',
+      eventFields: [],
       label: 'Send WhatsApp message',
     },
   },
@@ -199,6 +452,28 @@ const palette: Record<Exclude<PaletteNodeKey, 'start'>, {
       webhookSecret: '',
       verifySSL: true,
       label: 'Invoke webhook',
+    },
+  },
+  order: {
+    title: 'Order event',
+    description: 'Trigger when an order is created or updated.',
+    icon: Workflow,
+    accent: 'bg-sky-500/10 text-sky-400',
+    defaultData: {
+      orderTrigger: 'created',
+      label: 'Order created',
+      description: 'React to new orders automatically.',
+    },
+  },
+  cart: {
+    title: 'Abandoned cart',
+    description: 'Recover customers who left items in their cart.',
+    icon: ShoppingBag,
+    accent: 'bg-rose-500/10 text-rose-400',
+    defaultData: {
+      cartTrigger: 'new_abandon',
+      label: 'New abandoned cart',
+      description: 'Start a series when a cart is abandoned.',
     },
   },
 };
@@ -282,7 +557,14 @@ const StartNode = ({ data }: NodeProps) => {
   return (
     <div className="rounded-full bg-primary text-primary-foreground px-4 py-2 shadow-sm flex items-center gap-2">
       <Rocket className="h-4 w-4" />
-      <span className="font-medium text-sm">{nodeData.label}</span>
+      <div className="flex flex-col">
+        <span className="font-medium text-sm">{nodeData.label}</span>
+        {nodeData.activityEventLabel && (
+          <span className="text-[11px] text-primary-foreground/80">
+            {nodeData.activityEventLabel}
+          </span>
+        )}
+      </div>
       <Handle type="source" position={Position.Right} className="!bg-primary-foreground" />
     </div>
   );
@@ -325,7 +607,13 @@ const initialNodes: Node[] = [
     id: 'start',
     position: { x: 100, y: 200 },
     type: 'start',
-    data: { type: 'start', label: 'Journey start' },
+    data: {
+      type: 'start',
+      label: 'Journey start',
+      activityEventKey: FALLBACK_ACTIVITY_OPTIONS[0]?.key,
+      activityEventLabel: FALLBACK_ACTIVITY_OPTIONS[0]?.label,
+      activityStage: FALLBACK_ACTIVITY_OPTIONS[0]?.stage,
+    },
   },
   {
     id: 'wait-1',
@@ -352,7 +640,21 @@ const initialNodes: Node[] = [
       ctaUrl: '',
       sendFollowUp: true,
       customMessage: '',
+      recipientPath: 'order.customer_phone',
+      fallbackRecipient: '',
+      eventFields: [],
       description: 'Message the customer with payment link.',
+    },
+  },
+  {
+    id: 'cart-1',
+    position: { x: 880, y: 200 },
+    type: 'automation',
+    data: {
+      type: 'cart',
+      label: 'Abandoned cart trigger',
+      cartTrigger: 'new_abandon',
+      description: 'Start a recovery journey when the cart is abandoned.',
     },
   },
 ];
@@ -360,6 +662,7 @@ const initialNodes: Node[] = [
 const initialEdges: Edge[] = [
   { id: 'e1-2', source: 'start', target: 'wait-1', animated: true },
   { id: 'e2-3', source: 'wait-1', target: 'message-1', animated: true },
+  { id: 'e3-4', source: 'message-1', target: 'cart-1', animated: true },
 ];
 
 const AutomationPage = () => {
@@ -375,6 +678,9 @@ const AutomationPage = () => {
     description: '',
     status: 'draft',
   });
+  const [activityOptions, setActivityOptions] = useState<ActivityEventOption[]>(FALLBACK_ACTIVITY_OPTIONS);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
+  const [activityError, setActivityError] = useState<string | null>(null);
 
   const automationsQuery = useQuery<AutomationFlowRecord[], Error>({
     queryKey: ['automations'],
@@ -404,6 +710,66 @@ const AutomationPage = () => {
   const flows = useMemo(() => automationsQuery.data ?? [], [automationsQuery.data]);
   const selectedFlow = selectedFlowId === NEW_FLOW_ID ? undefined : flows.find((flow) => flow.id === selectedFlowId);
   const isLoadingFlows = automationsQuery.isLoading || automationsQuery.isFetching;
+
+  const loadActivityOptions = useCallback(async () => {
+    setIsLoadingActivities(true);
+    setActivityError(null);
+    try {
+      const endpoint = buildJourneyEndpoint('/api/customer-journey/data');
+      const response = await fetch(endpoint, { credentials: 'include' });
+      if (!response.ok) {
+        throw new Error(`Failed to load journey events (HTTP ${response.status})`);
+      }
+      const rawBody = await response.text();
+      let payload: any = null;
+      if (rawBody) {
+        try {
+          payload = JSON.parse(rawBody);
+        } catch (parseError) {
+          const snippet = rawBody.slice(0, 120).replace(/\s+/g, ' ').trim();
+          throw new Error(`Journey API returned non-JSON response: ${snippet}`);
+        }
+      }
+      if (!payload?.success) {
+        const message = payload?.error || 'Journey data response invalid';
+        throw new Error(message);
+      }
+      const events: JourneyEvent[] = Array.isArray(payload.events) ? payload.events : [];
+      const unique = new Map<string, ActivityEventOption>();
+      events.forEach((evt) => {
+        if (!evt?.event) return;
+        const key = evt.event;
+        if (unique.has(key)) return;
+        unique.set(key, {
+          key,
+          label: formatActivityLabel(key),
+          stage: evt.stage,
+          description: evt.metadata?.description || undefined,
+          example: evt,
+        });
+      });
+      const merged = [...Array.from(unique.values())];
+      // Ensure fallback events are present if missing
+      FALLBACK_ACTIVITY_OPTIONS.forEach((fallback) => {
+        if (!unique.has(fallback.key)) {
+          merged.push({ ...fallback, example: null });
+        }
+      });
+      merged.sort((a, b) => a.label.localeCompare(b.label));
+      setActivityOptions(merged);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to load journey events';
+      console.warn('Activity load error:', message);
+      setActivityError('Could not load recent activity events. Showing defaults.');
+      setActivityOptions(FALLBACK_ACTIVITY_OPTIONS);
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadActivityOptions();
+  }, [loadActivityOptions]);
 
   const applyGraph = useCallback((graph?: AutomationGraphPayload) => {
     const baseNodes = Array.isArray(graph?.nodes) && graph.nodes?.length ? graph.nodes : initialNodes;
@@ -580,6 +946,11 @@ const AutomationPage = () => {
   const isSaving = createFlowMutation.isPending || updateFlowMutation.isPending;
   const selectedNode = useMemo(() => nodes.find((n) => n.id === selectedNodeId) ?? null, [nodes, selectedNodeId]);
   const selectedNodeData = useMemo(() => (selectedNode ? extractData(selectedNode.data) : null), [selectedNode]);
+  const selectedNodePreviewContext = useMemo(() => {
+    if (!selectedNodeData?.activityPreview) return {};
+    return buildPreviewContext(selectedNodeData.activityPreview);
+  }, [selectedNodeData?.activityPreview]);
+  const selectedNodePreviewFields = useMemo(() => collectPlaceholderPaths(selectedNodePreviewContext), [selectedNodePreviewContext]);
 
   const onConnect = useCallback(
     (connection: Connection) => {
@@ -671,6 +1042,19 @@ const AutomationPage = () => {
       );
     },
     [setNodes]
+  );
+
+  const handleSelectActivity = useCallback(
+    (nodeId: string, option: ActivityEventOption | undefined) => {
+      if (!option) return;
+      handleNodeDataChange(nodeId, {
+        activityEventKey: option.key,
+        activityEventLabel: option.label,
+        activityStage: option.stage,
+        activityPreview: option.example || undefined,
+      });
+    },
+    [handleNodeDataChange]
   );
 
   const handleDeleteNode = useCallback(() => {
@@ -946,6 +1330,54 @@ const AutomationPage = () => {
                     </div>
                   </div>
 
+                  {(selectedNodeData.type === 'start' || selectedNodeData.type === 'order' || selectedNodeData.type === 'cart') && (
+                    <div className="space-y-4">
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Trigger activity
+                        </label>
+                        <Select
+                          value={selectedNodeData.activityEventKey ?? ''}
+                          onValueChange={(value) => {
+                            const option = activityOptions.find((opt) => opt.key === value);
+                            handleSelectActivity(selectedNode.id, option ?? FALLBACK_ACTIVITY_OPTIONS.find((opt) => opt.key === value));
+                          }}
+                        >
+                          <SelectTrigger disabled={isLoadingActivities}>
+                            <SelectValue placeholder={isLoadingActivities ? 'Loading…' : 'Choose an event'} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {activityOptions.map((option) => (
+                              <SelectItem key={option.key} value={option.key}>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-medium">{option.label}</span>
+                                  {option.stage && (
+                                    <span className="text-[11px] text-muted-foreground">Stage: {formatActivityLabel(option.stage)}</span>
+                                  )}
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {activityError && (
+                          <p className="text-[11px] text-destructive">{activityError}</p>
+                        )}
+                        <p className="text-[11px] text-muted-foreground">
+                          When this event arrives via the activity webhook, downstream nodes can use its data (customer, cart, order).
+                        </p>
+                      </div>
+
+                      {selectedNodeData.activityPreview && (
+                        <div className="rounded-lg border bg-muted/30 p-3 text-xs space-y-1">
+                          <p className="font-semibold text-muted-foreground">Sample payload</p>
+                          <pre className="max-h-40 overflow-auto whitespace-pre-wrap">
+                            {JSON.stringify(selectedNodeData.activityPreview, null, 2)}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {selectedNodeData.type === 'wait' && (
                     <div className="space-y-3">
                       <div className="grid grid-cols-[minmax(0,1fr)_120px] gap-3">
@@ -1054,26 +1486,195 @@ const AutomationPage = () => {
                         </div>
                       )}
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call-to-action link</label>
-                        <Input
-                          type="url"
-                          value={selectedNodeData.ctaUrl ?? ''}
-                          onChange={(e) => handleNodeDataChange(selectedNode.id, { ctaUrl: e.target.value })}
-                          placeholder="https://yourstore.com/checkout"
-                        />
-                      </div>
+                      {(selectedNodeData.channel === 'whatsapp' || selectedNodeData.channel === 'sms' || selectedNodeData.channel === 'email') && (
+                        <>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Call-to-action link</label>
+                            <Input
+                              type="url"
+                              value={selectedNodeData.ctaUrl ?? ''}
+                              onChange={(e) => handleNodeDataChange(selectedNode.id, { ctaUrl: e.target.value })}
+                              placeholder="https://yourstore.com/checkout"
+                            />
+                          </div>
 
-                      <div className="flex items-center justify-between rounded-lg border px-3 py-2">
-                        <div className="space-y-0.5">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Send follow-up</p>
-                          <p className="text-[11px] text-muted-foreground">Automatically queue another reminder if there is no response.</p>
+                          <div className="flex items-center justify-between rounded-lg border px-3 py-2">
+                            <div className="space-y-0.5">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Send follow-up</p>
+                              <p className="text-[11px] text-muted-foreground">Automatically queue another reminder if there is no response.</p>
+                            </div>
+                            <Switch
+                              checked={Boolean(selectedNodeData.sendFollowUp)}
+                              onCheckedChange={(checked) => handleNodeDataChange(selectedNode.id, { sendFollowUp: checked })}
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      {(selectedNodeData.channel === 'evolution_text' || selectedNodeData.channel === 'evolution_media') && (
+                        <div className="space-y-3 rounded-lg border px-3 py-3">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Send to</label>
+                            <Select
+                              value={(() => {
+                                const current = selectedNodeData.recipientPath ?? '';
+                                const known = RECIPIENT_PATH_OPTIONS.find((option) => option.value === current);
+                                if (known) return known.value;
+                                if (current) return CUSTOM_RECIPIENT_OPTION;
+                                return 'order.customer_phone';
+                              })()}
+                              onValueChange={(value) => {
+                                if (value === CUSTOM_RECIPIENT_OPTION) {
+                                  handleNodeDataChange(selectedNode.id, {
+                                    recipientPath: selectedNodeData.recipientPath ?? '',
+                                  });
+                                  return;
+                                }
+                                handleNodeDataChange(selectedNode.id, {
+                                  recipientPath: value,
+                                });
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Choose where to read the phone number" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {RECIPIENT_PATH_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    <div className="flex flex-col">
+                                      <span className="text-sm font-medium">{option.label}</span>
+                                      <span className="text-[11px] text-muted-foreground">{option.helper}</span>
+                                    </div>
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value={CUSTOM_RECIPIENT_OPTION}>
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-medium">Custom path</span>
+                                    <span className="text-[11px] text-muted-foreground">Specify a JSON path manually.</span>
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {!selectedNodeData.recipientPath || !RECIPIENT_PATH_OPTIONS.some((option) => option.value === selectedNodeData.recipientPath) ? (
+                            <div className="space-y-1.5">
+                              <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Recipient path</label>
+                              <Input
+                                value={selectedNodeData.recipientPath ?? ''}
+                                onChange={(e) => handleNodeDataChange(selectedNode.id, { recipientPath: e.target.value })}
+                                placeholder="e.g. data.payload.customer_phone"
+                              />
+                              <p className="text-[11px] text-muted-foreground">Path is resolved against the event context (event, data, order, customer, metadata).</p>
+                            </div>
+                          ) : null}
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Fallback number</label>
+                            <Input
+                              value={selectedNodeData.fallbackRecipient ?? ''}
+                              onChange={(e) => handleNodeDataChange(selectedNode.id, { fallbackRecipient: e.target.value })}
+                              placeholder="e.g. +919876543210"
+                            />
+                            <p className="text-[11px] text-muted-foreground">Used when the selected path resolves to an empty value.</p>
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Message text</label>
+                            <Textarea
+                              rows={3}
+                              value={selectedNodeData.evolutionMessage?.text ?? ''}
+                              onChange={(e) => handleNodeDataChange(selectedNode.id, {
+                                evolutionMessage: {
+                                  ...selectedNodeData.evolutionMessage,
+                                  text: e.target.value,
+                                },
+                              })}
+                              placeholder="Hey {{name}}, just nudging you about your order."
+                            />
+                          </div>
+                          {selectedNodeData.channel === 'evolution_media' && (
+                            <>
+                              <div className="space-y-1.5">
+                                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Media URL</label>
+                                <Input
+                                  type="url"
+                                  value={selectedNodeData.evolutionMessage?.mediaUrl ?? ''}
+                                  onChange={(e) => handleNodeDataChange(selectedNode.id, {
+                                    evolutionMessage: {
+                                      ...selectedNodeData.evolutionMessage,
+                                      mediaUrl: e.target.value,
+                                    },
+                                  })}
+                                  placeholder="https://cdn.example.com/promo.jpg"
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Media type</label>
+                                  <Select
+                                    value={selectedNodeData.evolutionMessage?.mediaType ?? 'image'}
+                                    onValueChange={(value) => handleNodeDataChange(selectedNode.id, {
+                                      evolutionMessage: {
+                                        ...selectedNodeData.evolutionMessage,
+                                        mediaType: value as 'image' | 'video' | 'audio' | 'document',
+                                      },
+                                    })}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {['image', 'video', 'audio', 'document'].map((type) => (
+                                        <SelectItem key={type} value={type} className="capitalize">
+                                          {type}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Caption (optional)</label>
+                                  <Input
+                                    value={selectedNodeData.evolutionMessage?.caption ?? ''}
+                                    onChange={(e) => handleNodeDataChange(selectedNode.id, {
+                                      evolutionMessage: {
+                                        ...selectedNodeData.evolutionMessage,
+                                        caption: e.target.value,
+                                      },
+                                    })}
+                                  />
+                                </div>
+                              </div>
+                            </>
+                          )}
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Simulated send delay (ms)</label>
+                            <Input
+                              type="number"
+                              min={0}
+                              value={selectedNodeData.evolutionMessage?.delayMs ?? 0}
+                              onChange={(e) => handleNodeDataChange(selectedNode.id, {
+                                evolutionMessage: {
+                                  ...selectedNodeData.evolutionMessage,
+                                  delayMs: Number.parseInt(e.target.value, 10) || 0,
+                                },
+                              })}
+                            />
+                            <p className="text-[11px] text-muted-foreground">Optional artificial delay before sending through Evolution API.</p>
+                          </div>
+
+                          {selectedNodeData.activityPreview && (
+                            <RecipientPreview
+                              context={selectedNodePreviewContext}
+                              path={selectedNodeData.recipientPath}
+                              fallback={selectedNodeData.fallbackRecipient}
+                              messageTemplate={selectedNodeData.evolutionMessage?.text ?? selectedNodeData.customMessage ?? ''}
+                              availableFields={selectedNodePreviewFields}
+                            />
+                          )}
                         </div>
-                        <Switch
-                          checked={Boolean(selectedNodeData.sendFollowUp)}
-                          onCheckedChange={(checked) => handleNodeDataChange(selectedNode.id, { sendFollowUp: checked })}
-                        />
-                      </div>
+                      )}
                     </div>
                   )}
 

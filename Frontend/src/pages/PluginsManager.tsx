@@ -27,9 +27,11 @@ import { getContentItems, uploadVideo, getContentVideoUrl, type ContentItem, get
 import { pocketbase } from "@/lib/pocketbase";
 import { ProductImage } from "@/components/ProductImage";
 import { Search, X } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 
 export default function PluginsManager() {
   const { enabled, configs, loading, reload } = usePlugins();
+  const { toast } = useToast();
 
   const [waConfig, setWaConfig] = useState<WhatsAppPluginConfig | null>(null);
   const [vidConfig, setVidConfig] = useState<VideoPluginConfig | null>(null);
@@ -55,6 +57,8 @@ export default function PluginsManager() {
   const [selectedVideoField, setSelectedVideoField] = useState<{type: 'main' | 'product' | 'path', index?: number} | null>(null);
   const [waApiConfig, setWaApiConfig] = useState<WhatsappApiConfig | null>(null);
   const [evoApiConfig, setEvoApiConfig] = useState<EvolutionApiConfig | null>(null);
+  const [testing, setTesting] = useState<{ type: 'whatsapp' | 'evolution' | null }>({ type: null });
+  const [testTargets, setTestTargets] = useState<{ whatsapp: string; evolution: string }>({ whatsapp: '', evolution: '' });
 
   useEffect(() => {
     if (!loading) {
@@ -71,6 +75,11 @@ export default function PluginsManager() {
       const customScripts = configs.custom_scripts as CustomScriptsConfig;
       console.log('[PluginsManager] Loading custom scripts config:', customScripts);
       setCustomScriptsConfig(customScripts);
+
+      setTestTargets((prev) => ({
+        whatsapp: prev.whatsapp || (configs.whatsapp_floating as WhatsAppPluginConfig)?.phoneNumber || '',
+        evolution: prev.evolution || '',
+      }));
     }
   }, [configs, loading]);
 
@@ -274,11 +283,146 @@ export default function PluginsManager() {
     setProductSearch("");
   };
 
+  const createTester = (type: 'whatsapp' | 'evolution') => async () => {
+    if (testing.type) return;
+    const recipient = type === 'whatsapp' ? testTargets.whatsapp.trim() : testTargets.evolution.trim();
+    if (!recipient) {
+      toast({
+        title: 'Set a test number',
+        description: 'Enter a recipient number before sending a test message.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setTesting({ type });
+    try {
+      if (type === 'whatsapp') {
+        if (!waApiConfig || waApiConfig.provider === 'meta') {
+          if (!waApiConfig?.phoneNumberId || !waApiConfig?.accessToken) {
+            throw new Error('Meta WhatsApp credentials are missing.');
+          }
+
+          const body = waApiConfig.defaultTemplate?.name ? {
+            messaging_product: 'whatsapp',
+            to: recipient,
+            type: 'template' as const,
+            template: {
+              name: waApiConfig.defaultTemplate.name,
+              language: { code: waApiConfig.defaultTemplate.lang || 'en_US' },
+            },
+          } : {
+            messaging_product: 'whatsapp',
+            to: recipient,
+            type: 'text' as const,
+            text: { body: 'Test message from Plugin Manager' },
+          };
+
+          const res = await fetch(`https://graph.facebook.com/v17.0/${waApiConfig.phoneNumberId}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${waApiConfig.accessToken}`,
+            },
+            body: JSON.stringify(body),
+          });
+
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(txt || 'WhatsApp request failed');
+          }
+        } else {
+          if (!waApiConfig.baseUrl) {
+            throw new Error('Custom WhatsApp base URL is missing.');
+          }
+
+          const res = await fetch(`${waApiConfig.baseUrl.replace(/\/$/, '')}/messages`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(waApiConfig.accessToken ? { Authorization: `Bearer ${waApiConfig.accessToken}` } : {}),
+            },
+            body: JSON.stringify({
+              to: recipient,
+              message: 'Test message from Plugin Manager',
+              template: waApiConfig.defaultTemplate,
+            }),
+          });
+
+          if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(txt || 'Custom WhatsApp request failed');
+          }
+        }
+      } else {
+        if (!evoApiConfig?.baseUrl) {
+          throw new Error('Evolution API base URL is missing.');
+        }
+
+        const instance = evoApiConfig.defaultSender?.trim();
+        if (!instance) {
+          throw new Error('Specify the Evolution instance ID in the Default Sender field.');
+        }
+
+        const url = `${evoApiConfig.baseUrl.replace(/\/$/, '')}/message/sendText/${encodeURIComponent(instance)}`;
+
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (evoApiConfig.authType === 'header') {
+          const headerName = evoApiConfig.authHeader?.trim() || 'apikey';
+          if (!evoApiConfig.tokenOrKey) {
+            throw new Error(`Provide a value for the ${headerName} header in the Access Token field.`);
+          }
+          headers[headerName] = evoApiConfig.tokenOrKey;
+        } else if (evoApiConfig.authType === 'bearer') {
+          if (!evoApiConfig.tokenOrKey) {
+            throw new Error('Provide a bearer token in the Access Token field.');
+          }
+          headers.Authorization = `Bearer ${evoApiConfig.tokenOrKey}`;
+        } else if (evoApiConfig.tokenOrKey) {
+          headers.apikey = evoApiConfig.tokenOrKey;
+        }
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            number: recipient,
+            text: 'Test message from Plugin Manager',
+            options: { delay: 250, presence: 'composing' },
+            textMessage: { text: 'Test message from Plugin Manager' },
+          }),
+        });
+
+        if (!res.ok) {
+          const txt = await res.text().catch(() => '');
+          throw new Error(txt || 'Evolution API request failed');
+        }
+      }
+
+      toast({
+        title: 'Test request sent',
+        description: `${type === 'whatsapp' ? 'WhatsApp' : 'Evolution'} API responded successfully.`,
+      });
+    } catch (error) {
+      console.error('API test failed', error);
+      toast({
+        title: 'Test failed',
+        variant: 'destructive',
+        description: error instanceof Error ? error.message : 'Unknown error occurred',
+      });
+    } finally {
+      setTesting({ type: null });
+    }
+  };
+
+
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold">Plugin Manager</h1>
-        <p className="text-muted-foreground mt-2">Enable and configure global floating plugins.</p>
+    <div className="container mx-auto px-4 py-8">
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
+        <div>
+          <h1 className="text-3xl font-bold">Plugin Manager</h1>
+          <p className="text-muted-foreground mt-2">Enable and configure global floating plugins.</p>
+        </div>
       </div>
 
       <div className="flex gap-6">
@@ -1872,11 +2016,28 @@ export default function PluginsManager() {
                       <Input placeholder="Language (e.g. en_US)" value={waApiConfig.defaultTemplate?.lang || 'en_US'} onChange={(e) => setWaApiConfig({ ...waApiConfig, defaultTemplate: { name: waApiConfig.defaultTemplate?.name || '', lang: e.target.value } })} />
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="wa-test-number">Test recipient number</Label>
+                    <Input
+                      id="wa-test-number"
+                      placeholder="e.g. 919999999999"
+                      value={testTargets.whatsapp}
+                      onChange={(e) => setTestTargets((prev) => ({ ...prev, whatsapp: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Used when you click "Send Test Message" below. Must include country code without +.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button onClick={() => onSave('whatsapp_api' as PluginKey)} disabled={saving}>
                       {saving ? 'Saving...' : 'Save'}
                     </Button>
                     <Button variant="outline" onClick={() => resetToDefault('whatsapp_api' as PluginKey)}>Reset</Button>
+                    <Button
+                      variant="secondary"
+                      onClick={createTester('whatsapp')}
+                      disabled={testing.type !== null}
+                    >
+                      {testing.type === 'whatsapp' ? 'Testing…' : 'Send Test Message'}
+                    </Button>
                   </div>
                 </>
               )}
@@ -1934,12 +2095,30 @@ export default function PluginsManager() {
                   <div className="grid gap-2">
                     <Label htmlFor="evo-sender">Default Sender</Label>
                     <Input id="evo-sender" value={evoApiConfig.defaultSender || ''} onChange={(e) => setEvoApiConfig({ ...evoApiConfig, defaultSender: e.target.value })} />
+                    <p className="text-xs text-muted-foreground">Enter the Evolution instance ID (used in the sendText URL).</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid gap-2">
+                    <Label htmlFor="evo-test-number">Test recipient number</Label>
+                    <Input
+                      id="evo-test-number"
+                      placeholder="e.g. 919999999999"
+                      value={testTargets.evolution}
+                      onChange={(e) => setTestTargets((prev) => ({ ...prev, evolution: e.target.value }))}
+                    />
+                    <p className="text-xs text-muted-foreground">Used when you click "Send Test Message" below. Include full number with country code.</p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button onClick={() => onSave('evolution_api' as PluginKey)} disabled={saving}>
                       {saving ? 'Saving...' : 'Save'}
                     </Button>
                     <Button variant="outline" onClick={() => resetToDefault('evolution_api' as PluginKey)}>Reset</Button>
+                    <Button
+                      variant="secondary"
+                      onClick={createTester('evolution')}
+                      disabled={testing.type !== null}
+                    >
+                      {testing.type === 'evolution' ? 'Testing…' : 'Send Test Message'}
+                    </Button>
                   </div>
                 </>
               )}
@@ -1947,220 +2126,249 @@ export default function PluginsManager() {
           </Card>
         )}
 
-        </section>
-      </div>
-    </div>
-  );
-}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                {loadingVideos ? "Loading videos..." : `${videos.length} video(s)`}
+        {/* Video Picker Dialog */}
+        <Dialog
+          open={videoPickerOpen}
+          onOpenChange={(open) => {
+            setVideoPickerOpen(open);
+            if (!open) {
+              setSelectedVideoField(null);
+            }
+          }}
+        >
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Select or Upload Video</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {loadingVideos ? 'Loading videos...' : `${videos.length} video(s)`}
+                </div>
+                <Input
+                  type="file"
+                  accept="video/*"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (f) await handleUploadVideo(f);
+                  }}
+                />
               </div>
-              <Input
-                type="file"
-                accept="video/*"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  if (f) await handleUploadVideo(f);
-                }}
-              />
-            </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[420px] overflow-auto">
-              {videos.map((v) => {
-                const url = getContentVideoUrl(v);
-                
-                const handleVideoSelect = () => {
-                  if (selectedVideoField?.type === 'main') {
-                    if (vidConfig) setVidConfig({ ...vidConfig, videoUrl: url });
-                  } else if (selectedVideoField?.type === 'product' && selectedVideoField.index !== undefined) {
-                    if (vidConfig) {
-                      const updated = [...(vidConfig.productVideos || [])];
-                      updated[selectedVideoField.index] = { ...updated[selectedVideoField.index], videoUrl: url };
-                      setVidConfig({ ...vidConfig, productVideos: updated });
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[420px] overflow-auto">
+                {videos.map((v) => {
+                  const url = getContentVideoUrl(v);
+
+                  const handleVideoSelect = () => {
+                    if (selectedVideoField?.type === 'main') {
+                      if (vidConfig) setVidConfig({ ...vidConfig, videoUrl: url });
+                    } else if (selectedVideoField?.type === 'product' && selectedVideoField.index !== undefined) {
+                      if (vidConfig) {
+                        const updated = [...(vidConfig.productVideos || [])];
+                        updated[selectedVideoField.index] = { ...updated[selectedVideoField.index], videoUrl: url };
+                        setVidConfig({ ...vidConfig, productVideos: updated });
+                      }
+                    } else if (selectedVideoField?.type === 'path' && selectedVideoField.index !== undefined) {
+                      if (vidConfig) {
+                        const updated = [...(vidConfig.pathConfigs || [])];
+                        updated[selectedVideoField.index] = { ...updated[selectedVideoField.index], videoUrl: url };
+                        setVidConfig({ ...vidConfig, pathConfigs: updated });
+                      }
                     }
-                  } else if (selectedVideoField?.type === 'path' && selectedVideoField.index !== undefined) {
-                    if (vidConfig) {
-                      const updated = [...(vidConfig.pathConfigs || [])];
-                      updated[selectedVideoField.index] = { ...updated[selectedVideoField.index], videoUrl: url };
-                      setVidConfig({ ...vidConfig, pathConfigs: updated });
-                    }
-                  }
-                  setVideoPickerOpen(false);
-                  setSelectedVideoField(null);
-                };
-                
-                return (
-                  <button
-                    key={v.id}
-                    type="button"
-                    onClick={handleVideoSelect}
-                    className="rounded-md border hover:ring-2 hover:ring-primary p-1 text-left"
-                    title="Select this video"
-                  >
-                    <video src={url} className="w-full h-40 object-cover rounded" />
-                    <div className="px-1 py-2 text-xs truncate">{v.Videos}</div>
-                  </button>
-                );
-              })}
-              {!loadingVideos && videos.length === 0 && (
-                <div className="text-sm text-muted-foreground">No videos found. Upload one above.</div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+                    setVideoPickerOpen(false);
+                    setSelectedVideoField(null);
+                  };
 
-      {/* Image Picker Dialog */}
-      <Dialog open={imagePickerOpen} onOpenChange={setImagePickerOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Select or Upload Image</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                {loadingImages ? "Loading images..." : `${images.length} image(s)`}
-              </div>
-              <Input type="file" accept="image/*" onChange={async (e) => { const f = e.target.files?.[0]; if (f) await handleUploadImage(f); }} />
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[420px] overflow-auto">
-              {images.map((img) => {
-                const url = getContentImageUrl(img);
-                return (
-                  <button key={img.id} type="button" onClick={() => { if (popupConfig) setPopupConfig({ ...popupConfig, imageUrl: url }); setImagePickerOpen(false); }} className="rounded-md border hover:ring-2 hover:ring-primary p-1 text-left" title="Select this image">
-                    <img src={url} alt="Content image" className="w-full h-40 object-cover rounded" />
-                    <div className="px-1 py-2 text-xs truncate">{img.Images as any}</div>
-                  </button>
-                );
-              })}
-              {!loadingImages && images.length === 0 && (
-                <div className="text-sm text-muted-foreground">No images found. Upload one above.</div>
-              )}
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Product Picker Dialog */}
-      <Dialog open={productPickerOpen} onOpenChange={setProductPickerOpen}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Select Product</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {/* Search */}
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products..."
-                value={productSearch}
-                onChange={(e) => setProductSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            
-            {/* Loading state */}
-            {loadingProducts && (
-              <div className="flex items-center justify-center py-8">
-                <div className="text-sm text-muted-foreground">Loading products...</div>
-              </div>
-            )}
-            
-            {/* Products grid */}
-            {!loadingProducts && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-auto">
-                {filteredProducts.map((product) => {
-                  const imageUrl = product.images && product.images.length > 0 ? product.images[0] : null;
                   return (
                     <button
-                      key={product.id}
+                      key={v.id}
                       type="button"
-                      onClick={() => handleProductSelect(product)}
-                      className="p-3 border rounded-lg hover:ring-2 hover:ring-primary text-left transition-all hover:shadow-md"
-                      title={`Select ${product.name}`}
+                      onClick={handleVideoSelect}
+                      className="rounded-md border hover:ring-2 hover:ring-primary p-1 text-left"
+                      title="Select this video"
                     >
-                      <div className="space-y-3">
-                        {/* Product Image */}
-                        <div className="aspect-square bg-muted rounded-md overflow-hidden">
-                          {imageUrl ? (
-                            <ProductImage
-                              url={imageUrl}
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                              <div className="text-center">
-                                <div className="text-2xl mb-1">📦</div>
-                                <div className="text-xs">No Image</div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {/* Product Info */}
-                        <div className="space-y-1">
-                          <h4 className="font-medium text-sm line-clamp-2 leading-tight">
-                            {product.name}
-                          </h4>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-muted-foreground">
-                              ID: {product.id}
-                            </span>
-                            {product.price && (
-                              <span className="text-xs font-medium">
-                                ₹{product.price}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
+                      <video src={url} className="w-full h-40 object-cover rounded" />
+                      <div className="px-1 py-2 text-xs truncate">{v.Videos}</div>
                     </button>
                   );
                 })}
+                {!loadingVideos && videos.length === 0 && (
+                  <div className="text-sm text-muted-foreground">No videos found. Upload one above.</div>
+                )}
               </div>
-            )}
-            
-            {/* No results */}
-            {!loadingProducts && filteredProducts.length === 0 && products.length > 0 && (
-              <div className="text-center py-8">
-                <div className="text-sm text-muted-foreground">
-                  No products found matching "{productSearch}"
-                </div>
-              </div>
-            )}
-            
-            {/* No products at all */}
-            {!loadingProducts && products.length === 0 && (
-              <div className="text-center py-8">
-                <div className="text-sm text-muted-foreground">
-                  No products found. Please add products first.
-                </div>
-              </div>
-            )}
-            
-            {/* Footer */}
-            <div className="flex items-center justify-between pt-4 border-t">
-              <div className="text-xs text-muted-foreground">
-                {!loadingProducts && `${filteredProducts.length} of ${products.length} products`}
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setProductPickerOpen(false);
-                  setSelectedProductForVideo(null);
-                  setProductSearch("");
-                }}
-              >
-                Cancel
-              </Button>
             </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </DialogContent>
+        </Dialog>
+
+        {/* Image Picker Dialog */}
+        <Dialog open={imagePickerOpen} onOpenChange={setImagePickerOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Select or Upload Image</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-muted-foreground">
+                  {loadingImages ? 'Loading images...' : `${images.length} image(s)`}
+                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    if (f) await handleUploadImage(f);
+                  }}
+                />
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-h-[420px] overflow-auto">
+                {images.map((img) => {
+                  const url = getContentImageUrl(img);
+                  return (
+                    <button
+                      key={img.id}
+                      type="button"
+                      onClick={() => {
+                        if (popupConfig) {
+                          setPopupConfig({ ...popupConfig, imageUrl: url });
+                        }
+                        setImagePickerOpen(false);
+                      }}
+                      className="rounded-md border hover:ring-2 hover:ring-primary p-1 text-left"
+                      title="Select this image"
+                    >
+                      <img src={url} alt="Content image" className="w-full h-40 object-cover rounded" />
+                      <div className="px-1 py-2 text-xs truncate">{img.Images as any}</div>
+                    </button>
+                  );
+                })}
+                {!loadingImages && images.length === 0 && (
+                  <div className="text-sm text-muted-foreground">No images found. Upload one above.</div>
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Product Picker Dialog */}
+        <Dialog open={productPickerOpen} onOpenChange={setProductPickerOpen}>
+          <DialogContent className="max-w-4xl">
+            <DialogHeader>
+              <DialogTitle>Select Product</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+
+              {/* Loading state */}
+              {loadingProducts && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-sm text-muted-foreground">Loading products...</div>
+                </div>
+              )}
+
+              {/* Products grid */}
+              {!loadingProducts && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-auto">
+                  {filteredProducts.map((product) => {
+                    const imageUrl = product.images && product.images.length > 0 ? product.images[0] : null;
+                    return (
+                      <button
+                        key={product.id}
+                        type="button"
+                        onClick={() => handleProductSelect(product)}
+                        className="p-3 border rounded-lg hover:ring-2 hover:ring-primary text-left transition-all hover:shadow-md"
+                        title={`Select ${product.name}`}
+                      >
+                        <div className="space-y-3">
+                          {/* Product Image */}
+                          <div className="aspect-square bg-muted rounded-md overflow-hidden">
+                            {imageUrl ? (
+                              <ProductImage
+                                url={imageUrl}
+                                alt={product.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                                <div className="text-center">
+                                  <div className="text-2xl mb-1">📦</div>
+                                  <div className="text-xs">No Image</div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Product Info */}
+                          <div className="space-y-1">
+                            <h4 className="font-medium text-sm line-clamp-2 leading-tight">
+                              {product.name}
+                            </h4>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-muted-foreground">
+                                ID: {product.id}
+                              </span>
+                              {product.price && (
+                                <span className="text-xs font-medium">
+                                  ₹{product.price}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* No results */}
+              {!loadingProducts && filteredProducts.length === 0 && products.length > 0 && (
+                <div className="text-center py-8">
+                  <div className="text-sm text-muted-foreground">
+                    No products found matching "{productSearch}"
+                  </div>
+                </div>
+              )}
+
+              {/* No products at all */}
+              {!loadingProducts && products.length === 0 && (
+                <div className="text-center py-8">
+                  <div className="text-sm text-muted-foreground">
+                    No products found. Please add products first.
+                  </div>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="flex items-center justify-between pt-4 border-t">
+                <div className="text-xs text-muted-foreground">
+                  {!loadingProducts && `${filteredProducts.length} of ${products.length} products`}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setProductPickerOpen(false);
+                    setSelectedProductForVideo(null);
+                    setProductSearch("");
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </section>
     </div>
+  </div>
   );
 }
