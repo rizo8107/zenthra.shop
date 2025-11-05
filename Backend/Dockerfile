@@ -67,15 +67,23 @@ RUN npm install
 # Copy the rest of the application code
 COPY . .
 
-# Build only the frontend (skip server bundle)
-RUN npm run build
+# Build frontend + server bundle
+RUN npm run build:all
 
-# Optionally, prune dev dependencies to reduce image size for production
+# Remove dev dependencies for smaller runtime image
 RUN npm prune --production
 
-# Default port and expose
-ENV PORT=8080
-EXPOSE 8080
+# Copy entrypoint script that starts static host + API server
+COPY docker-entrypoint.sh ./docker-entrypoint.sh
+RUN chmod +x docker-entrypoint.sh
 
-# Start static file server only (bind to all interfaces for Traefik)
-CMD ["npx", "serve", "-s", "dist", "-l", "tcp://0.0.0.0:8080"]
+# Runtime environment
+ENV NODE_ENV=production
+ENV PORT=8080
+ENV SERVER_PORT=3001
+
+# Expose static + API ports (static served on 8080, API on 3001)
+EXPOSE 8080 3001
+
+# Run both static site and API (trap signals for graceful shutdown)
+ENTRYPOINT ["./docker-entrypoint.sh"]
