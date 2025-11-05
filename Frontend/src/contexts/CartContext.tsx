@@ -4,6 +4,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { deduplicateCartItems, isValidCartItem } from '@/utils/cartUtils';
 import { trackEcommerceEvent } from '@/utils/analytics';
+import { sendWebhookEvent } from '@/lib/webhooks';
 
 // Define a PocketBaseError interface to avoid using 'any'
 interface PocketBaseError {
@@ -421,26 +422,31 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
       let newItems;
 
+      let action: 'added' | 'updated' = 'added';
+      let payloadItem: CartItem;
+
       if (existingItemIndex >= 0) {
         // Update quantity if item exists
         newItems = [...currentItems];
+        const existing = newItems[existingItemIndex];
+        const newQuantity = existing.quantity + quantity;
         newItems[existingItemIndex] = {
-          ...newItems[existingItemIndex],
-          quantity: newItems[existingItemIndex].quantity + quantity,
+          ...existing,
+          quantity: newQuantity,
         };
+        action = 'updated';
+        payloadItem = newItems[existingItemIndex];
       } else {
         // Add new item if it doesn't exist
-        newItems = [
-          ...currentItems,
-          {
-            productId: product.id,
-            product,
-            quantity,
-            color,
-            options,
-            unitPrice: typeof unitPrice === 'number' ? unitPrice : undefined,
-          },
-        ];
+        payloadItem = {
+          productId: product.id,
+          product,
+          quantity,
+          color,
+          options,
+          unitPrice: typeof unitPrice === 'number' ? unitPrice : undefined,
+        };
+        newItems = [...currentItems, payloadItem];
       }
 
       // Track the add to cart event for Google Analytics
@@ -467,6 +473,27 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         description: `${product.name} x${quantity} added to your cart.`,
       });
 
+      void sendWebhookEvent({
+        type: action === 'added' ? 'cart.item_added' : 'cart.item_updated',
+        data: {
+          item: {
+            product_id: payloadItem.productId,
+            name: payloadItem.product?.name,
+            quantity: payloadItem.quantity,
+            color: payloadItem.color,
+            options: payloadItem.options,
+            unit_price: payloadItem.unitPrice ?? payloadItem.product?.price,
+          },
+          cart: {
+            item_count: newItems.reduce((sum, item) => sum + item.quantity, 0),
+          },
+        },
+        metadata: {
+          source: 'cart_context',
+          user_id: user?.id,
+        },
+      });
+
       return newItems;
     });
   };
@@ -474,7 +501,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const removeItem = (productId: string) => {
     setItems((currentItems) => {
       const itemToRemove = currentItems.find(item => item.productId === productId);
-      
+
       if (itemToRemove) {
         // Track removal in Google Analytics
         trackEcommerceEvent('remove_from_cart', [{
@@ -484,8 +511,24 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           quantity: itemToRemove.quantity,
           item_variant: itemToRemove.color || undefined
         }]);
+        void sendWebhookEvent({
+          type: 'cart.item_removed',
+          data: {
+            item: {
+              product_id: itemToRemove.productId,
+              name: itemToRemove.product?.name,
+              quantity: itemToRemove.quantity,
+              color: itemToRemove.color,
+              options: itemToRemove.options,
+            },
+          },
+          metadata: {
+            source: 'cart_context',
+            user_id: user?.id,
+          },
+        });
       }
-      
+
       return currentItems.filter((item) => item.productId !== productId);
     });
   };
@@ -499,11 +542,11 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems((currentItems) => {
       const existingItem = currentItems.find(item => item.productId === productId);
       const oldQuantity = existingItem ? existingItem.quantity : 0;
-      
+
       const newItems = currentItems.map((item) =>
         item.productId === productId ? { ...item, quantity } : item
       );
-      
+
       if (existingItem && quantity !== oldQuantity) {
         // Track quantity update in Google Analytics
         if (quantity > oldQuantity) {
@@ -525,15 +568,50 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             item_variant: existingItem.color || undefined
           }]);
         }
+
+        void sendWebhookEvent({
+          type: 'cart.item_updated',
+          data: {
+            item: {
+              product_id: existingItem.productId,
+              name: existingItem.product?.name,
+              old_quantity: oldQuantity,
+              new_quantity: quantity,
+              color: existingItem.color,
+              options: existingItem.options,
+            },
+          },
+          metadata: {
+            source: 'cart_context',
+            user_id: user?.id,
+          },
+        });
       }
-      
+
       return newItems;
     });
   };
 
   const clearCart = () => {
     // Don't track this in analytics since it's usually after checkout or other events
-    setItems([]);
+    setItems((currentItems) => {
+      if (currentItems.length > 0) {
+        void sendWebhookEvent({
+          type: 'cart.cleared',
+          data: {
+            items_cleared: currentItems.map((item) => ({
+              product_id: item.productId,
+              quantity: item.quantity,
+            })),
+          },
+          metadata: {
+            source: 'cart_context',
+            user_id: user?.id,
+          },
+        });
+      }
+      return [];
+    });
   };
 
   const getItem = (productId: string, color?: string): CartItem | undefined => {
