@@ -8,7 +8,7 @@ import type {
   AbandonedCartAnalytics,
   AbandonedCartSummary,
   AbandonedCartDetail,
-} from '@/lib/types';
+} from './types.js';
 
 // Initialize PocketBase with the URL from environment variables (supports Vite and Node)
 const VITE_ENV = (() => {
