@@ -31,6 +31,8 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
     facebook_pixel: false,
     microsoft_clarity: false,
     custom_scripts: false,
+    evolution_api: false,
+    whatsapp_api: false,
   });
   const [configs, setConfigs] = useState<Record<PluginKey, WhatsAppPluginConfig | VideoPluginConfig | PopupBannerConfig | CustomScriptsConfig>>({
     whatsapp_floating: pluginRegistry.whatsapp_floating.defaultConfig,
@@ -41,6 +43,8 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
     facebook_pixel: pluginRegistry.facebook_pixel.defaultConfig as any,
     microsoft_clarity: pluginRegistry.microsoft_clarity.defaultConfig as any,
     custom_scripts: pluginRegistry.custom_scripts.defaultConfig as CustomScriptsConfig,
+    evolution_api: pluginRegistry.evolution_api.defaultConfig as any,
+    whatsapp_api: pluginRegistry.whatsapp_api.defaultConfig as any,
   });
   const { pathname } = useLocation();
 
@@ -57,6 +61,8 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
         facebook_pixel: false,
         microsoft_clarity: false,
         custom_scripts: false,
+        evolution_api: false,
+        whatsapp_api: false,
       };
       const nextConfigs: Record<PluginKey, WhatsAppPluginConfig | VideoPluginConfig | PopupBannerConfig | CustomScriptsConfig> = {
         whatsapp_floating: pluginRegistry.whatsapp_floating.defaultConfig,
@@ -67,6 +73,8 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
         facebook_pixel: pluginRegistry.facebook_pixel.defaultConfig as any,
         microsoft_clarity: pluginRegistry.microsoft_clarity.defaultConfig as any,
         custom_scripts: pluginRegistry.custom_scripts.defaultConfig as CustomScriptsConfig,
+        evolution_api: pluginRegistry.evolution_api.defaultConfig as any,
+        whatsapp_api: pluginRegistry.whatsapp_api.defaultConfig as any,
       };
 
       (Object.keys(pluginRegistry) as PluginKey[]).forEach((key) => {

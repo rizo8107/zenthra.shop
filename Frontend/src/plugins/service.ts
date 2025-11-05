@@ -1,5 +1,5 @@
 import { pocketbase } from "@/lib/pocketbase";
-import type { PluginKey, PluginRecord, WhatsAppPluginConfig, VideoPluginConfig, PopupBannerConfig } from "./types";
+import type { PluginKey, PluginRecord, WhatsAppPluginConfig, VideoPluginConfig, PopupBannerConfig, EvolutionApiConfig, WhatsappApiConfig } from "./types";
 
 export type StoredPlugin = PluginRecord;
 
@@ -75,7 +75,7 @@ export async function savePluginConfig<T extends object>(key: PluginKey, config:
   return created as unknown as StoredPlugin;
 }
 
-export function parseConfigForKey(key: PluginKey, raw: unknown): WhatsAppPluginConfig | VideoPluginConfig | PopupBannerConfig | null {
+export function parseConfigForKey(key: PluginKey, raw: unknown): WhatsAppPluginConfig | VideoPluginConfig | PopupBannerConfig | EvolutionApiConfig | WhatsappApiConfig | null {
   const obj = safeParse<Record<string, any>>(raw, {});
   if (key === "whatsapp_floating") {
     const v = obj.visibility || {};
@@ -258,6 +258,30 @@ export function parseConfigForKey(key: PluginKey, raw: unknown): WhatsAppPluginC
         exclude: Array.isArray(v.exclude) ? v.exclude.map((s: unknown) => String(s)) : [],
       },
     } as PopupBannerConfig;
+  }
+  if (key === "evolution_api") {
+    return {
+      enabled: Boolean(obj.enabled),
+      baseUrl: String(obj.baseUrl || ""),
+      authType: ["bearer", "header"].includes(obj.authType) ? obj.authType : "bearer",
+      tokenOrKey: typeof obj.tokenOrKey === "string" ? obj.tokenOrKey : "",
+      authHeader: typeof obj.authHeader === "string" ? obj.authHeader : "Authorization",
+      defaultSender: typeof obj.defaultSender === "string" ? obj.defaultSender : undefined,
+    } as EvolutionApiConfig;
+  }
+  if (key === "whatsapp_api") {
+    const provider = ["meta", "custom"].includes(obj.provider) ? obj.provider : "meta";
+    return {
+      enabled: Boolean(obj.enabled),
+      provider,
+      phoneNumberId: typeof obj.phoneNumberId === "string" ? obj.phoneNumberId : undefined,
+      accessToken: typeof obj.accessToken === "string" ? obj.accessToken : undefined,
+      baseUrl: typeof obj.baseUrl === "string" ? obj.baseUrl : undefined,
+      defaultSender: typeof obj.defaultSender === "string" ? obj.defaultSender : undefined,
+      defaultTemplate: obj.defaultTemplate && typeof obj.defaultTemplate.name === "string"
+        ? { name: String(obj.defaultTemplate.name), lang: String(obj.defaultTemplate.lang || "en_US") }
+        : undefined,
+    } as WhatsappApiConfig;
   }
   if (key === "custom_scripts") {
     // Parse Custom Scripts config

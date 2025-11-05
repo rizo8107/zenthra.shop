@@ -5,18 +5,18 @@ import {
   LayoutDashboard, 
   ShoppingCart, 
   Users, 
+  AlertTriangle, 
   Package, 
-  CreditCard, 
+  FileText, 
+  Palette, 
+  Puzzle, 
   Settings, 
-  ChevronLeft,
+  Workflow, 
+  ChevronLeft, 
   ChevronRight,
   MessageSquare,
   Mail,
-  MapPin,
-  FileText,
-  Palette,
-  Puzzle,
-  AlertTriangle
+  MapPin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -71,6 +71,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { title: 'Customers', path: '/admin/customers', icon: Users },
     { title: 'Abandoned carts', path: '/admin/abandoned-carts', icon: AlertTriangle },
     { title: 'Products', path: '/admin/products', icon: Package },
+    { title: 'Automation', path: '/admin/automation', icon: Workflow },
     { title: 'Pages', path: '/admin/pages', icon: FileText },
     { title: 'Themes', path: '/admin/themes', icon: Palette },
     { title: 'Plugins', path: '/admin/plugins', icon: Puzzle },

@@ -13,6 +13,8 @@ import type {
   ProductVideoMapping,
   PathVideoConfig,
   CustomScriptsConfig,
+  EvolutionApiConfig,
+  WhatsappApiConfig,
 } from "./types";
 
 function cx(...classes: (string | false | undefined)[]) {
@@ -761,6 +763,35 @@ export const pluginRegistry = {
       return null;
     },
   } as PluginDefinition<CustomScriptsConfig>,
+  evolution_api: {
+    key: 'evolution_api',
+    name: 'Evolution API',
+    description: 'Backend messaging provider settings (secure).',
+    defaultConfig: {
+      enabled: false,
+      baseUrl: '',
+      authType: 'bearer',
+      tokenOrKey: '',
+      authHeader: 'Authorization',
+      defaultSender: '',
+    } as EvolutionApiConfig,
+    Component: () => null,
+  } as PluginDefinition<EvolutionApiConfig>,
+  whatsapp_api: {
+    key: 'whatsapp_api',
+    name: 'WhatsApp API',
+    description: 'Meta WhatsApp Cloud or Custom provider settings (secure).',
+    defaultConfig: {
+      enabled: false,
+      provider: 'meta',
+      phoneNumberId: '',
+      accessToken: '',
+      baseUrl: '',
+      defaultSender: '',
+      defaultTemplate: { name: '', lang: 'en_US' },
+    } as WhatsappApiConfig,
+    Component: () => null,
+  } as PluginDefinition<WhatsappApiConfig>,
 };
 
 export type PluginRegistry = typeof pluginRegistry;

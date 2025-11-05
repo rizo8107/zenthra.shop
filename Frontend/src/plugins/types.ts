@@ -6,7 +6,9 @@ export type PluginKey =
   | "google_tag_manager"
   | "facebook_pixel"
   | "microsoft_clarity"
-  | "custom_scripts";
+  | "custom_scripts"
+  | "evolution_api"
+  | "whatsapp_api";
 
 export interface BasePluginConfig {
   enabled: boolean;
@@ -167,6 +169,26 @@ export interface CustomScriptsConfig extends BasePluginConfig {
   scripts: CustomScript[];
 }
 
+// Messaging backends (no UI components, just configuration stored in plugins collection)
+export interface EvolutionApiConfig extends BasePluginConfig {
+  baseUrl: string;
+  authType?: 'bearer' | 'header';
+  tokenOrKey?: string;
+  authHeader?: string; // when authType === 'header'
+  defaultSender?: string;
+}
+
+export interface WhatsappApiConfig extends BasePluginConfig {
+  provider: 'meta' | 'custom';
+  // Meta Cloud
+  phoneNumberId?: string;
+  accessToken?: string;
+  // Custom provider
+  baseUrl?: string;
+  defaultSender?: string;
+  defaultTemplate?: { name: string; lang: string };
+}
+
 export type AnyPluginConfig =
   | { key: "whatsapp_floating"; config: WhatsAppPluginConfig }
   | { key: "video_floating"; config: VideoPluginConfig }
@@ -175,7 +197,9 @@ export type AnyPluginConfig =
   | { key: "google_tag_manager"; config: GoogleTagManagerConfig }
   | { key: "facebook_pixel"; config: FacebookPixelConfig }
   | { key: "microsoft_clarity"; config: MicrosoftClarityConfig }
-  | { key: "custom_scripts"; config: CustomScriptsConfig };
+  | { key: "custom_scripts"; config: CustomScriptsConfig }
+  | { key: "evolution_api"; config: EvolutionApiConfig }
+  | { key: "whatsapp_api"; config: WhatsappApiConfig };
 
 export interface PluginDefinition<T extends BasePluginConfig> {
   key: PluginKey;
