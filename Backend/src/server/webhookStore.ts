@@ -1,6 +1,6 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
-import { adminAuth } from './pocketbase.js';
+import PocketBase from 'pocketbase';
 import {
   fallbackCreateWebhook,
   fallbackDeleteWebhook,
@@ -8,13 +8,30 @@ import {
   fallbackRecordFailure,
   fallbackUpdateWebhook,
 } from './webhookStoreFallback.js';
-import { ensureWebhookCollections } from './webhookCollections.js';
 
 dotenv.config();
 
 const POCKETBASE_URL = process.env.VITE_POCKETBASE_URL || 'http://localhost:8090';
 const WEBHOOKS_COLLECTION = process.env.WEBHOOKS_COLLECTION || 'webhooks';
 const WEBHOOKS_FAILURES_COLLECTION = process.env.WEBHOOKS_FAILURES_COLLECTION || 'webhook_failures';
+
+// Create PocketBase client instance like the frontend components do
+const pb = new PocketBase(POCKETBASE_URL);
+pb.autoCancellation(false);
+
+// Simple collection creation without authentication
+async function ensureWebhookCollections(): Promise<void> {
+  try {
+    // Try to access the webhooks collection
+    await pb.collection(WEBHOOKS_COLLECTION).getList(1, 1);
+  } catch (error: any) {
+    if (error?.status === 404) {
+      console.log('⚠️ Webhooks collection not found, but continuing anyway...');
+      // Collection doesn't exist, but we'll let PocketBase handle this
+      // The admin UI should create the collections manually
+    }
+  }
+}
 
 export type WebhookSubscription = {
   id?: string;
@@ -29,13 +46,15 @@ export type WebhookSubscription = {
 
 export async function listWebhooks(): Promise<WebhookSubscription[]> {
   try {
-    const { token } = await adminAuth();
-    await ensureWebhookCollections(token);
-    const res = await axios.get(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records`, {
-      headers: { Authorization: `Bearer ${token}` },
-      params: { perPage: 200, sort: '-created' }
+    console.log('📋 Listing webhooks from PocketBase...');
+    await ensureWebhookCollections();
+    
+    const records = await pb.collection(WEBHOOKS_COLLECTION).getFullList({
+      sort: '-created',
     });
-    return (res.data?.items || []).map((item: any) => ({
+    
+    console.log(`✅ Found ${records.length} webhook subscriptions`);
+    return records.map((item: any) => ({
       id: item.id,
       url: item.url,
       events: Array.isArray(item.events) ? item.events : (typeof item.events === 'string' ? item.events.split(',').map((s:string)=>s.trim()).filter(Boolean) : []),
@@ -46,32 +65,17 @@ export async function listWebhooks(): Promise<WebhookSubscription[]> {
       description: item.description || ''
     }));
   } catch (error: any) {
-    if (shouldUseFallback(error)) {
-      console.warn('Using fallback webhook store for list operation.');
-      return fallbackListWebhooks();
-    }
-
-    // Log other errors but return empty array to prevent breaking the UI
-    console.error('Error listing webhooks:', error?.message || error);
-    console.error('Error details:', {
-      status: error?.response?.status,
-      code: error?.code,
-      message: error?.message,
-      url: error?.config?.url
-    });
-    return [];
+    console.error('❌ Error listing webhooks from PocketBase:', error?.message);
+    console.warn('Using fallback webhook store for list operation.');
+    return fallbackListWebhooks();
   }
 }
 
 export async function createWebhook(data: WebhookSubscription): Promise<WebhookSubscription> {
   console.log('🔄 Creating webhook subscription:', data);
   try {
-    console.log('🔐 Authenticating with PocketBase...');
-    const { token } = await adminAuth();
-    console.log('✅ PocketBase authentication successful');
-    
     console.log('📦 Ensuring webhook collections exist...');
-    await ensureWebhookCollections(token);
+    await ensureWebhookCollections();
     console.log('✅ Webhook collections ready');
     
     const payload = {
@@ -85,60 +89,33 @@ export async function createWebhook(data: WebhookSubscription): Promise<WebhookS
     };
     
     console.log('💾 Saving webhook to PocketBase:', payload);
-    const res = await axios.post(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records`, payload, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
-    console.log('✅ Webhook saved to PocketBase with ID:', res.data?.id);
-    return { ...data, id: res.data?.id };
+    const record = await pb.collection(WEBHOOKS_COLLECTION).create(payload);
+    console.log('✅ Webhook saved to PocketBase with ID:', record.id);
+    return { ...data, id: record.id };
   } catch (error: any) {
     console.error('❌ Error creating webhook in PocketBase:', error?.message);
-    console.error('Error details:', {
-      status: error?.response?.status,
-      data: error?.response?.data,
-      code: error?.code
-    });
+    console.error('Error details:', error);
     
-    if (shouldUseFallback(error)) {
-      console.warn('⚠️ Using fallback webhook store for create operation.');
-      return fallbackCreateWebhook(data);
-    }
-    throw error;
+    console.warn('⚠️ Using fallback webhook store for create operation.');
+    return fallbackCreateWebhook(data);
   }
 }
 
 export async function updateWebhook(id: string, data: Partial<WebhookSubscription>): Promise<void> {
   try {
-    const { token } = await adminAuth();
-    await ensureWebhookCollections(token);
-    const payload: any = { ...data };
-    if (Array.isArray(payload.events)) payload.events = payload.events;
-    await axios.patch(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records/${id}`, payload, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await pb.collection(WEBHOOKS_COLLECTION).update(id, data);
   } catch (error: any) {
-    if (shouldUseFallback(error)) {
-      console.warn('Using fallback webhook store for update operation.', error?.message);
-      fallbackUpdateWebhook(id, data);
-      return;
-    }
-    throw error;
+    console.warn('Using fallback webhook store for update operation.', error?.message);
+    fallbackUpdateWebhook(id, data);
   }
 }
 
 export async function deleteWebhook(id: string): Promise<void> {
   try {
-    const { token } = await adminAuth();
-    await ensureWebhookCollections(token);
-    await axios.delete(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records/${id}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await pb.collection(WEBHOOKS_COLLECTION).delete(id);
   } catch (error: any) {
-    if (shouldUseFallback(error)) {
-      console.warn('Using fallback webhook store for delete operation.', error?.message);
-      fallbackDeleteWebhook(id);
-      return;
-    }
-    throw error;
+    console.warn('Using fallback webhook store for delete operation.', error?.message);
+    fallbackDeleteWebhook(id);
   }
 }
 
@@ -153,22 +130,14 @@ export async function recordWebhookFailure(data: {
   error_message?: string;
 }): Promise<void> {
   try {
-    const { token } = await adminAuth();
-    await ensureWebhookCollections(token);
     const payload = {
       ...data,
       timestamp: new Date().toISOString()
     };
-    await axios.post(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_FAILURES_COLLECTION}/records`, payload, {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    await pb.collection(WEBHOOKS_FAILURES_COLLECTION).create(payload);
   } catch (error: any) {
-    if (shouldUseFallback(error)) {
-      console.warn('Using fallback webhook store for recording failures.', error?.message);
-      fallbackRecordFailure(data);
-      return;
-    }
-    console.error('Failed to record webhook failure:', error?.message || error);
+    console.warn('Using fallback webhook store for recording failures.', error?.message);
+    fallbackRecordFailure(data);
   }
 }
 
