@@ -1,4 +1,4 @@
-import app from './index';
+import app from './index.js';
 import { createServer } from 'http';
 import { writeFileSync } from 'fs';
 import { join } from 'path';

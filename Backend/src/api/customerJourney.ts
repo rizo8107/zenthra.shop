@@ -1,6 +1,6 @@
 import express from 'express';
 import crypto from 'crypto';
-import { pb, ensureAdminAuth } from '@/lib/pocketbase';
+import { pb, ensureAdminAuth } from '../lib/pocketbase.js';
 
 const router = express.Router();
 
