@@ -28,11 +28,26 @@ export default defineConfig(({ mode }) => {
       console.warn('Could not read port-info.json, using default port');
     }
   }
-  const webhookServerUrl = env.WEBHOOK_SERVER_URL || `http://localhost:${serverPort}`;
+  // Normalize webhook server origin; accept full URL or URL with path, otherwise fallback
+  const webhookServerUrlRaw = (env.WEBHOOK_SERVER_URL || '').trim();
+  let webhookServerOrigin = '';
+  if (webhookServerUrlRaw) {
+    try {
+      const u = new URL(webhookServerUrlRaw);
+      // Keep only the origin (protocol + host[:port]) to use with proxy target and API base
+      webhookServerOrigin = u.origin;
+    } catch {
+      // Invalid URL provided (e.g., 'api/webhooks/'); we'll fallback below
+      console.warn(`Invalid WEBHOOK_SERVER_URL: ${webhookServerUrlRaw}. Falling back to http://localhost:${serverPort}`);
+    }
+  }
+  if (!webhookServerOrigin) {
+    webhookServerOrigin = `http://localhost:${serverPort}`;
+  }
 
   console.log(`WhatsApp API URL: ${whatsAppApiUrl}`);
   console.log(`Email API URL: ${emailApiUrl}`);
-  console.log(`Webhook Server URL: ${webhookServerUrl}`);
+  console.log(`Webhook Server Origin: ${webhookServerOrigin}`);
 
   // Determine if we need proxies for development mode
   const useProxies = mode === 'development';
@@ -100,6 +115,9 @@ export default defineConfig(({ mode }) => {
       'import.meta.env.VITE_EMAIL_API_URL': JSON.stringify(
         useProxies ? '/email-api' : emailApiUrl
       ),
+      'import.meta.env.VITE_WEBHOOKS_API_BASE': JSON.stringify(
+        useProxies ? '/api/webhooks' : new URL('/api/webhooks', webhookServerOrigin).toString()
+      ),
       'import.meta.env.VITE_VAPID_PUBLIC_KEY': JSON.stringify(env.VITE_VAPID_PUBLIC_KEY),
     }
   };
@@ -108,7 +126,7 @@ export default defineConfig(({ mode }) => {
   if (useProxies && config.server?.proxy) {
     config.server.proxy = {
       '/api/webhooks': {
-        target: webhookServerUrl,
+        target: webhookServerOrigin,
         changeOrigin: true,
         secure: false,
         configure: (proxy) => {
