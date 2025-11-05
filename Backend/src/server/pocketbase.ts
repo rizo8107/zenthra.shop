@@ -52,12 +52,12 @@ export const adminAuth = async (): Promise<{ token: string; model: any }> => {
     }
     
     console.log('✅ PocketBase auth response status:', res.status);
-    const { token, admin } = res.data || {};
+    const { token, admin, record } = res.data || {};
     if (!token) {
-      throw new Error('Failed to obtain PocketBase admin token');
+      throw new Error('Failed to obtain PocketBase token');
     }
-    console.log('✅ PocketBase admin token obtained successfully');
-    return { token, model: admin };
+    console.log('✅ PocketBase token obtained successfully');
+    return { token, model: admin || record };
   } catch (error: any) {
     console.error('❌ PocketBase authentication failed:', error?.message);
     console.error('Error details:', {
