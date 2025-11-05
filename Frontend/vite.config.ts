@@ -7,21 +7,19 @@ import { componentTagger } from "lovable-tagger";
 export default defineConfig(({ mode }) => {
   // Load env from root directory (parent folder)
   const env = loadEnv(mode, path.resolve(__dirname, '..'), '');
-  // Normalize webhook server origin for prod; fallback to localhost for dev
-  const serverPort = env.SERVER_PORT || '3001';
+  // Force use of WEBHOOK_SERVER_URL - no localhost fallback
   const rawWebhookUrl = (env.WEBHOOK_SERVER_URL || '').trim();
-  let webhookOrigin = '';
-  if (rawWebhookUrl) {
-    try {
-      const u = new URL(rawWebhookUrl);
-      webhookOrigin = u.origin;
-    } catch {
-      console.warn(`Invalid WEBHOOK_SERVER_URL for Frontend: ${rawWebhookUrl}. Falling back to http://localhost:${serverPort}`);
-    }
+  if (!rawWebhookUrl) {
+    throw new Error('WEBHOOK_SERVER_URL is required in .env file');
   }
-  if (!webhookOrigin) webhookOrigin = `http://localhost:${serverPort}`;
   
-  const useAbsoluteInDev = !!rawWebhookUrl;
+  let webhookOrigin = '';
+  try {
+    const u = new URL(rawWebhookUrl);
+    webhookOrigin = u.origin;
+  } catch {
+    throw new Error(`Invalid WEBHOOK_SERVER_URL in .env: ${rawWebhookUrl}`);
+  }
 
   return {
   envDir: path.resolve(__dirname, '..'), // Use root .env file
@@ -53,9 +51,7 @@ export default defineConfig(({ mode }) => {
   },
   define: {
     'import.meta.env.VITE_WEBHOOKS_API_BASE': JSON.stringify(
-      mode === 'development'
-        ? (useAbsoluteInDev ? new URL('/api/webhooks', webhookOrigin).toString() : '/api/webhooks')
-        : new URL('/api/webhooks', webhookOrigin).toString()
+      env.VITE_WEBHOOKS_API_BASE || new URL('/api/webhooks', webhookOrigin).toString()
     ),
   },
   build: {
