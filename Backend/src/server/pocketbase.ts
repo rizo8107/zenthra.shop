@@ -21,6 +21,10 @@ export const adminAuth = async (): Promise<{ token: string; model: any }> => {
   }
   
   try {
+    console.log('🔐 Attempting PocketBase admin authentication...');
+    console.log('📧 Email:', POCKETBASE_ADMIN_EMAIL);
+    console.log('🔗 URL:', `${POCKETBASE_URL}/api/admins/auth-with-password`);
+    
     const res = await axios.post(`${POCKETBASE_URL}/api/admins/auth-with-password`, {
       identity: POCKETBASE_ADMIN_EMAIL,
       password: POCKETBASE_ADMIN_PASSWORD,
@@ -28,10 +32,13 @@ export const adminAuth = async (): Promise<{ token: string; model: any }> => {
       headers: { 'Content-Type': 'application/json' },
       timeout: 10000, // 10 second timeout
     });
+    
+    console.log('✅ PocketBase auth response status:', res.status);
     const { token, admin } = res.data || {};
     if (!token) {
       throw new Error('Failed to obtain PocketBase admin token');
     }
+    console.log('✅ PocketBase admin token obtained successfully');
     return { token, model: admin };
   } catch (error: any) {
     if (error?.code === 'ECONNREFUSED' || error?.code === 'ETIMEDOUT') {

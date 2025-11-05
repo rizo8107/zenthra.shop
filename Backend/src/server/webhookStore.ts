@@ -64,9 +64,16 @@ export async function listWebhooks(): Promise<WebhookSubscription[]> {
 }
 
 export async function createWebhook(data: WebhookSubscription): Promise<WebhookSubscription> {
+  console.log('🔄 Creating webhook subscription:', data);
   try {
+    console.log('🔐 Authenticating with PocketBase...');
     const { token } = await adminAuth();
+    console.log('✅ PocketBase authentication successful');
+    
+    console.log('📦 Ensuring webhook collections exist...');
     await ensureWebhookCollections(token);
+    console.log('✅ Webhook collections ready');
+    
     const payload = {
       url: data.url,
       events: data.events,
@@ -76,13 +83,23 @@ export async function createWebhook(data: WebhookSubscription): Promise<WebhookS
       retries: data.retries ?? 3,
       description: data.description || ''
     };
+    
+    console.log('💾 Saving webhook to PocketBase:', payload);
     const res = await axios.post(`${POCKETBASE_URL}/api/collections/${WEBHOOKS_COLLECTION}/records`, payload, {
       headers: { Authorization: `Bearer ${token}` }
     });
+    console.log('✅ Webhook saved to PocketBase with ID:', res.data?.id);
     return { ...data, id: res.data?.id };
   } catch (error: any) {
+    console.error('❌ Error creating webhook in PocketBase:', error?.message);
+    console.error('Error details:', {
+      status: error?.response?.status,
+      data: error?.response?.data,
+      code: error?.code
+    });
+    
     if (shouldUseFallback(error)) {
-      console.warn('Using fallback webhook store for create operation.', error?.message);
+      console.warn('⚠️ Using fallback webhook store for create operation.');
       return fallbackCreateWebhook(data);
     }
     throw error;
