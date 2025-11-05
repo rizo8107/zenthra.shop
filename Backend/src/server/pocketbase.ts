@@ -9,6 +9,8 @@ const POCKETBASE_ADMIN_EMAIL = process.env.VITE_POCKETBASE_ADMIN_EMAIL || '';
 const POCKETBASE_ADMIN_PASSWORD = process.env.VITE_POCKETBASE_ADMIN_PASSWORD || '';
 
 console.log('PocketBase URL:', POCKETBASE_URL);
+console.log('PocketBase Admin Email:', POCKETBASE_ADMIN_EMAIL ? 'SET' : 'NOT SET');
+console.log('PocketBase Admin Password:', POCKETBASE_ADMIN_PASSWORD ? 'SET' : 'NOT SET');
 
 // Perform admin authentication and return token + admin model
 export const adminAuth = async (): Promise<{ token: string; model: any }> => {
