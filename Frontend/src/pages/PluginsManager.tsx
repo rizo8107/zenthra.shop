@@ -19,7 +19,9 @@ import type {
   FacebookPixelConfig,
   MicrosoftClarityConfig,
   CustomScriptsConfig,
-  CustomScript
+  CustomScript,
+  WhatsappApiConfig,
+  EvolutionApiConfig
 } from "@/plugins/types";
 import { getContentItems, uploadVideo, getContentVideoUrl, type ContentItem, getContentImageUrl, uploadImage } from "@/lib/content-service";
 import { pocketbase } from "@/lib/pocketbase";
@@ -51,6 +53,8 @@ export default function PluginsManager() {
   const [productSearch, setProductSearch] = useState("");
   const [selectedProductForVideo, setSelectedProductForVideo] = useState<{index: number, type: 'main' | 'path'} | null>(null);
   const [selectedVideoField, setSelectedVideoField] = useState<{type: 'main' | 'product' | 'path', index?: number} | null>(null);
+  const [waApiConfig, setWaApiConfig] = useState<WhatsappApiConfig | null>(null);
+  const [evoApiConfig, setEvoApiConfig] = useState<EvolutionApiConfig | null>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -61,6 +65,8 @@ export default function PluginsManager() {
       setGtmConfig(configs.google_tag_manager as GoogleTagManagerConfig);
       setFbConfig(configs.facebook_pixel as FacebookPixelConfig);
       setClarityConfig(configs.microsoft_clarity as MicrosoftClarityConfig);
+      setWaApiConfig((configs as any).whatsapp_api as WhatsappApiConfig);
+      setEvoApiConfig((configs as any).evolution_api as EvolutionApiConfig);
       
       const customScripts = configs.custom_scripts as CustomScriptsConfig;
       console.log('[PluginsManager] Loading custom scripts config:', customScripts);
@@ -100,6 +106,12 @@ export default function PluginsManager() {
       if (key === "custom_scripts" && customScriptsConfig) {
         await savePluginConfig(key, customScriptsConfig);
       }
+      if (key === "whatsapp_api" && waApiConfig) {
+        await savePluginConfig(key, waApiConfig);
+      }
+      if (key === "evolution_api" && evoApiConfig) {
+        await savePluginConfig(key, evoApiConfig);
+      }
       await reload();
     } finally {
       setSaving(false);
@@ -115,6 +127,8 @@ export default function PluginsManager() {
     if (key === "facebook_pixel") setFbConfig(pluginRegistry.facebook_pixel.defaultConfig);
     if (key === "microsoft_clarity") setClarityConfig(pluginRegistry.microsoft_clarity.defaultConfig);
     if (key === "custom_scripts") setCustomScriptsConfig(pluginRegistry.custom_scripts.defaultConfig);
+    if (key === "whatsapp_api") setWaApiConfig(pluginRegistry.whatsapp_api.defaultConfig as unknown as WhatsappApiConfig);
+    if (key === "evolution_api") setEvoApiConfig(pluginRegistry.evolution_api.defaultConfig as unknown as EvolutionApiConfig);
   };
 
   const origin = useMemo(() => (typeof window !== "undefined" ? window.location.origin : ""), []);
@@ -359,6 +373,29 @@ export default function PluginsManager() {
               >
                 <span>Custom Scripts</span>
                 <Switch checked={enabled.custom_scripts} onCheckedChange={(v) => onToggle('custom_scripts', v)} />
+              </button>
+
+              {/* Messaging Backends */}
+              <div className="pt-2 mt-2 border-t">
+                <div className="px-3 py-1 text-xs font-medium text-muted-foreground">Messaging APIs</div>
+              </div>
+              <button
+                type="button"
+                className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-accent ${selected === 'whatsapp_api' ? 'bg-accent' : ''}`}
+                onClick={() => setSelected('whatsapp_api')}
+                title="WhatsApp API"
+              >
+                <span>WhatsApp API</span>
+                <Switch checked={enabled.whatsapp_api} onCheckedChange={(v) => onToggle('whatsapp_api', v)} />
+              </button>
+              <button
+                type="button"
+                className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-accent ${selected === 'evolution_api' ? 'bg-accent' : ''}`}
+                onClick={() => setSelected('evolution_api')}
+                title="Evolution API"
+              >
+                <span>Evolution API</span>
+                <Switch checked={enabled.evolution_api} onCheckedChange={(v) => onToggle('evolution_api', v)} />
               </button>
             </nav>
           </div>
@@ -1305,6 +1342,7 @@ export default function PluginsManager() {
           </CardContent>
         </Card>
         )}
+
         {selected === 'popup_banner' && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -1778,15 +1816,142 @@ export default function PluginsManager() {
           </Card>
         )}
 
+        {selected === 'whatsapp_api' && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>WhatsApp API</CardTitle>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Enabled</Label>
+                <Switch
+                  checked={enabled.whatsapp_api}
+                  onCheckedChange={(v) => onToggle('whatsapp_api', v)}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {waApiConfig && (
+                <>
+                  <div className="grid gap-2">
+                    <Label>Provider</Label>
+                    <select
+                      className="h-9 rounded-md border px-2"
+                      value={waApiConfig.provider || 'meta'}
+                      onChange={(e) => setWaApiConfig({ ...waApiConfig, provider: e.target.value as WhatsappApiConfig['provider'] })}
+                    >
+                      <option value="meta">Meta WhatsApp Cloud</option>
+                      <option value="custom">Custom Provider</option>
+                    </select>
+                  </div>
+                  {waApiConfig.provider !== 'custom' ? (
+                    <>
+                      <div className="grid gap-2">
+                        <Label htmlFor="wa-phone-id">Phone Number ID</Label>
+                        <Input id="wa-phone-id" value={waApiConfig.phoneNumberId || ''} onChange={(e) => setWaApiConfig({ ...waApiConfig, phoneNumberId: e.target.value })} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="wa-access">Access Token</Label>
+                        <Input id="wa-access" value={waApiConfig.accessToken || ''} onChange={(e) => setWaApiConfig({ ...waApiConfig, accessToken: e.target.value })} />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="grid gap-2">
+                        <Label htmlFor="wa-custom-url">Base URL</Label>
+                        <Input id="wa-custom-url" value={waApiConfig.baseUrl || ''} onChange={(e) => setWaApiConfig({ ...waApiConfig, baseUrl: e.target.value })} placeholder="https://api.example.com/whatsapp" />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="wa-custom-token">Access Token</Label>
+                        <Input id="wa-custom-token" value={waApiConfig.accessToken || ''} onChange={(e) => setWaApiConfig({ ...waApiConfig, accessToken: e.target.value })} />
+                      </div>
+                    </>
+                  )}
+                  <div className="grid gap-2">
+                    <Label>Default Template</Label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Input placeholder="Name" value={waApiConfig.defaultTemplate?.name || ''} onChange={(e) => setWaApiConfig({ ...waApiConfig, defaultTemplate: { name: e.target.value, lang: waApiConfig.defaultTemplate?.lang || 'en_US' } })} />
+                      <Input placeholder="Language (e.g. en_US)" value={waApiConfig.defaultTemplate?.lang || 'en_US'} onChange={(e) => setWaApiConfig({ ...waApiConfig, defaultTemplate: { name: waApiConfig.defaultTemplate?.name || '', lang: e.target.value } })} />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => onSave('whatsapp_api' as PluginKey)} disabled={saving}>
+                      {saving ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button variant="outline" onClick={() => resetToDefault('whatsapp_api' as PluginKey)}>Reset</Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {selected === 'evolution_api' && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Evolution API</CardTitle>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Enabled</Label>
+                <Switch
+                  checked={enabled.evolution_api}
+                  onCheckedChange={(v) => onToggle('evolution_api', v)}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {evoApiConfig && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="evo-url">Base URL</Label>
+                    <Input id="evo-url" value={evoApiConfig.baseUrl || ''} onChange={(e) => setEvoApiConfig({ ...evoApiConfig, baseUrl: e.target.value })} placeholder="https://api.evolution.example" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label>Auth Type</Label>
+                    <select
+                      className="h-9 rounded-md border px-2"
+                      value={evoApiConfig.authType || 'bearer'}
+                      onChange={(e) => setEvoApiConfig({ ...evoApiConfig, authType: e.target.value as EvolutionApiConfig['authType'] })}
+                    >
+                      <option value="bearer">Bearer token</option>
+                      <option value="header">Custom header</option>
+                    </select>
+                  </div>
+                  {evoApiConfig.authType === 'header' ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="grid gap-2">
+                        <Label htmlFor="evo-auth-h">Header Name</Label>
+                        <Input id="evo-auth-h" value={evoApiConfig.authHeader || 'Authorization'} onChange={(e) => setEvoApiConfig({ ...evoApiConfig, authHeader: e.target.value })} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label htmlFor="evo-auth-v">Header Value</Label>
+                        <Input id="evo-auth-v" value={evoApiConfig.tokenOrKey || ''} onChange={(e) => setEvoApiConfig({ ...evoApiConfig, tokenOrKey: e.target.value })} />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid gap-2">
+                      <Label htmlFor="evo-token">Bearer Token</Label>
+                      <Input id="evo-token" value={evoApiConfig.tokenOrKey || ''} onChange={(e) => setEvoApiConfig({ ...evoApiConfig, tokenOrKey: e.target.value })} />
+                    </div>
+                  )}
+                  <div className="grid gap-2">
+                    <Label htmlFor="evo-sender">Default Sender</Label>
+                    <Input id="evo-sender" value={evoApiConfig.defaultSender || ''} onChange={(e) => setEvoApiConfig({ ...evoApiConfig, defaultSender: e.target.value })} />
+                  </div>
+                  <div className="flex gap-2">
+                    <Button onClick={() => onSave('evolution_api' as PluginKey)} disabled={saving}>
+                      {saving ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button variant="outline" onClick={() => resetToDefault('evolution_api' as PluginKey)}>Reset</Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         </section>
       </div>
-
-      {/* Video Picker Dialog */}
-      <Dialog open={videoPickerOpen} onOpenChange={setVideoPickerOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Select or Upload Video</DialogTitle>
-          </DialogHeader>
+    </div>
+  );
+}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="text-sm text-muted-foreground">

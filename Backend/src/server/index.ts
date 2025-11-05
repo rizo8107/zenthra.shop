@@ -5,6 +5,8 @@ import dotenv from 'dotenv';
 import webpush from 'web-push';
 import evolutionRoutes from './evolutionService.js';
 import webhooksRouter from './webhooks.js';
+import automationsRouter from './automations.js';
+import messagingRouter from './messaging.js';
 import customerJourneyRoutes from '../api/customerJourney.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -62,6 +64,8 @@ app.use((req, res, next) => {
 app.use('/evolution', evolutionRoutes);
 app.use('/api', customerJourneyRoutes);
 app.use('/api/webhooks', webhooksRouter);
+app.use('/api/automations', automationsRouter);
+app.use('/api/messaging', messagingRouter);
 
 // In-memory store for push subscriptions
 const subscriptions: webpush.PushSubscription[] = [];
