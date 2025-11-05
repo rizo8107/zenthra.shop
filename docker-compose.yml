@@ -44,18 +44,33 @@ services:
         VITE_EVOLUTION_INSTANCE_NAME: ${VITE_EVOLUTION_INSTANCE_NAME}
         VITE_ZENTHRA_FRONTEND_URL: ${VITE_ZENTHRA_FRONTEND_URL}
         VITE_ZENTHRA_AUTH_PATH: ${VITE_ZENTHRA_AUTH_PATH}
+    environment:
+      PORT: "8080"
+      SERVER_PORT: "3001"
+      NODE_ENV: production
     expose:
       - "8080"
+      - "3001"
     restart: unless-stopped
     labels:
       - traefik.enable=true
       - traefik.docker.network=dokploy-network
-      - traefik.http.routers.cms-web.rule=Host(`admin.karigaistore.in`)
+      - "traefik.http.routers.cms-web.rule=Host(`admin.karigaistore.in`)"
       - traefik.http.routers.cms-web.entrypoints=web
-      - traefik.http.routers.cms-websecure.rule=Host(`admin.karigaistore.in`)
+      - "traefik.http.routers.cms-websecure.rule=Host(`admin.karigaistore.in`)"
       - traefik.http.routers.cms-websecure.entrypoints=websecure
       - traefik.http.routers.cms-websecure.tls.certresolver=letsencrypt
       - traefik.http.services.cms.loadbalancer.server.port=8080
+      - "traefik.http.routers.cms-api.rule=Host(`admin.karigaistore.in`) && PathPrefix(`/api`)"
+      - traefik.http.routers.cms-api.entrypoints=web
+      - traefik.http.routers.cms-api.priority=100
+      - "traefik.http.routers.cms-api-secure.rule=Host(`admin.karigaistore.in`) && PathPrefix(`/api`)"
+      - traefik.http.routers.cms-api-secure.entrypoints=websecure
+      - traefik.http.routers.cms-api-secure.priority=100
+      - traefik.http.routers.cms-api-secure.tls.certresolver=letsencrypt
+      - traefik.http.routers.cms-api.service=cms-api
+      - traefik.http.routers.cms-api-secure.service=cms-api
+      - traefik.http.services.cms-api.loadbalancer.server.port=3001
     networks:
       - dokploy-network
 
