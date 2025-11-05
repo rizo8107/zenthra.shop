@@ -5,7 +5,7 @@ PORT="${PORT:-8080}"
 SERVER_PORT="${SERVER_PORT:-3001}"
 
 echo "Starting webhook/API server on port ${SERVER_PORT}"
-node dist-server/server/index.js &
+node dist-server/server/local.js &
 API_PID=$!
 
 echo "Starting static site on port ${PORT}"
