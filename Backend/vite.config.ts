@@ -125,22 +125,6 @@ export default defineConfig(({ mode }) => {
   // Add proxies only for development mode
   if (useProxies && config.server?.proxy) {
     config.server.proxy = {
-      '/api/automations': {
-        target: webhookServerOrigin,
-        changeOrigin: true,
-        secure: false,
-        configure: (proxy) => {
-          proxy.on('error', (err: Error) => {
-            console.log('Automation proxy error:', err);
-          });
-          proxy.on('proxyReq', (proxyReq: ClientRequest, req: IncomingMessage) => {
-            console.log('Sending Automation Request:', req.method, req.url);
-          });
-          proxy.on('proxyRes', (proxyRes: IncomingMessage, req: IncomingMessage) => {
-            console.log('Received Automation Response:', proxyRes.statusCode, req.url);
-          });
-        }
-      },
       '/api/webhooks': {
         target: webhookServerOrigin,
         changeOrigin: true,
