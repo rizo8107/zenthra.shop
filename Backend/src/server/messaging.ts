@@ -1,7 +1,12 @@
 import express, { Request, Response } from 'express';
-import { pb, ensureAdminAuth } from '@/lib/pocketbase';
+import PocketBase from 'pocketbase';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const router = express.Router();
+const POCKETBASE_URL = process.env.VITE_POCKETBASE_URL || 'https://backend-karigaibackend.7za6uc.easypanel.host';
+const pb = new PocketBase(POCKETBASE_URL);
 
 type WhatsappApiConfig = {
   enabled: boolean;
@@ -21,13 +26,24 @@ type EvolutionApiConfig = {
   defaultSender?: string;
 };
 
+function isWhatsappConfig(config: unknown): config is WhatsappApiConfig {
+  return (config as WhatsappApiConfig).provider !== undefined || 
+         (config as WhatsappApiConfig).phoneNumberId !== undefined;
+}
+
+function isEvolutionConfig(config: unknown): config is EvolutionApiConfig {
+  return (config as EvolutionApiConfig).authType !== undefined || 
+         (config as EvolutionApiConfig).defaultSender !== undefined;
+}
+
+async function getPluginConfig(key: 'whatsapp_api'): Promise<WhatsappApiConfig | null>;
+async function getPluginConfig(key: 'evolution_api'): Promise<EvolutionApiConfig | null>;
 async function getPluginConfig(key: 'whatsapp_api' | 'evolution_api'): Promise<WhatsappApiConfig | EvolutionApiConfig | null> {
-  await ensureAdminAuth();
   try {
     const item = await pb.collection('plugins').getFirstListItem(`key = "${key}"`);
     const configRaw = item?.config;
     const parsed = typeof configRaw === 'string' ? JSON.parse(configRaw) : (configRaw || {});
-    return { enabled: Boolean(item?.enabled), ...parsed } as WhatsappApiConfig | EvolutionApiConfig;
+    return { enabled: Boolean(item?.enabled), ...parsed };
   } catch {
     return null;
   }
@@ -116,7 +132,7 @@ router.post('/evolution/send', async (req: Request, res: Response) => {
     const url = String(cfg.baseUrl).replace(/\/$/, '') + '/messages/send';
     const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
     const data = await r.json();
-    if (!r.ok) return res.status(r.status).json({ error: (data as any)?.error || 'Send failed', details: data });
+    if (!r.ok) return res.status(r.status).json({ error: (data as Record<string, unknown>)?.error || 'Send failed', details: data });
     return res.json({ ok: true, data });
   } catch (err) {
     const e = err as Error;
