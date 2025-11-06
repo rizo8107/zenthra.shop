@@ -19,7 +19,6 @@ import ZenthraPagesManager from "./pages/admin/ZenthraPagesManager";
 import ZenthraPageEditor from "./pages/admin/ZenthraPageEditor";
 import ZenthraThemes from "./pages/admin/ZenthraThemes";
 import ZenthraPlugins from "./pages/admin/ZenthraPlugins";
-import AutomationPage from "./pages/admin/AutomationPage";
 
 // Set PocketBase URL from environment variable
 if (import.meta.env.VITE_POCKETBASE_URL) {
@@ -73,7 +72,6 @@ const App = () => {
             <Route path="/admin/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
             <Route path="/admin/abandoned-carts" element={<ProtectedRoute><AbandonedCartsPage /></ProtectedRoute>} />
             <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
-            <Route path="/admin/automation" element={<ProtectedRoute><AutomationPage /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/admin/pages" element={<ProtectedRoute><ZenthraPagesManager /></ProtectedRoute>} />
             <Route path="/admin/pages/:pageId/edit" element={<ProtectedRoute><ZenthraPageEditor /></ProtectedRoute>} />
