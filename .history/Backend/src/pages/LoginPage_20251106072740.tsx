@@ -10,7 +10,19 @@ import { LockKeyhole, Mail, LogIn } from 'lucide-react';
 import { authenticateAdmin } from '@/lib/pocketbase';
 import { useTheme } from '@/components/theme/theme-provider';
 
-
+declare global {
+  // Allow usage of the dotlottie web component in JSX
+  namespace JSX {
+    interface IntrinsicElements {
+      'dotlottie-wc': React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+        src?: string;
+        autoplay?: boolean;
+        loop?: boolean;
+        style?: React.CSSProperties;
+      };
+    }
+  }
+}
 
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -65,6 +77,15 @@ const LoginPage: React.FC = () => {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10 rounded-3xl border border-border/60 bg-card/70 p-8 shadow-[0_40px_120px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl md:flex-row md:p-12">
         <div className="flex w-full flex-col justify-between gap-12 md:w-1/2">
           <div className="space-y-8">
+            <div className="flex items-center gap-3">
+              <img
+                src="/logo.svg"
+                alt="Zenthra Shop logo"
+                className="h-20 w-auto drop-shadow-[0_18px_46px_rgba(59,130,246,0.35)]"
+                loading="eager"
+              />
+            </div>
+
             <div className="space-y-4">
               <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
                 Unlock your commerce command centre
@@ -74,20 +95,19 @@ const LoginPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="relative overflow-hidden rounded-3xl border border-primary/40 bg-gradient-to-br from-primary/30 via-primary/15 to-transparent p-6 text-sm text-primary-foreground shadow-[0_35px_80px_-40px_rgba(59,130,246,0.75)]">
-              <div className="pointer-events-none absolute -top-12 right-[-30%] h-48 w-48 rounded-full bg-primary/30 blur-3xl" />
-              <p className="font-semibold uppercase tracking-[0.35em] text-[10px] text-primary-foreground/80">Release highlights</p>
-              <ul className="mt-4 space-y-2 text-sm">
+            <div className="rounded-3xl border border-primary/30 bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6 text-sm text-primary/90 shadow-[0_18px_40px_-20px_rgba(59,130,246,0.55)]">
+              <p className="font-semibold uppercase tracking-[0.3em] text-[10px] text-primary/70">Release highlights</p>
+              <ul className="mt-4 space-y-2 text-sm text-primary/90">
                 <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary-foreground/90"></span>
+                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary"></span>
                   Evolution journeys with personalised fallback recipients
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary-foreground/90"></span>
+                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary"></span>
                   Real-time activity previews and enriched context
                 </li>
                 <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary-foreground/90"></span>
+                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary"></span>
                   Refreshed admin canvas with faster navigation
                 </li>
               </ul>
@@ -103,16 +123,22 @@ const LoginPage: React.FC = () => {
         <div className="flex w-full flex-col justify-center md:w-1/2">
           <Card className="w-full border border-border/60 bg-background/90 shadow-2xl">
             <CardHeader className="items-center space-y-4 text-center">
-              <img
-                src="/logo.svg"
-                alt="Zenthra Shop logo"
-                className="h-16 w-auto drop-shadow-[0_18px_46px_rgba(59,130,246,0.35)]"
-                loading="eager"
+              <dotlottie-wc
+                src="https://lottie.host/5c0bbe64-da89-42a7-b377-738ec32516d4/3UmqEdaCPy.lottie"
+                autoplay
+                loop
+                style={{ width: 260, height: 260 }}
               />
               <div className="space-y-2">
                 <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary">
-                  Welcome back
+                  Access
                 </div>
+                <CardTitle className="text-xl font-semibold">
+                  Step into your operations cockpit
+                </CardTitle>
+                <CardDescription className="text-sm text-muted-foreground/80">
+                  Authorise with your secure credentials to continue.
+                </CardDescription>
               </div>
             </CardHeader>
 

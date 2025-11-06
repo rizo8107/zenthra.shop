@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,6 @@ import { LockKeyhole, Mail, LogIn } from 'lucide-react';
 import { authenticateAdmin } from '@/lib/pocketbase';
 import { useTheme } from '@/components/theme/theme-provider';
 
-
-
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -19,16 +17,6 @@ const LoginPage: React.FC = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { theme } = useTheme();
-
-  useEffect(() => {
-    const existingScript = document.getElementById('dotlottie-wc-script');
-    if (existingScript) return;
-    const script = document.createElement('script');
-    script.id = 'dotlottie-wc-script';
-    script.type = 'module';
-    script.src = 'https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.5/dist/dotlottie-wc.js';
-    document.head.appendChild(script);
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,6 +53,21 @@ const LoginPage: React.FC = () => {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10 rounded-3xl border border-border/60 bg-card/70 p-8 shadow-[0_40px_120px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl md:flex-row md:p-12">
         <div className="flex w-full flex-col justify-between gap-12 md:w-1/2">
           <div className="space-y-8">
+            <div className="flex items-center gap-3">
+              <div className="relative h-14 w-14 overflow-hidden rounded-2xl border border-white/20 bg-white/80 shadow-lg shadow-primary/20">
+                <img
+                  src="/logo.svg"
+                  alt="Zenthra Shop logo"
+                  className="h-full w-full object-contain"
+                  loading="eager"
+                />
+              </div>
+              <div className="flex flex-col text-left">
+                <span className="text-sm uppercase tracking-[0.35em] text-muted-foreground">Admin</span>
+                <span className="text-2xl font-semibold">Zenthra Shop</span>
+              </div>
+            </div>
+
             <div className="space-y-4">
               <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
                 Unlock your commerce command centre
@@ -74,22 +77,12 @@ const LoginPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="relative overflow-hidden rounded-3xl border border-primary/40 bg-gradient-to-br from-primary/30 via-primary/15 to-transparent p-6 text-sm text-primary-foreground shadow-[0_35px_80px_-40px_rgba(59,130,246,0.75)]">
-              <div className="pointer-events-none absolute -top-12 right-[-30%] h-48 w-48 rounded-full bg-primary/30 blur-3xl" />
-              <p className="font-semibold uppercase tracking-[0.35em] text-[10px] text-primary-foreground/80">Release highlights</p>
-              <ul className="mt-4 space-y-2 text-sm">
-                <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary-foreground/90"></span>
-                  Evolution journeys with personalised fallback recipients
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary-foreground/90"></span>
-                  Real-time activity previews and enriched context
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-primary-foreground/90"></span>
-                  Refreshed admin canvas with faster navigation
-                </li>
+            <div className="rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-6 text-sm text-primary/90">
+              <p className="font-medium uppercase tracking-wide text-xs text-primary/60">New in this release</p>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li>• Evolution journeys with personalised fallback recipients</li>
+                <li>• Real-time activity previews and enriched context</li>
+                <li>• Refreshed admin canvas with faster navigation</li>
               </ul>
             </div>
           </div>
@@ -102,18 +95,9 @@ const LoginPage: React.FC = () => {
 
         <div className="flex w-full flex-col justify-center md:w-1/2">
           <Card className="w-full border border-border/60 bg-background/90 shadow-2xl">
-            <CardHeader className="items-center space-y-4 text-center">
-              <img
-                src="/logo.svg"
-                alt="Zenthra Shop logo"
-                className="h-16 w-auto drop-shadow-[0_18px_46px_rgba(59,130,246,0.35)]"
-                loading="eager"
-              />
-              <div className="space-y-2">
-                <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary">
-                  Welcome back
-                </div>
-              </div>
+            <CardHeader className="space-y-1 text-center">
+              <CardTitle className="text-2xl font-semibold">Welcome back</CardTitle>
+              <CardDescription>Authenticate with your admin credentials</CardDescription>
             </CardHeader>
 
             <CardContent>

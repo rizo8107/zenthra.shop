@@ -65,6 +65,15 @@ const LoginPage: React.FC = () => {
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-10 rounded-3xl border border-border/60 bg-card/70 p-8 shadow-[0_40px_120px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl md:flex-row md:p-12">
         <div className="flex w-full flex-col justify-between gap-12 md:w-1/2">
           <div className="space-y-8">
+            <div className="flex items-center gap-3">
+              <img
+                src="/logo.svg"
+                alt="Zenthra Shop logo"
+                className="h-20 w-auto drop-shadow-[0_18px_46px_rgba(59,130,246,0.35)]"
+                loading="eager"
+              />
+            </div>
+
             <div className="space-y-4">
               <h1 className="text-4xl font-semibold leading-tight md:text-5xl">
                 Unlock your commerce command centre
@@ -103,15 +112,9 @@ const LoginPage: React.FC = () => {
         <div className="flex w-full flex-col justify-center md:w-1/2">
           <Card className="w-full border border-border/60 bg-background/90 shadow-2xl">
             <CardHeader className="items-center space-y-4 text-center">
-              <img
-                src="/logo.svg"
-                alt="Zenthra Shop logo"
-                className="h-16 w-auto drop-shadow-[0_18px_46px_rgba(59,130,246,0.35)]"
-                loading="eager"
-              />
               <div className="space-y-2">
                 <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-primary/50 bg-primary/10 px-4 py-1 text-xs font-semibold uppercase tracking-[0.35em] text-primary">
-                  Welcome back
+                  Access
                 </div>
               </div>
             </CardHeader>

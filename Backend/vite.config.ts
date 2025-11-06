@@ -141,6 +141,22 @@ export default defineConfig(({ mode }) => {
           });
         }
       },
+      '/api/customer-journey': {
+        target: webhookServerOrigin,
+        changeOrigin: true,
+        secure: false,
+        configure: (proxy) => {
+          proxy.on('error', (err: Error) => {
+            console.log('CustomerJourney proxy error:', err);
+          });
+          proxy.on('proxyReq', (proxyReq: ClientRequest, req: IncomingMessage) => {
+            console.log('Sending Journey Request:', req.method, req.url);
+          });
+          proxy.on('proxyRes', (proxyRes: IncomingMessage, req: IncomingMessage) => {
+            console.log('Received Journey Response:', proxyRes.statusCode, req.url);
+          });
+        }
+      },
       '/whatsapp-api': {
         target: whatsAppApiUrl,
         changeOrigin: true,
