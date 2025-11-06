@@ -157,13 +157,25 @@ const ProductDetail = () => {
     return computed;
   }, [product, selectedSize, selectedCombo]);
 
+  const formatSizeOptionLabel = (size?: { name?: string; value?: unknown; unit?: string } | null) => {
+    if (!size) return '';
+    const name = typeof size.name === 'string' ? size.name.trim() : '';
+    const value = size?.value !== undefined && size?.value !== null ? String(size.value).trim() : '';
+    const unit = typeof size?.unit === 'string' ? size.unit.trim() : '';
+    const base = name || value;
+    if (!unit || !base) return base || unit;
+    return base.toLowerCase().includes(unit.toLowerCase()) ? base : `${base} ${unit}`;
+  };
+
   // Human label for selected size (e.g., 300 ml)
-  const selectedSizeLabel = useMemo(() => {
-    if (!selectedSize) return '';
-    const v = String(selectedSize.value ?? '');
-    const u = selectedSize.unit ? ` ${selectedSize.unit}` : '';
-    return `${v}${u}`.trim();
-  }, [selectedSize]);
+  const selectedSizeLabel = useMemo(() => formatSizeOptionLabel(selectedSize), [selectedSize]);
+
+  const selectedSubtotal = useMemo(() => {
+    const unit = typeof effectivePrice === 'number' ? effectivePrice : Number(effectivePrice) || 0;
+    return unit * quantity;
+  }, [effectivePrice, quantity]);
+
+  const unitPrice = typeof effectivePrice === 'number' ? effectivePrice : Number(effectivePrice) || 0;
 
   // Force scroll to top when page loads or product ID changes
   useEffect(() => {
@@ -1046,13 +1058,12 @@ const ProductDetail = () => {
               ))}
             </div>
           </div>
-
           {/* Column 2: Product Options & Details (Mobile: Below image, Desktop: Right) */}
           <div className="p-4 md:p-0">
 
             {/* Price and Title (Mobile: Top, Desktop: Integrated) */}
             <div className="mb-4 md:mb-6">
-              <h1 className="text-2xl md:text-3xl font-bold mb-1 text-foreground flex items-center gap-2">
+              <h1 className="text-xl md:text-3xl font-bold mb-0.5 text-foreground flex items-center gap-2">
                 <span>{product.name}</span>
                 {selectedSizeLabel && (
                   <Badge className="rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-0.5 text-xs md:text-sm font-semibold border border-dotted border-emerald-600">
@@ -1061,6 +1072,7 @@ const ProductDetail = () => {
                 )}
               </h1>
               <div className="flex flex-wrap items-center gap-2 mb-2">
+
                 {(() => {
                   // Compute bundle subtotal to show strikethrough if discounted
                   const base0 = Number(product.price) || 0;
@@ -1082,7 +1094,7 @@ const ProductDetail = () => {
                           ₹{subtotal.toFixed(2)}
                         </p>
                       )}
-                      <p className="text-3xl md:text-4xl font-extrabold text-primary">
+                      <p className="text-2xl md:text-4xl font-extrabold text-primary">
                         ₹{typeof effectivePrice === 'number' ? effectivePrice.toFixed(2) : '0.00'}
                       </p>
                     </>
@@ -1094,15 +1106,14 @@ const ProductDetail = () => {
                   {Math.round((1 - (effectivePrice / product.original_price)) * 100)}% OFF
                 </span>
               )}
-              {/* Average Rating and Review Link */}
               {orderConfig.showStarRating && (
-                <div className="flex items-center gap-2 mt-1">
-                  {/* Rating pill */}
+                <div className="hidden md:flex items-center gap-2 mt-1">
                   <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
                     {averageRating.toFixed(1)}
                   </span>
                   {product.reviews && product.reviews > 0 ? (
                     <div className="flex items-center gap-0.5 text-yellow-500">
+
                       {Array(5).fill(null).map((_, i) => (
                         <Star
                           key={i}
@@ -1127,6 +1138,76 @@ const ProductDetail = () => {
               )}
             </div>
             
+            <div className="md:hidden space-y-3 mb-3">
+              {(() => {
+                const sizeOptions = (product as any).variants?.sizes || [];
+                return sizeOptions.length > 0 ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-base">Size</h3>
+                      <span className="text-xs text-muted-foreground">
+                        {formatSizeOptionLabel(selectedSize) || 'Select'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {sizeOptions.map((sz: any) => (
+                        <button
+                          key={sz.value}
+                          type="button"
+                          onClick={() => { setSelectedSize(sz); setLastVariantPick('size'); }}
+                          disabled={sz.inStock === false}
+                          className={cn(
+                            "px-2.5 py-1 rounded-full text-xs border transition-all",
+                            selectedSize?.value === sz.value ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground hover:bg-accent",
+                            sz.inStock === false ? "opacity-50 cursor-not-allowed" : ""
+                          )}
+                          title={formatSizeOptionLabel(sz)}
+                        >
+                          {formatSizeOptionLabel(sz)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+              {(() => {
+                const comboOptions = (product as any).variants?.combos || [];
+                return comboOptions.length > 0 ? (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <h3 className="font-semibold text-base">Combo</h3>
+                      <span className="text-xs text-muted-foreground">
+                        {selectedCombo ? selectedCombo.name : 'Select'}
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {comboOptions.map((cb: any) => (
+                        <button
+                          key={cb.value}
+                          type="button"
+                          onClick={() => { setSelectedCombo(cb); setLastVariantPick('combo'); }}
+                          className={cn(
+                            "px-2.5 py-1 rounded-full text-xs border transition-all",
+                            selectedCombo?.value === cb.value 
+                              ? "bg-emerald-50 text-emerald-700 border-emerald-600 border-dotted" 
+                              : "bg-background text-foreground hover:bg-accent border-muted"
+                          )}
+                          title={cb.description || cb.name}
+                        >
+                          {(() => {
+                            const suffix = cb.discountType && typeof cb.discountValue === 'number'
+                              ? ` −${cb.discountType === 'percent' ? `${cb.discountValue}%` : `₹${cb.discountValue}`}`
+                              : '';
+                            return `${cb.name}${suffix}`;
+                          })()}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+
             <Separator className="my-4 md:hidden" />
 
             {/* **Mobile UI Card Section (Zepto Style)** */}
@@ -1157,16 +1238,6 @@ const ProductDetail = () => {
                     </div>
                   </div>
                 )}
-
-                {/* Estimated delivery chip */}
-                <div className="mt-3 flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-medium">
-                    <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-                    Estimated Delivery: 2–5 days
-                  </span>
-                </div>
-
-                <Separator className="my-4" />
 
                 {/* Color Selection */}
                 {(() => {
@@ -1212,11 +1283,11 @@ const ProductDetail = () => {
                 {(() => {
                   const sizeOptions = (product as any).variants?.sizes || [];
                   return sizeOptions.length > 0 ? (
-                    <div className="mb-6">
+                    <div className="mb-6 hidden md:block">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-lg">Size</h3>
                         <span className="text-sm text-muted-foreground">
-                          {selectedSize ? `${selectedSize.name}${selectedSize.unit ? ` ${selectedSize.unit}` : ''}` : 'Select a size'}
+                          {formatSizeOptionLabel(selectedSize) || 'Select a size'}
                         </span>
                       </div>
                       <div className="flex flex-wrap gap-2 mt-2">
@@ -1231,9 +1302,9 @@ const ProductDetail = () => {
                               selectedSize?.value === sz.value ? "bg-primary text-primary-foreground border-primary" : "bg-background text-foreground hover:bg-accent",
                               sz.inStock === false ? "opacity-50 cursor-not-allowed" : ""
                             )}
-                            title={sz.name}
+                            title={formatSizeOptionLabel(sz)}
                           >
-                            {sz.name}{sz.unit ? ` ${sz.unit}` : ''}
+                            {formatSizeOptionLabel(sz)}
                           </button>
                         ))}
                       </div>
@@ -1245,7 +1316,7 @@ const ProductDetail = () => {
                 {(() => {
                   const comboOptions = (product as any).variants?.combos || [];
                   return comboOptions.length > 0 ? (
-                    <div className="mb-6">
+                    <div className="mb-6 hidden md:block">
                       <div className="flex items-center justify-between mb-2">
                         <h3 className="font-semibold text-lg">Combo</h3>
                         <span className="text-sm text-muted-foreground">
@@ -1307,52 +1378,61 @@ const ProductDetail = () => {
                 
                 <Separator className="my-4" />
 
-                {/* Quantity Selector & Price (Combined for Mobile Card) */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <h3 className="font-semibold text-lg mr-2">Quantity</h3>
-                        <div className="flex items-center border rounded-full overflow-hidden">
-                            <button
-                                type="button"
-                                onClick={decreaseQuantity}
-                                disabled={quantity <= 1}
-                                className="p-2 text-muted-foreground hover:text-foreground disabled:opacity-50 transition-colors"
-                                aria-label="Decrease quantity"
-                            >
-                                <Minus className="h-4 w-4" />
-                            </button>
-                            <p className="text-base font-medium px-3 border-x">{quantity}</p>
-                            <button
-                                type="button"
-                                onClick={increaseQuantity}
-                                className="p-2 text-muted-foreground hover:text-foreground transition-colors"
-                                aria-label="Increase quantity"
-                            >
-                                <Plus className="h-4 w-4" />
-                            </button>
-                        </div>
+                {/* Purchase Controls */}
+                <div className="mt-4 rounded-2xl border border-border/60 bg-gradient-to-br from-white via-white to-muted/60 p-4 shadow-sm">
+                  <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
+                    <span className="inline-flex items-center gap-2 text-emerald-600">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Delivery in 2–5 days
+                    </span>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                      <Check className="h-3 w-3" /> {product?.inStock ? 'In stock' : 'Preorder'}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Qty</span>
+                      <div className="flex items-center gap-1 rounded-full border border-border/70 bg-white px-1.5 py-1 shadow-sm">
+                        <button
+                          type="button"
+                          onClick={decreaseQuantity}
+                          disabled={quantity <= 1}
+                          className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="min-w-[28px] text-center text-sm font-semibold">{quantity}</span>
+                        <button
+                          type="button"
+                          onClick={increaseQuantity}
+                          className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+                          aria-label="Increase quantity"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Price on the right of the quantity selector (as per image sample) */}
-                    <p className="text-xl font-semibold text-foreground">
-                        ₹{(effectivePrice * quantity).toFixed(2)}
-                    </p>
-                </div>
-                
-                {/* Primary action */}
-                <div className="mt-6">
-                  <Button 
+                    <div className="text-right">
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Subtotal</p>
+                      <p className="text-lg font-semibold text-foreground">₹{(effectivePrice * quantity).toFixed(2)}</p>
+                      <p className="text-[11px] text-muted-foreground">₹{effectivePrice.toFixed(2)} / unit</p>
+                    </div>
+                  </div>
+
+                  <Button
                     onClick={handleAddToCart}
-                    className="w-full bg-green-700 hover:bg-green-800"
+                    className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 text-sm font-semibold shadow-lg hover:from-emerald-500 hover:via-emerald-500 hover:to-emerald-500"
                     size="lg"
                     disabled={!product?.inStock}
                   >
-                    {product?.inStock ? 'Add to Cart' : 'Out of Stock'}
+                    {product?.inStock ? 'Add to Cart' : 'Notify Me'}
                   </Button>
                 </div>
             </Card>
             {/* **END Mobile UI Card Section** */}
-
             {/* Mobile-only info cards */}
             <div className="md:hidden space-y-4">
               {/* Specifications */}
@@ -1653,9 +1733,9 @@ const ProductDetail = () => {
               <div className="flex items-center justify-between gap-4">
                 <div className="flex flex-col">
                   <p className="text-lg font-bold">
-                    ₹{typeof product.price === 'number' ? (product.price * quantity).toFixed(2) : '0.00'}
+                    ₹{typeof effectivePrice === 'number' ? (effectivePrice * quantity).toFixed(2) : '0.00'}
                   </p>
-                  <span className="text-xs text-muted-foreground">Total for {quantity} item(s)</span>
+                  <span className="text-xs text-muted-foreground">Selected total</span>
                 </div>
                 <Button
                   className="flex-1 max-w-[200px] shadow-lg bg-green-700 hover:bg-green-800"
