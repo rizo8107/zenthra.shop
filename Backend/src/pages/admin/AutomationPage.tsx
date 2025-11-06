@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -32,10 +31,14 @@ import {
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import {
+  Activity,
+  AlertCircle,
   Clock,
+  Copy,
   MessageCircle,
   GitBranch,
   Globe,
+  RefreshCw,
   Rocket,
   Trash,
   Workflow,
@@ -46,6 +49,7 @@ import {
   PlusCircle,
   ArrowLeft,
   ShoppingBag,
+  CircleStop,
 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
@@ -143,6 +147,10 @@ type JourneyEvent = {
   customer_id?: string;
   customer_name?: string;
   customer_email?: string;
+  payload?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+  order?: Record<string, unknown>;
+  customer?: Record<string, unknown>;
 };
 
 type ActivityEventOption = {
@@ -172,6 +180,16 @@ const formatActivityLabel = (value: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
+type LiveActivity = {
+  id: string;
+  event: string;
+  capturedAt: string;
+  stage?: string;
+  status: 'captured' | 'error';
+  payload?: JourneyEvent;
+  error?: string;
+};
+
 const getApiBaseUrl = (): string => {
   if (typeof window !== 'undefined') {
     return window.location.origin;
@@ -182,12 +200,68 @@ const getApiBaseUrl = (): string => {
   return '';
 };
 
-const buildJourneyEndpoint = (path: string): string => {
+const buildJourneyEndpoint = (path: string, baseOverride?: string | null): string => {
   if (path.startsWith('http')) return path;
-  const base = getApiBaseUrl();
-  if (!base) return path;
+  const base = (baseOverride && baseOverride.trim()) || getApiBaseUrl();
+  if (!base) return path.startsWith('/') ? path : `/${path}`;
   const sanitized = path.startsWith('/') ? path : `/${path}`;
   return `${base}${sanitized}`;
+};
+
+const discoverApiBaseUrl = async (): Promise<string | null> => {
+  try {
+    const candidates: string[] = [];
+    // env-driven (Vite)
+    try {
+      const envOrigin = (import.meta as any)?.env?.VITE_API_ORIGIN as string | undefined;
+      if (envOrigin && typeof envOrigin === 'string') candidates.push(envOrigin);
+    } catch {}
+    // window origin
+    if (typeof window !== 'undefined' && window.location?.origin) candidates.push(window.location.origin);
+    // common dev ports
+    candidates.push('http://localhost:3000', 'http://127.0.0.1:3000');
+
+    for (const origin of candidates) {
+      try {
+        const sameOrigin = typeof window !== 'undefined' && origin === window.location.origin;
+        const res = await fetch(`${origin}/api/customer-journey/health`, {
+          credentials: sameOrigin ? 'include' : 'omit',
+          headers: { Accept: 'application/json' },
+        });
+        if (!res.ok) continue;
+        const ct = res.headers.get('content-type')?.toLowerCase() || '';
+        if (!ct.includes('application/json')) continue;
+        const body = await res.json().catch(() => null);
+        if (body && body.success) return origin;
+      } catch {}
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const fetchRecentJourneyEvents = async (base?: string | null): Promise<JourneyEvent[]> => {
+  const endpoint = buildJourneyEndpoint('/api/customer-journey/data', base);
+  const sameOrigin = typeof window !== 'undefined' && base ? base === window.location.origin : true;
+  const response = await fetch(endpoint, { credentials: sameOrigin ? 'include' : 'omit', headers: { Accept: 'application/json' } });
+  if (!response.ok) {
+    throw new Error(`Failed to load journey events (HTTP ${response.status})`);
+  }
+  const text = await response.text();
+  if (!text) return [];
+  let body: any;
+  try {
+    body = JSON.parse(text);
+  } catch (error) {
+    const snippet = text.slice(0, 120).replace(/\s+/g, ' ').trim();
+    throw new Error(`Journey API returned non-JSON response: ${snippet}`);
+  }
+  if (!body?.success) {
+    throw new Error(body?.error || 'Journey data response invalid');
+  }
+  const events: JourneyEvent[] = Array.isArray(body.events) ? body.events : [];
+  return events;
 };
 
 const getDeepValue = (obj: unknown, rawPath: string): unknown => {
@@ -198,24 +272,33 @@ const getDeepValue = (obj: unknown, rawPath: string): unknown => {
     .map((segment) => segment.trim())
     .filter(Boolean);
   if (segments.length === 0) return undefined;
-
-  let current: unknown = obj;
-  for (const key of segments) {
-    if (current === undefined || current === null) return undefined;
-    if (Array.isArray(current)) {
-      const index = Number.parseInt(key, 10);
-      if (Number.isNaN(index) || index < 0 || index >= current.length) return undefined;
-      current = current[index];
-      continue;
-    }
-    if (typeof current === 'object' && key in (current as Record<string, unknown>)) {
-      current = (current as Record<string, unknown>)[key];
-      continue;
+  return segments.reduce<unknown>((acc, segment) => {
+    if (acc && typeof acc === 'object' && segment in (acc as Record<string, unknown>)) {
+      return (acc as Record<string, unknown>)[segment];
     }
     return undefined;
-  }
+  }, obj);
+};
 
-  return current;
+const formatSampleValue = (value: unknown): string | null => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    return trimmed.length > 40 ? `${trimmed.slice(0, 37)}…` : trimmed;
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (Array.isArray(value)) {
+    return `${value.length} ${value.length === 1 ? 'item' : 'items'}`;
+  }
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>);
+    if (keys.length === 0) return 'Object (empty)';
+    return `Object (${keys.slice(0, 3).join(', ')}${keys.length > 3 ? '…' : ''})`;
+  }
+  return null;
 };
 
 const collectPlaceholderPaths = (value: unknown, prefix = '', acc: Set<string> = new Set()): string[] => {
@@ -280,9 +363,10 @@ type RecipientPreviewProps = {
   fallback?: string | null;
   messageTemplate: string;
   availableFields: string[];
+  onPickPath?: (field: string) => void;
 };
 
-const RecipientPreview = ({ context, path, fallback, messageTemplate, availableFields }: RecipientPreviewProps) => {
+const RecipientPreview = ({ context, path, fallback, messageTemplate, availableFields, onPickPath }: RecipientPreviewProps) => {
   const resolved = (path ? getDeepValue(context, path) : undefined) ?? undefined;
   const value = typeof resolved === 'string' && resolved.trim() ? resolved.trim() : undefined;
   const usedFallback = !value && fallback ? fallback.trim() : undefined;
@@ -333,9 +417,22 @@ const RecipientPreview = ({ context, path, fallback, messageTemplate, availableF
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Available fields</p>
           <div className="flex flex-wrap gap-1">
             {availableFields.slice(0, 30).map((field) => (
-              <span key={field} className="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+              <button
+                key={field}
+                type="button"
+                className="rounded-full bg-background px-2 py-0.5 text-[11px] text-muted-foreground hover:bg-muted transition-colors"
+                title="Click to copy path and set as recipient"
+                onClick={async () => {
+                  try {
+                    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+                      await navigator.clipboard.writeText(field);
+                    }
+                  } catch {}
+                  if (onPickPath) onPickPath(field);
+                }}
+              >
                 {field}
-              </span>
+              </button>
             ))}
             {availableFields.length > 30 && (
               <span className="text-[11px] text-muted-foreground">+{availableFields.length - 30} more</span>
@@ -681,6 +778,13 @@ const AutomationPage = () => {
   const [activityOptions, setActivityOptions] = useState<ActivityEventOption[]>(FALLBACK_ACTIVITY_OPTIONS);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [activityError, setActivityError] = useState<string | null>(null);
+  const [apiBaseUrl, setApiBaseUrl] = useState<string | null>(null);
+  const [apiDiscoveryError, setApiDiscoveryError] = useState<string | null>(null);
+  const [liveActivities, setLiveActivities] = useState<LiveActivity[]>([]);
+  const [isListening, setIsListening] = useState(false);
+  const [liveActivityError, setLiveActivityError] = useState<string | null>(null);
+  const liveActivityIdsRef = useRef<Set<string>>(new Set());
+  const livePollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const automationsQuery = useQuery<AutomationFlowRecord[], Error>({
     queryKey: ['automations'],
@@ -715,26 +819,7 @@ const AutomationPage = () => {
     setIsLoadingActivities(true);
     setActivityError(null);
     try {
-      const endpoint = buildJourneyEndpoint('/api/customer-journey/data');
-      const response = await fetch(endpoint, { credentials: 'include' });
-      if (!response.ok) {
-        throw new Error(`Failed to load journey events (HTTP ${response.status})`);
-      }
-      const rawBody = await response.text();
-      let payload: any = null;
-      if (rawBody) {
-        try {
-          payload = JSON.parse(rawBody);
-        } catch (parseError) {
-          const snippet = rawBody.slice(0, 120).replace(/\s+/g, ' ').trim();
-          throw new Error(`Journey API returned non-JSON response: ${snippet}`);
-        }
-      }
-      if (!payload?.success) {
-        const message = payload?.error || 'Journey data response invalid';
-        throw new Error(message);
-      }
-      const events: JourneyEvent[] = Array.isArray(payload.events) ? payload.events : [];
+      const events = await fetchRecentJourneyEvents(apiBaseUrl);
       const unique = new Map<string, ActivityEventOption>();
       events.forEach((evt) => {
         if (!evt?.event) return;
@@ -765,11 +850,22 @@ const AutomationPage = () => {
     } finally {
       setIsLoadingActivities(false);
     }
-  }, []);
+  }, [apiBaseUrl]);
 
   useEffect(() => {
     loadActivityOptions();
   }, [loadActivityOptions]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      const detected = await discoverApiBaseUrl();
+      if (!mounted) return;
+      setApiBaseUrl(detected);
+      if (!detected) setApiDiscoveryError('Could not detect API origin; using same-origin /api.');
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const applyGraph = useCallback((graph?: AutomationGraphPayload) => {
     const baseNodes = Array.isArray(graph?.nodes) && graph.nodes?.length ? graph.nodes : initialNodes;
@@ -1086,6 +1182,109 @@ const AutomationPage = () => {
 
   const isMutatingList = duplicateFlowMutation.isPending || deleteFlowMutation.isPending;
 
+  const handleUseLiveActivity = useCallback((entry: LiveActivity) => {
+    const label = formatActivityLabel(entry.event);
+    const preview = (entry.payload as unknown) as Record<string, unknown> | undefined;
+    setNodes((current) =>
+      current.map((node) =>
+        node.id === 'start'
+          ? {
+              ...node,
+              data: {
+                ...(node.data as Record<string, unknown>),
+                type: 'start',
+                label: (extractData(node.data).label || 'Journey start'),
+                activityEventKey: entry.event,
+                activityEventLabel: label,
+                activityStage: entry.stage,
+                activityPreview: preview,
+              },
+            }
+          : node
+      )
+    );
+    setSelectedNodeId('start');
+    toast.success(`Using ${label} as journey trigger`);
+  }, [setNodes]);
+
+  const pushLiveActivities = useCallback((events: JourneyEvent[]) => {
+    setLiveActivities((prev) => {
+      const ids = liveActivityIdsRef.current;
+      const nextEntries: LiveActivity[] = [...prev];
+      events.forEach((evt) => {
+        const id = evt.id ?? `${evt.event ?? 'event'}-${evt.timestamp ?? Date.now()}`;
+        if (!id || ids.has(id)) return;
+        const payloadContext = buildPreviewContext(evt as Record<string, unknown>);
+        const entry: LiveActivity = {
+          id,
+          event: evt.event ?? 'unknown.event',
+          capturedAt: evt.timestamp ?? new Date().toISOString(),
+          stage: evt.stage,
+          status: 'captured',
+          payload: {
+            ...evt,
+            payload: payloadContext.data as Record<string, unknown>,
+          },
+        };
+        ids.add(id);
+        nextEntries.unshift(entry);
+      });
+      return nextEntries.slice(0, 10);
+    });
+  }, []);
+
+  const loadRecentActivitySnapshot = useCallback(async () => {
+    try {
+      const events = await fetchRecentJourneyEvents(apiBaseUrl);
+      pushLiveActivities(events.slice(0, 5));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch journey snapshot';
+      setLiveActivityError(message);
+    }
+  }, [apiBaseUrl, pushLiveActivities]);
+
+  const stopListening = useCallback(() => {
+    setIsListening(false);
+    if (livePollRef.current) {
+      clearInterval(livePollRef.current);
+      livePollRef.current = null;
+    }
+  }, []);
+
+  const pollRecentEvents = useCallback(async () => {
+    try {
+      const events = await fetchRecentJourneyEvents(apiBaseUrl);
+      pushLiveActivities(events);
+      setLiveActivityError(null);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to fetch live journey events';
+      setLiveActivityError(message);
+    }
+  }, [apiBaseUrl, pushLiveActivities]);
+
+  const startListening = useCallback(async () => {
+    if (isListening) return;
+    setIsListening(true);
+    liveActivityIdsRef.current.clear();
+    setLiveActivities([]);
+    await loadRecentActivitySnapshot();
+    if (livePollRef.current) {
+      clearInterval(livePollRef.current);
+    }
+    livePollRef.current = setInterval(() => {
+      pollRecentEvents();
+    }, 5000);
+  }, [isListening, loadRecentActivitySnapshot, pollRecentEvents]);
+
+  useEffect(() => {
+    return () => {
+      if (livePollRef.current) {
+        clearInterval(livePollRef.current);
+        livePollRef.current = null;
+      }
+    };
+  }, []);
+
   if (pageMode === 'list') {
     return (
       <AdminLayout>
@@ -1240,8 +1439,66 @@ const AutomationPage = () => {
         </Card>
 
         <div className="grid gap-4 xl:grid-cols-[260px_minmax(0,1fr)_320px] h-[calc(100vh-200px)]">
-          {/* Palette */}
+          {/* Palette + Live activity */}
           <div className="rounded-2xl border bg-card shadow-sm overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b flex items-center justify-between">
+              <div>
+                <p className="text-sm font-semibold">Test an event</p>
+                <p className="text-xs text-muted-foreground">{isListening ? 'Listening for activity…' : 'Capture a recent checkout, payment, or cart event.'}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {!isListening ? (
+                  <Button size="sm" onClick={startListening} className="h-7 px-2 gap-1">
+                    <Activity className="h-3.5 w-3.5" /> Listen
+                  </Button>
+                ) : (
+                  <Button size="sm" variant="destructive" onClick={stopListening} className="h-7 px-2 gap-1">
+                    <CircleStop className="h-3.5 w-3.5" /> Stop
+                  </Button>
+                )}
+                <Button size="sm" variant="outline" onClick={loadRecentActivitySnapshot} className="h-7 px-2" title="Fetch latest">
+                  <RefreshCw className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            </div>
+            <div className="px-3 py-3 border-b space-y-2">
+              {liveActivityError && (
+                <div className="flex items-center gap-2 text-xs text-destructive">
+                  <AlertCircle className="h-3.5 w-3.5" /> {liveActivityError}
+                </div>
+              )}
+              <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>API: {apiBaseUrl || 'same-origin'}</span>
+                {apiDiscoveryError && <span className="text-destructive/80">{apiDiscoveryError}</span>}
+              </div>
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                <span>Captured: {liveActivities.length}</span>
+                <span>Last: {liveActivities[0] ? new Date(liveActivities[0].capturedAt).toLocaleTimeString() : '—'}</span>
+              </div>
+              <div className="space-y-2 max-h-40 overflow-auto pr-1">
+                {liveActivities.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">No recent events yet.</p>
+                ) : (
+                  liveActivities.slice(0, 5).map((item) => (
+                    <div key={item.id} className="rounded-lg border px-2.5 py-2 text-xs bg-background/60">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Badge variant="secondary" className="text-[10px]">{item.stage || 'Event'}</Badge>
+                          <span className="font-medium">{formatActivityLabel(item.event)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <Button size="sm" className="h-6 px-2 text-[11px]" onClick={() => handleUseLiveActivity(item)}>Use</Button>
+                        </div>
+                      </div>
+                      <details className="mt-1">
+                        <summary className="cursor-pointer text-[11px] text-muted-foreground">Preview</summary>
+                        <pre className="mt-1 max-h-28 overflow-auto rounded bg-muted/40 p-2">{JSON.stringify(item.payload, null, 2)}</pre>
+                      </details>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
             <div className="px-4 py-3 border-b">
               <p className="text-sm font-semibold">Step library</p>
               <p className="text-xs text-muted-foreground">Drag actions onto the canvas to build the journey.</p>
@@ -1543,7 +1800,13 @@ const AutomationPage = () => {
                                   <SelectItem key={option.value} value={option.value}>
                                     <div className="flex flex-col">
                                       <span className="text-sm font-medium">{option.label}</span>
-                                      <span className="text-[11px] text-muted-foreground">{option.helper}</span>
+                                      <span className="text-[11px] text-muted-foreground">
+                                        {option.helper}
+                                        {(() => {
+                                          const sample = formatSampleValue(getDeepValue(selectedNodePreviewContext, option.value));
+                                          return sample ? ` • e.g. ${sample}` : '';
+                                        })()}
+                                      </span>
                                     </div>
                                   </SelectItem>
                                 ))}
@@ -1671,6 +1934,7 @@ const AutomationPage = () => {
                               fallback={selectedNodeData.fallbackRecipient}
                               messageTemplate={selectedNodeData.evolutionMessage?.text ?? selectedNodeData.customMessage ?? ''}
                               availableFields={selectedNodePreviewFields}
+                              onPickPath={(field) => handleNodeDataChange(selectedNode.id, { recipientPath: field })}
                             />
                           )}
                         </div>
@@ -1789,18 +2053,6 @@ const AutomationPage = () => {
           </div>
         </div>
 
-        <Card className="rounded-2xl border bg-card shadow-sm">
-          <div className="flex items-center justify-between px-4 py-3 border-b">
-            <div>
-              <p className="text-sm font-semibold">Journey JSON preview</p>
-              <p className="text-xs text-muted-foreground">Persist this data to PocketBase to store the automation.</p>
-            </div>
-            <Badge variant="secondary">Schema draft</Badge>
-          </div>
-          <pre className="max-h-64 overflow-auto p-4 text-xs bg-muted/40 rounded-b-2xl">
-            {JSON.stringify(flowJson, null, 2)}
-          </pre>
-        </Card>
       </div>
     </AdminLayout>
   );
