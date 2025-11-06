@@ -69,8 +69,8 @@ export default function PluginsManager() {
       setGtmConfig(configs.google_tag_manager as GoogleTagManagerConfig);
       setFbConfig(configs.facebook_pixel as FacebookPixelConfig);
       setClarityConfig(configs.microsoft_clarity as MicrosoftClarityConfig);
-      setWaApiConfig((configs as any).whatsapp_api as WhatsappApiConfig);
-      setEvoApiConfig((configs as any).evolution_api as EvolutionApiConfig);
+      setWaApiConfig((configs as any).whatsapp_api as WhatsappApiConfig || pluginRegistry.whatsapp_api.defaultConfig as unknown as WhatsappApiConfig);
+      setEvoApiConfig((configs as any).evolution_api as EvolutionApiConfig || pluginRegistry.evolution_api.defaultConfig as unknown as EvolutionApiConfig);
       
       const customScripts = configs.custom_scripts as CustomScriptsConfig;
       console.log('[PluginsManager] Loading custom scripts config:', customScripts);
@@ -430,7 +430,7 @@ export default function PluginsManager() {
         <aside className="w-64 shrink-0">
           <div className="rounded-md border bg-card">
             <div className="p-3 border-b text-sm font-medium">Plugins</div>
-            <nav className="p-2 space-y-1">
+            <nav className="p-2 space-y-1 max-h-[500px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-400 scrollbar-track-gray-100">
               <button
                 type="button"
                 className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-accent ${selected === 'whatsapp_floating' ? 'bg-accent' : ''}`}

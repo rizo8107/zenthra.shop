@@ -6,6 +6,7 @@ import {
   deleteAutomationFlow,
   type AutomationFlowInput,
 } from './automationStore.js';
+import { runAutomationsForEvent } from './automationRunner.js';
 
 const router = express.Router();
 
@@ -56,6 +57,42 @@ router.delete('/:id', async (req, res) => {
   } catch (error: any) {
     console.error('Failed to delete automation:', error?.message || error);
     res.status(500).json({ error: error?.message || 'Failed to delete automation' });
+  }
+});
+
+// Webhook endpoint to trigger automations
+router.post('/webhook', async (req, res) => {
+  try {
+    const payload = req.body || {};
+    console.log('[Automation Webhook] Received event:', payload);
+
+    // Extract event type from payload (support multiple formats)
+    const eventType = payload.type || payload.event || payload.eventType || 'unknown';
+    
+    // Create automation event from webhook payload
+    const automationEvent = {
+      id: payload.id || `evt_${Date.now()}`,
+      type: eventType,
+      timestamp: payload.timestamp || new Date().toISOString(),
+      source: payload.source || 'webhook',
+      data: payload.data || payload,
+      metadata: payload.metadata || {},
+    };
+    
+    // Run automations for this event
+    await runAutomationsForEvent(automationEvent);
+    
+    res.json({ 
+      success: true, 
+      message: 'Automations triggered',
+      eventType 
+    });
+  } catch (error: any) {
+    console.error('[Automation Webhook] Error:', error?.message || error);
+    res.status(500).json({ 
+      success: false,
+      error: error?.message || 'Failed to trigger automations' 
+    });
   }
 });
 

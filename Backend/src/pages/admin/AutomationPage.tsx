@@ -1299,6 +1299,53 @@ const AutomationPage = () => {
             </Button>
           </div>
 
+          {/* Webhook URL Card */}
+          <Card className="border bg-card">
+            <div className="px-4 py-3 border-b flex items-center gap-3">
+              <Globe className="h-4 w-4 text-muted-foreground" />
+              <span className="font-medium text-sm">Automation Webhook</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Webhook URL
+                </label>
+                <div className="flex gap-2">
+                  <Input
+                    readOnly
+                    value="http://localhost:3001/api/automations/webhook"
+                    className="font-mono text-sm bg-muted/50"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      navigator.clipboard.writeText('http://localhost:3001/api/automations/webhook');
+                      toast.success('Webhook URL copied to clipboard');
+                    }}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Send POST requests to this URL from your existing webhook system. The automation will trigger based on the event type in the payload.
+              </p>
+              <div className="text-xs text-muted-foreground space-y-1 bg-muted/30 rounded-md p-3">
+                <p className="font-semibold">Example payload:</p>
+                <pre className="font-mono text-[11px] overflow-x-auto">
+{`{
+  "type": "order.created",
+  "data": {
+    "order_id": "abc123",
+    "customer_phone": "919876543210"
+  }
+}`}
+                </pre>
+              </div>
+            </div>
+          </Card>
+
           <Card className="border bg-card">
             <div className="px-4 py-3 border-b flex items-center gap-3">
               <Badge variant="secondary" className="uppercase">Library</Badge>
@@ -1483,7 +1530,6 @@ const AutomationPage = () => {
                     <div key={item.id} className="rounded-lg border px-2.5 py-2 text-xs bg-background/60">
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <Badge variant="secondary" className="text-[10px]">{item.stage || 'Event'}</Badge>
                           <span className="font-medium">{formatActivityLabel(item.event)}</span>
                         </div>
                         <div className="flex items-center gap-1.5">
