@@ -145,6 +145,10 @@ const ProductsPage = () => {
           open={isViewDialogOpen}
           onOpenChange={setIsViewDialogOpen}
           product={selectedProduct}
+          onDelete={async () => {
+            await refetch();
+            setSelectedProduct(null);
+          }}
         />
 
         <EditProductDialog
