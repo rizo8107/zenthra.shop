@@ -17,11 +17,15 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import { Trash2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { pb } from '@/lib/pocketbase';
 
 interface ViewProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
+  onDelete?: (productId: string) => void;
 }
 
 type ColorData = {
@@ -51,9 +55,36 @@ type Specifications = {
   [key: string]: unknown;
 };
 
-export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDialogProps) {
+export function ViewProductDialog({ open, onOpenChange, product, onDelete }: ViewProductDialogProps) {
   // Selected size for viewing variant images (keep hook unconditional)
   const [selectedSize, setSelectedSize] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!product || !confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsDeleting(true);
+    try {
+      await pb.collection('products').delete(product.id);
+      toast({
+        title: 'Product deleted',
+        description: 'The product has been successfully deleted.',
+      });
+      onDelete?.(product.id);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete product. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
   // If no product is selected, don't render the dialog content
   if (!product) {
     return (
@@ -79,9 +110,18 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
     if (imagePath.startsWith('http')) {
       return imagePath;
     }
+
+    // Get PocketBase URL from environment or use default
+    const pocketbaseUrl = import.meta.env.VITE_POCKETBASE_URL || pb.baseUrl || 'https://backend-pocketbase.p3ibd8.easypanel.host';
     
-    // Use the format from the backend
-    return `https://backend-pocketbase.7za6uc.easypanel.host/api/files/${product.collectionId}/${product.id}/${imagePath}`;
+    // Handle both format: "filename.jpg" and "recordId/filename.jpg"
+    if (imagePath.includes('/')) {
+      // Already has recordId/filename format
+      return `${pocketbaseUrl}/api/files/products/${imagePath}`;
+    }
+    
+    // Just filename - construct full path
+    return `${pocketbaseUrl}/api/files/${product.collectionId || 'products'}/${product.id}/${imagePath}`;
   };
 
   // Safe access to product fields with fallbacks
@@ -177,6 +217,18 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
                   <span className="text-sm text-muted-foreground">
                     Rating: {product.review}/5
                   </span>
+                )}
+                {onDelete && (
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                    className="ml-2"
+                  >
+                    <Trash2 className="h-4 w-4 mr-1" />
+                    {isDeleting ? 'Deleting...' : 'Delete'}
+                  </Button>
                 )}
               </div>
             </div>

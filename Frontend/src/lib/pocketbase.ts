@@ -310,11 +310,21 @@ export async function getProducts(filter?: ProductFilter, signal?: AbortSignal):
                 try {
                     if (typeof value === 'string') {
                         if (value === '' || value === 'null') return defaultValue;
-                        return JSON.parse(value) as T;
+                        // Try to parse as JSON first
+                        try {
+                            return JSON.parse(value) as T;
+                        } catch {
+                            // If parsing fails and we expect an array, convert comma-separated string to array
+                            if (Array.isArray(defaultValue) && value.trim()) {
+                                return value.split(',').map(v => v.trim()).filter(Boolean) as T;
+                            }
+                            // Otherwise return the string as-is or default
+                            return (value as T) || defaultValue;
+                        }
                     }
                     return defaultValue;
                 } catch (e) {
-                    console.warn(`Failed to parse JSON field:`, e);
+                    console.warn(`Failed to parse field:`, e);
                     return defaultValue;
                 }
             };
@@ -438,11 +448,21 @@ export async function getProduct(id: string) {
             try {
                 if (typeof value === 'string') {
                     if (value === '' || value === 'null') return defaultValue;
-                    return JSON.parse(value) as T;
+                    // Try to parse as JSON first
+                    try {
+                        return JSON.parse(value) as T;
+                    } catch {
+                        // If parsing fails and we expect an array, convert comma-separated string to array
+                        if (Array.isArray(defaultValue) && value.trim()) {
+                            return value.split(',').map(v => v.trim()).filter(Boolean) as T;
+                        }
+                        // Otherwise return the string as-is or default
+                        return (value as T) || defaultValue;
+                    }
                 }
                 return defaultValue;
             } catch (e) {
-                console.warn(`Failed to parse JSON field:`, e);
+                console.warn(`Failed to parse field:`, e);
                 return defaultValue;
             }
         };
