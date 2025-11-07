@@ -326,9 +326,20 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
 
   // Function to get the full image URL for an image filename
   const getFullImageUrl = (filename: string) => {
-    if (!product || !product.id) return '';
-    if (filename.startsWith('http')) return filename; // Already a full URL
+    if (!filename) return 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
+    if (!product || !product.id) return 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
     
+    // Check if the image path is already a full URL
+    if (filename.startsWith('http')) return filename;
+    
+    // Handle both format: "filename.jpg" and "recordId/filename.jpg"
+    if (filename.includes('/')) {
+      // Already has recordId/filename format
+      const pocketbaseUrl = pb.baseUrl || 'https://backend-pocketbase.p3ibd8.easypanel.host';
+      return `${pocketbaseUrl}/api/files/products/${filename}`;
+    }
+    
+    // Just filename - use the helper function
     return getImageUrl('products', product.id, filename);
   };
 
