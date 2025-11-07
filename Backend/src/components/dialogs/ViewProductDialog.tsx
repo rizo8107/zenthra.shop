@@ -112,7 +112,7 @@ export function ViewProductDialog({ open, onOpenChange, product, onDelete }: Vie
     }
 
     // Get PocketBase URL from environment or use default
-    const pocketbaseUrl = import.meta.env.VITE_POCKETBASE_URL || pb.baseUrl || 'https://backend-pocketbase.p3ibd8.easypanel.host';
+    const pocketbaseUrl = pb.baseUrl || import.meta.env.VITE_POCKETBASE_URL || 'https://backend-pocketbase.p3ibd8.easypanel.host';
     
     // Handle both format: "filename.jpg" and "recordId/filename.jpg"
     if (imagePath.includes('/')) {
@@ -120,7 +120,7 @@ export function ViewProductDialog({ open, onOpenChange, product, onDelete }: Vie
       return `${pocketbaseUrl}/api/files/products/${imagePath}`;
     }
     
-    // Just filename - construct full path
+    // Just filename - construct full path using collectionId and record id
     return `${pocketbaseUrl}/api/files/${product.collectionId || 'products'}/${product.id}/${imagePath}`;
   };
 
