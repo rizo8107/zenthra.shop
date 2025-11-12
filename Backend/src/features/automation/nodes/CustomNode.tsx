@@ -100,34 +100,7 @@ export function CustomNode({ data, selected }: NodeProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0 pb-3">
-        <div className="text-xs text-muted-foreground mb-2">
-          {nodeDefinition.description}
-        </div>
-        
-        {/* Show key config values */}
-        {nodeData.config && Object.keys(nodeData.config).length > 0 && (
-          <div className="space-y-1">
-            {Object.entries(nodeData.config)
-              .slice(0, 2) // Show only first 2 config items
-              .map(([key, value]) => (
-                <div key={key} className="text-xs">
-                  <span className="font-medium text-muted-foreground">{key}:</span>{' '}
-                  <span className="text-foreground">
-                    {typeof value === 'string' && value.length > 20
-                      ? `${value.substring(0, 20)}...`
-                      : String(value)}
-                  </span>
-                </div>
-              ))}
-            {Object.keys(nodeData.config).length > 2 && (
-              <div className="text-xs text-muted-foreground">
-                +{Object.keys(nodeData.config).length - 2} more...
-              </div>
-            )}
-          </div>
-        )}
-      </CardContent>
+      <CardContent className="hidden" />
 
       {/* Output Handles */}
       {nodeDefinition.outputs?.map((output, index) => (
