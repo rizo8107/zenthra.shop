@@ -24,7 +24,6 @@ const POCKETBASE_URL =
   (VITE_ENV as any).VITE_POCKETBASE_URL ||
   (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
   (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_POCKETBASE_URL) ||
-  import.meta.env?.VITE_POCKETBASE_URL ||
   'http://127.0.0.1:8090'; // Default to local development
 
 console.log('PocketBase URL:', POCKETBASE_URL);
