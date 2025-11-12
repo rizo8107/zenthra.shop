@@ -328,7 +328,7 @@ export function openRazorpayCheckout(
         return;
       }
 
-      // Ensure key is set
+      // Ensure key is set - prefer key from server response if available
       if (!options.key) {
         options.key = getRazorpayKeyId();
 

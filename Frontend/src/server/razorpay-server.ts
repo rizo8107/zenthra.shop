@@ -41,6 +41,7 @@ export interface CreateOrderOptions {
 export const createOrder = async (options: CreateOrderOptions) => {
   try {
     const razorpay = getRazorpayInstance();
+    const keyId = process.env.VITE_RAZORPAY_KEY_ID || '';
     
     // Ensure amount is in paise (multiply by 100 if in rupees)
     const amount = Math.round(options.amount);
@@ -66,7 +67,8 @@ export const createOrder = async (options: CreateOrderOptions) => {
       amount: order.amount,
       currency: order.currency,
       receipt: order.receipt,
-      status: order.status
+      status: order.status,
+      key_id: keyId   // send to client to guarantee same account
     };
   } catch (error) {
     console.error('Error creating Razorpay order:', error);

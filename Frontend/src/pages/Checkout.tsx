@@ -1705,14 +1705,16 @@ export default function CheckoutPage() {
       // Track payment start
       trackPaymentStart(order.id, order.total, "Razorpay");
 
-      // Check environment variables again before attempting payment
-      const razorpayKeyId = import.meta.env.VITE_RAZORPAY_KEY_ID;
-      console.log("VITE_RAZORPAY_KEY_ID present:", !!razorpayKeyId);
+      // Use key_id from server response to ensure client/server sync
+      const razorpayKeyId = razorpayOrderResponse.key_id || import.meta.env.VITE_RAZORPAY_KEY_ID;
+      console.log("Using Razorpay key_id:", razorpayKeyId ? razorpayKeyId.substring(0, 8) + "..." : "NOT FOUND");
       if (!razorpayKeyId) {
         console.error(
-          "ERROR: VITE_RAZORPAY_KEY_ID environment variable is not set",
+          "ERROR: No Razorpay key available from server response or environment",
         );
-        throw new Error("Payment configuration error: API key missing");
+        throw new Error(
+          "Payment configuration error. Please contact support.",
+        );
       }
 
       // Load the Razorpay script first

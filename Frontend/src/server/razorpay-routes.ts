@@ -22,16 +22,18 @@ router.post('/create-order', async (req: Request, res: Response): Promise<void> 
   try {
     const { amount, currency = 'INR', receipt, notes } = req.body;
     
-    if (!amount) {
-      res.status(400).json({ error: 'Amount is required' });
+    // validate
+    const rupees = Number(amount);
+    if (!Number.isFinite(rupees) || rupees <= 0) {
+      res.status(400).json({ error: 'Invalid amount value' });
       return;
     }
     
-    // Convert amount to paise if it's not already (Razorpay expects amount in paise)
-    const amountInPaise = amount < 100 ? Math.round(amount * 100) : Math.round(amount);
+    // ✅ convert to paise
+    const amountPaise = Math.round(rupees * 100);
     
     console.log('Creating Razorpay order with details:', {
-      amount: amountInPaise,
+      amount: amountPaise,
       currency,
       receipt: receipt || `receipt_${Date.now()}`,
       notes: {
@@ -48,7 +50,7 @@ router.post('/create-order', async (req: Request, res: Response): Promise<void> 
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        amount: amountInPaise,
+        amount: amountPaise,
         currency: currency || 'INR',
         receipt: receipt || `receipt_${Date.now()}`,
         notes: {
@@ -72,7 +74,14 @@ router.post('/create-order', async (req: Request, res: Response): Promise<void> 
     const order = await response.json();
     console.log('Successfully created Razorpay order:', order.id);
     
-    res.status(200).json(order);
+    // Return order data with key_id to ensure client/server sync
+    res.status(200).json({
+      id: order.id,
+      amount: order.amount,
+      currency: order.currency,
+      status: order.status,
+      key_id: RAZORPAY_KEY_ID,   // send to client to guarantee same account
+    });
     return;
   } catch (error) {
     console.error('Error in create-order endpoint:', error);
