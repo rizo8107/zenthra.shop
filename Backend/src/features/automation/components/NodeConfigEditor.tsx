@@ -461,7 +461,13 @@ export function NodeConfigEditor({
       }
         
       case 'iterate.each': {
-        const items = Array.isArray(input) ? input : [input];
+        const path = typeof config.path === 'string' && config.path.trim().length > 0 ? config.path.trim() : 'items';
+        const resolved = path ? resolveValueFromPath(input, path) : input;
+        const items = Array.isArray(resolved)
+          ? resolved
+          : resolved == null
+            ? []
+            : [resolved];
         return {
           total_items: items.length,
           processed_items: items.map((item, index) => ({ index, item }))
