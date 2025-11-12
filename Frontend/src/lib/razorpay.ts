@@ -89,31 +89,21 @@ export const createRazorpayOrder = async (
   try {
     console.log('Creating Razorpay order with amount:', amount);
     
-    // For local development, create a dummy order ID
-    if (window.location.hostname === 'localhost') {
-      console.log('Running in local development mode, creating mock order');
-      const mockOrderId = `order_${Date.now()}`;
-      return {
-        id: mockOrderId,
-        amount: Math.round(amount * 100),
-        currency,
-        receipt,
-        status: 'created'
-      };
-    }
+    // ALWAYS use the Supabase function (no localhost bypass)
+    console.log('Using Supabase function for order creation');
     
-    // In production, use a separate proxy server
-    const proxyUrl = import.meta.env.VITE_RAZORPAY_PROXY_URL || 'https://backend-n8n.7za6uc.easypanel.host/razorpay';
+    // Use your working Supabase function
+    const proxyUrl = import.meta.env.VITE_CRM_ORDER_ENDPOINT || 'https://crm-supabase.7za6uc.easypanel.host/functions/v1/create-order';
     
     try {
-      const response = await fetch(`${proxyUrl}/create-order`, {
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-API-Key': import.meta.env.VITE_RAZORPAY_PROXY_KEY || ''
         },
         body: JSON.stringify({
-          amount: Math.round(amount * 100), // Convert to paise and ensure it's an integer
+          amount: amount, // Send in rupees, backend will convert to paise
           currency,
           receipt,
           payment_capture: 1,  // 1 for auto-capture, 0 for manual
