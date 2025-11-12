@@ -4,7 +4,7 @@ export type { RecordModel };
 console.log('Initializing PocketBase client with URL:', import.meta.env.VITE_POCKETBASE_URL);
 
 // Initialize PocketBase instance without auto-authenticating an admin
-export const pocketbase = new PocketBase(import.meta.env.VITE_POCKETBASE_URL || 'http://localhost:8090');
+export const pocketbase = new PocketBase(import.meta.env.VITE_POCKETBASE_URL || 'https://backend.karigaistore.in');
 
 export async function ensureAdminAuth() {
     if (!pocketbase.authStore.isValid) {
