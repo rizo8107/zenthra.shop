@@ -9,8 +9,7 @@ const VITE_ENV = (() => {
     }
 })();
 const POCKETBASE_URL = VITE_ENV.VITE_POCKETBASE_URL ||
-    (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
-    'https://backend-pocketbase.p3ibd8.easypanel.host';
+    (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||;
 export const pb = new PocketBase(POCKETBASE_URL);
 // Disable auto-cancellation of requests which is causing issues
 pb.autoCancellation(false);

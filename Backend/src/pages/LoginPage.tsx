@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { LockKeyhole, Mail, LogIn } from 'lucide-react';
 import { authenticateAdmin } from '@/lib/pocketbase';
 import { useTheme } from '@/components/theme/theme-provider';
+import { debugEnvironment } from '@/utils/env-debug';
 
 
 
@@ -21,6 +22,9 @@ const LoginPage: React.FC = () => {
   const { theme } = useTheme();
 
   useEffect(() => {
+    // Debug environment variables on component mount
+    debugEnvironment();
+    
     const existingScript = document.getElementById('dotlottie-wc-script');
     if (existingScript) return;
     const script = document.createElement('script');

@@ -18,10 +18,16 @@ const VITE_ENV = (() => {
     return {};
   }
 })();
-const POCKETBASE_URL =
+
+// Try multiple environment variable sources
+const POCKETBASE_URL = 
   (VITE_ENV as any).VITE_POCKETBASE_URL ||
   (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
-  'https://backend-pocketbase.p3ibd8.easypanel.host';
+  (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_POCKETBASE_URL) ||
+  import.meta.env?.VITE_POCKETBASE_URL ||
+  'http://127.0.0.1:8090'; // Default to local development
+
+console.log('PocketBase URL:', POCKETBASE_URL);
 
 export const pb = new PocketBase(POCKETBASE_URL);
 
@@ -552,10 +558,29 @@ export const getAbandonedCartAnalytics = async (): Promise<AbandonedCartAnalytic
 // User login using default PocketBase users collection
 export const authenticateAdmin = async (email: string, password: string) => {
   try {
+    console.log('Attempting authentication with PocketBase at:', POCKETBASE_URL);
+    
+    // Clear any existing auth before attempting new login
+    pb.authStore.clear();
+    
     const authData = await pb.collection('users').authWithPassword(email, password);
+    
+    console.log('Authentication successful:', authData.record?.email);
     return authData;
   } catch (error) {
     console.error('Authentication error:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+        throw new Error('Cannot connect to PocketBase server. Please check if PocketBase is running and the URL is correct.');
+      } else if (error.message.includes('400')) {
+        throw new Error('Invalid email or password.');
+      } else if (error.message.includes('CORS')) {
+        throw new Error('CORS error: Please check PocketBase CORS settings.');
+      }
+    }
+    
     throw error;
   }
 };
