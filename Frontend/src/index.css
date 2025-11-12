@@ -4,65 +4,65 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 20 10% 5%;
+    --background: 227 100% 97%;
+    --foreground: 229 35% 18%;
 
     --card: 0 0% 100%;
-    --card-foreground: 20 10% 5%;
+    --card-foreground: 229 35% 18%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 20 10% 5%;
+    --popover-foreground: 229 35% 18%;
 
-    --primary: 142 72% 28% !important;
+    --primary: 223 90% 60% !important;
     --primary-foreground: 0 0% 100% !important;
 
-    --secondary: 48 50% 96%;
-    --secondary-foreground: 20 10% 5%;
+    --secondary: 224 68% 94%;
+    --secondary-foreground: 229 35% 18%;
 
-    --muted: 240 5% 96%;
-    --muted-foreground: 20 10% 40%;
+    --muted: 226 44% 92%;
+    --muted-foreground: 228 24% 44%;
 
-    --accent: 142 71% 80% !important;
-    --accent-foreground: 20 10% 5%;
+    --accent: 224 100% 92% !important;
+    --accent-foreground: 229 35% 18%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 20 5.9% 90%;
-    --input: 20 5.9% 90%;
-    --ring: 20 14.3% 4.1%;
+    --border: 226 45% 88%;
+    --input: 226 45% 88%;
+    --ring: 223 90% 60%;
 
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 20 14.3% 4.1%;
-    --foreground: 0 0% 95%;
+    --background: 226 45% 10%;
+    --foreground: 220 30% 96%;
 
-    --card: 20 14.3% 4.1%;
-    --card-foreground: 0 0% 95%;
+    --card: 226 45% 12%;
+    --card-foreground: 220 30% 96%;
 
-    --popover: 20 14.3% 4.1%;
-    --popover-foreground: 0 0% 95%;
+    --popover: 226 45% 12%;
+    --popover-foreground: 220 30% 96%;
 
-    --primary: 142 50% 24% !important;
+    --primary: 210 88% 58% !important;
     --primary-foreground: 210 40% 98% !important;
 
-    --secondary: 12 6.5% 15.1%;
-    --secondary-foreground: 0 0% 95%;
+    --secondary: 225 38% 18%;
+    --secondary-foreground: 220 30% 96%;
 
-    --muted: 12 6.5% 15.1%;
-    --muted-foreground: 24 5.4% 63.9%;
+    --muted: 225 30% 20%;
+    --muted-foreground: 216 20% 72%;
 
-    --accent: 142 40% 30% !important;
+    --accent: 214 90% 45% !important;
     --accent-foreground: 210 40% 98% !important;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
+    --destructive: 350 82% 55%;
+    --destructive-foreground: 210 40% 98%;
 
-    --border: 12 6.5% 15.1%;
-    --input: 12 6.5% 15.1%;
-    --ring: 24 5.7% 82.9%;
+    --border: 225 38% 18%;
+    --input: 225 38% 18%;
+    --ring: 210 88% 58%;
   }
 
   * {
@@ -129,9 +129,9 @@
   }
 }
 
-/* Force green theme colors for buttons */
+/* Force brand primary blue across utilities */
 .bg-primary {
-  background-color: hsl(142 72% 28%) !important;
+  background-color: hsl(223 90% 60%) !important;
 }
 
 .text-primary-foreground {
@@ -139,7 +139,7 @@
 }
 
 .hover\:bg-primary\/90:hover {
-  background-color: hsl(142 72% 28% / 0.9) !important;
+  background-color: hsl(223 90% 60% / 0.9) !important;
 }
 
 /* Hide scrollbar but maintain functionality for breadcrumbs */

@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Badge } from '@/components/ui/badge';
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -28,6 +29,7 @@ interface SidebarItemProps {
   active: boolean;
   collapsed: boolean;
   onNavigate?: () => void;
+  badge?: string;
 }
 
 const SidebarItem: React.FC<SidebarItemProps> = ({ 
@@ -36,7 +38,8 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
   path, 
   active, 
   collapsed,
-  onNavigate
+  onNavigate,
+  badge
 }) => {
   return (
     <Link 
@@ -51,7 +54,16 @@ const SidebarItem: React.FC<SidebarItemProps> = ({
       onClick={onNavigate}
     >
       <Icon size={20} className={cn(collapsed ? "mx-0" : "mr-3")} />
-      {!collapsed && <span>{title}</span>}
+      {!collapsed && (
+        <span className="flex items-center gap-2">
+          <span>{title}</span>
+          {badge && (
+            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+              {badge}
+            </Badge>
+          )}
+        </span>
+      )}
     </Link>
   );
 };
@@ -71,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { title: 'Customers', path: '/admin/customers', icon: Users },
     { title: 'Abandoned carts', path: '/admin/abandoned-carts', icon: AlertTriangle },
     { title: 'Products', path: '/admin/products', icon: Package },
-    { title: 'Automation', path: '/admin/automation', icon: Workflow },
+    { title: 'Automation', path: '/admin/automation', icon: Workflow, badge: 'Beta' },
     { title: 'Pages', path: '/admin/pages', icon: FileText },
     { title: 'Themes', path: '/admin/themes', icon: Palette },
     { title: 'Plugins', path: '/admin/plugins', icon: Puzzle },
@@ -124,6 +136,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
             active={location.pathname === item.path}
             collapsed={collapsed}
             onNavigate={onNavigate}
+            badge={item.badge}
           />
         ))}
       </nav>
