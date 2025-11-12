@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { getFlow, listRunSteps, listRuns, updateFlow, triggerTestRun } from '@/features/automation/api';
-import type { FlowRun, FlowRunStep, FlowSummary, FlowNode, FlowEdge } from '@/features/automation/types';
+import type { FlowRun, FlowRunStep, FlowSummary, FlowNode, FlowEdge, RunStatus } from '@/features/automation/types';
 import { NodePalette } from '@/features/automation/components/NodePalette';
 import { NodeConfigEditor } from '@/features/automation/components/NodeConfigEditor';
 import { nodeTypes } from '@/features/automation/nodes/nodeTypes';
@@ -48,6 +48,7 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
   const [runs, setRuns] = useState<FlowRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
   const [runSteps, setRunSteps] = useState<FlowRunStep[]>([]);
+  const [runStepsLoading, setRunStepsLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [flowName, setFlowName] = useState('');
@@ -102,15 +103,40 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
   useEffect(() => {
     if (!selectedRunId) return;
     setRunSteps([]);
+    setRunStepsLoading(true);
     void (async () => {
       try {
         const steps = await listRunSteps(selectedRunId);
         setRunSteps(steps);
       } catch (error) {
         console.error('Failed to load run steps', error);
+      } finally {
+        setRunStepsLoading(false);
       }
     })();
   }, [selectedRunId]);
+
+  const runStatusVariant: Record<RunStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
+    queued: 'outline',
+    running: 'default',
+    success: 'secondary',
+    failed: 'destructive',
+    canceled: 'outline',
+  };
+
+  const formatPayload = (payload?: Record<string, unknown>): string => {
+    if (!payload) return 'No data captured';
+    try {
+      const isEmptyObject =
+        typeof payload === 'object' && payload !== null && Object.keys(payload as Record<string, unknown>).length === 0;
+      if (isEmptyObject) {
+        return 'No data captured';
+      }
+      return JSON.stringify(payload, null, 2);
+    } catch {
+      return String(payload);
+    }
+  };
 
   const onNodesChange = useCallback((changes: NodeChange[]) => {
     setNodes((current) => applyNodeChanges(changes, current));
@@ -552,61 +578,160 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
                   <p className="text-sm text-muted-foreground">No executions yet. Trigger a test run once your flow is ready.</p>
                 ) : (
                   <Tabs value={selectedRunId ?? runs[0]?.id} onValueChange={setSelectedRunId}>
-                    <TabsList className="w-full">
-                      {runs.slice(0, 3).map((run) => (
-                        <TabsTrigger key={run.id} value={run.id} className="flex-1">
-                          <div className="flex flex-col text-left">
-                            <span className="text-sm font-medium capitalize">{run.status}</span>
-                            <span className="text-[11px] text-muted-foreground">{new Date(run.startedAt).toLocaleString()}</span>
-                          </div>
-                        </TabsTrigger>
-                      ))}
-                    </TabsList>
-                    {runs.slice(0, 3).map((run) => (
-                      <TabsContent key={run.id} value={run.id} className="mt-4">
-                        <div className="space-y-3 text-xs">
-                          <div className="grid grid-cols-2 gap-3">
-                            <div>
-                              <p className="text-muted-foreground">Trigger</p>
-                              <p className="font-medium capitalize">{run.triggerType}</p>
-                            </div>
-                            <div>
-                              <p className="text-muted-foreground">Duration</p>
-                              <p className="font-medium">
-                                {run.finishedAt
-                                  ? `${Math.max(0, (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
-                                  : 'In progress'}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="rounded-md border bg-muted/50 p-3">
-                            <p className="text-muted-foreground uppercase text-[11px] mb-2">Steps</p>
-                            <div className="space-y-2">
-                              {runSteps.length === 0 ? (
-                                <p className="text-muted-foreground">Select a run to inspect step output.</p>
-                              ) : (
-                                runSteps.map((step) => (
-                                  <div key={step.id} className="rounded-md border bg-background px-3 py-2">
-                                    <div className="flex items-center justify-between text-xs">
-                                      <span className="font-medium">{step.nodeType}</span>
-                                      <span className="capitalize text-muted-foreground">{step.status}</span>
-                                    </div>
-                                    {step.error ? (
-                                      <p className="text-[11px] text-destructive mt-2">{step.error}</p>
-                                    ) : (
-                                      <details className="mt-2 text-[11px] space-y-1">
-                                        <summary className="cursor-pointer text-muted-foreground">View payloads</summary>
-                                        <pre className="bg-muted/60 p-2 rounded">{JSON.stringify(step.output ?? step.input, null, 2)}</pre>
-                                      </details>
-                                    )}
-                                  </div>
-                                ))
+                    <TabsList className="grid w-full grid-cols-3 gap-2 rounded-lg bg-muted/40 p-1">
+                      {runs.slice(0, 3).map((run) => {
+                        const isActive = (selectedRunId ?? runs[0]?.id) === run.id;
+                        return (
+                          <TabsTrigger
+                            key={run.id}
+                            value={run.id}
+                            className="flex flex-col items-start gap-1 rounded-md px-3 py-2 text-left"
+                          >
+                            <div className="flex items-center gap-2">
+                              <Badge variant={runStatusVariant[run.status]} className="text-[10px] uppercase tracking-wide">
+                                {run.status}
+                              </Badge>
+                              {run.testMode && (
+                                <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Test</Badge>
                               )}
                             </div>
+                            <span className="text-[11px] text-muted-foreground">
+                              {new Date(run.startedAt).toLocaleString()}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {run.finishedAt
+                                ? `${Math.max(0, (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
+                                : isActive ? 'Viewing…' : 'Running'}
+                            </span>
+                          </TabsTrigger>
+                        );
+                      })}
+                    </TabsList>
+                    {runs.slice(0, 3).map((run) => {
+                      const isActiveRun = run.id === (selectedRunId ?? runs[0]?.id);
+                      const stepStatusVariant = (status: FlowRunStep['status']) =>
+                        status === 'success'
+                          ? 'secondary'
+                          : status === 'failed'
+                            ? 'destructive'
+                            : status === 'running'
+                              ? 'default'
+                              : 'outline';
+
+                      return (
+                        <TabsContent key={run.id} value={run.id} className="mt-4">
+                          <div className="space-y-4 text-sm">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                              <div className="rounded-lg border bg-muted/30 p-3">
+                                <p className="text-xs text-muted-foreground uppercase">Trigger</p>
+                                <p className="mt-1 font-medium capitalize">{run.triggerType}</p>
+                              </div>
+                              <div className="rounded-lg border bg-muted/30 p-3">
+                                <p className="text-xs text-muted-foreground uppercase">Duration</p>
+                                <p className="mt-1 font-medium">
+                                  {run.finishedAt
+                                    ? `${Math.max(0, (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
+                                    : 'In progress'}
+                                </p>
+                              </div>
+                              <div className="rounded-lg border bg-muted/30 p-3">
+                                <p className="text-xs text-muted-foreground uppercase">Started</p>
+                                <p className="mt-1 font-medium">{new Date(run.startedAt).toLocaleString()}</p>
+                              </div>
+                              <div className="rounded-lg border bg-muted/30 p-3">
+                                <p className="text-xs text-muted-foreground uppercase">Completed</p>
+                                <p className="mt-1 font-medium">
+                                  {run.finishedAt ? new Date(run.finishedAt).toLocaleString() : '—'}
+                                </p>
+                              </div>
+                            </div>
+
+                            {run.error && (
+                              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                                <p className="text-destructive font-semibold">Run error</p>
+                                <p className="text-destructive/80 mt-1 text-xs">{run.error}</p>
+                              </div>
+                            )}
+
+                            <div className="rounded-xl border bg-muted/40 p-4">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Step events</p>
+                                {isActiveRun && runStepsLoading && (
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                    Loading…
+                                  </div>
+                                )}
+                              </div>
+                              <div className="mt-3 space-y-3">
+                                {!isActiveRun ? (
+                                  <p className="text-xs text-muted-foreground">Select this run to view detailed node output.</p>
+                                ) : runStepsLoading ? (
+                                  <p className="text-xs text-muted-foreground">Fetching step logs…</p>
+                                ) : runSteps.length === 0 ? (
+                                  <p className="text-xs text-muted-foreground">No step events recorded for this execution.</p>
+                                ) : (
+                                  runSteps.map((step) => {
+                                    const nodeDefinition = getNodeDefinition(step.nodeType);
+                                    const nodeLabel = nodeDefinition?.label ?? step.nodeType;
+                                    const started = new Date(step.startedAt);
+                                    const finished = step.finishedAt ? new Date(step.finishedAt) : null;
+                                    const duration = finished
+                                      ? `${Math.max(0, (finished.getTime() - started.getTime()) / 1000).toFixed(1)}s`
+                                      : '—';
+
+                                    return (
+                                      <div key={step.id} className="rounded-lg border bg-background p-3 shadow-sm">
+                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                          <div>
+                                            <p className="text-sm font-semibold">{nodeLabel}</p>
+                                            <p className="text-[11px] text-muted-foreground">{step.nodeType}</p>
+                                            <p className="text-[11px] text-muted-foreground">Node ID: {step.nodeId}</p>
+                                          </div>
+                                          <div className="flex flex-col items-start gap-2 text-[11px] text-muted-foreground sm:items-end">
+                                            <Badge variant={stepStatusVariant(step.status)} className="text-[10px] uppercase tracking-wide">
+                                              {step.status}
+                                            </Badge>
+                                            <p>Duration: {duration}</p>
+                                            <p>Started: {started.toLocaleTimeString()}</p>
+                                            <p>Finished: {finished ? finished.toLocaleTimeString() : '—'}</p>
+                                          </div>
+                                        </div>
+
+                                        {step.error && (
+                                          <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
+                                            {step.error}
+                                          </p>
+                                        )}
+
+                                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                          <details className="group rounded-md border bg-muted/30 p-2">
+                                            <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground group-open:text-foreground">
+                                              Input payload
+                                            </summary>
+                                            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px]">
+                                              {formatPayload(step.input)}
+                                            </pre>
+                                          </details>
+                                          <details className="group rounded-md border bg-muted/30 p-2">
+                                            <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground group-open:text-foreground">
+                                              Output payload
+                                            </summary>
+                                            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px]">
+                                              {formatPayload(step.output)}
+                                            </pre>
+                                          </details>
+                                        </div>
+                                      </div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </TabsContent>
-                    ))}
+                        </TabsContent>
+                      );
+                    })}
                   </Tabs>
                 )}
               </CardContent>
