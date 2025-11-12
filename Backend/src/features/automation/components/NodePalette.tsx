@@ -104,19 +104,7 @@ export function NodePalette({ onNodeDragStart }: NodePaletteProps) {
                           {node.category}
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {node.description}
-                      </p>
-                      
-                      {/* Show input/output info */}
-                      <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                        {node.inputs && node.inputs.length > 0 && (
-                          <span>📥 {node.inputs.length} input{node.inputs.length > 1 ? 's' : ''}</span>
-                        )}
-                        {node.outputs && node.outputs.length > 0 && (
-                          <span>📤 {node.outputs.length} output{node.outputs.length > 1 ? 's' : ''}</span>
-                        )}
-                      </div>
+                      {/* Description and IO details intentionally hidden for a cleaner UI */}
                     </div>
                   </div>
                 </div>

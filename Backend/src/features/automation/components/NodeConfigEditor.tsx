@@ -7,10 +7,12 @@ import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Trash2, Play, AlertCircle, CheckCircle2, Settings } from 'lucide-react';
+import { Trash2, Play, AlertCircle, CheckCircle2, Settings, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getNodeDefinition, type NodeDefinition, type NodeConfigField } from '../nodes/nodeDefinitions';
 import { pb, ensureAdminAuth } from '@/lib/pocketbase';
+
+const pluginConfigCache: Record<string, Record<string, unknown>> = {};
 
 interface NodeConfigEditorProps {
   nodeId: string;
@@ -64,12 +66,83 @@ export function NodeConfigEditor({
   const [testing, setTesting] = useState(false);
   const { toast } = useToast();
   const nodeDefinition = getNodeDefinition(nodeType);
+  const CRON_SCHEDULES: Record<string, string> = {
+    '5m': '*/5 * * * *',
+    '15m': '*/15 * * * *',
+    '1h': '0 * * * *',
+    '6h': '0 */6 * * *',
+    '1d': '0 9 * * *',
+  };
+  const [webhookOptions, setWebhookOptions] = useState<Array<{ value: string; label: string; detail?: string }>>([]);
+  const [webhookLoading, setWebhookLoading] = useState(false);
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+
+  const fetchPluginConfig = async (key: 'whatsapp_api' | 'evolution_api') => {
+    if (pluginConfigCache[key]) return pluginConfigCache[key];
+    try {
+      await ensureAdminAuth();
+    } catch (error) {
+      console.warn('PocketBase admin auth not confirmed for plugin config fetch:', error);
+    }
+    try {
+      const record = await pb.collection('plugins').getFirstListItem<Record<string, unknown>>(`key = "${key}"`);
+      const rawConfig = record?.['config'];
+      const parsed = typeof rawConfig === 'string' ? JSON.parse(rawConfig) : (rawConfig ?? {});
+      const configWithEnabled = {
+        enabled: Boolean(record?.['enabled']),
+        ...parsed,
+      } as Record<string, unknown>;
+      pluginConfigCache[key] = configWithEnabled;
+      return configWithEnabled;
+    } catch (error) {
+      console.error(`Failed to load plugin config for ${key}:`, error);
+      throw new Error(`Unable to load ${key} configuration from plugins collection`);
+    }
+  };
 
   useEffect(() => {
     setLocalConfig(config);
     if (Array.isArray(config.conditions)) setQbConditions(config.conditions as Array<{ field: string; operator: string; value?: string; value2?: string }>);
     if (config.logic === 'OR') setQbLogic('OR');
   }, [config]);
+
+  useEffect(() => {
+    if (nodeType !== 'trigger.webhook') return;
+    let cancelled = false;
+    const loadWebhooks = async () => {
+      setWebhookLoading(true);
+      setWebhookError(null);
+      try {
+        const res = await fetch('/api/webhooks/subscriptions');
+        if (!res.ok) {
+          throw new Error(`Failed to load webhook subscriptions (${res.status})`);
+        }
+        const data = (await res.json()) as { items?: Array<{ id: string; url: string; description?: string }> };
+        if (cancelled) return;
+        const items = (data?.items ?? []).map((item) => ({
+          value: item.id,
+          label: item.description ? `${item.description} (${item.url})` : item.url,
+          detail: item.description,
+        }));
+        setWebhookOptions(items);
+        if (!localConfig.subscriptionId && items[0]) {
+          const next = { ...localConfig, subscriptionId: items[0].value };
+          setLocalConfig(next);
+          onConfigChange(nodeId, next);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setWebhookOptions([]);
+        setWebhookError(error instanceof Error ? error.message : 'Unable to load webhooks');
+      } finally {
+        if (!cancelled) setWebhookLoading(false);
+      }
+    };
+    void loadWebhooks();
+    return () => {
+      cancelled = true;
+    };
+  }, [nodeType, localConfig, nodeId, onConfigChange]);
 
   if (!nodeDefinition) {
     return (
@@ -82,7 +155,23 @@ export function NodeConfigEditor({
   }
 
   const handleConfigChange = (key: string, value: unknown) => {
-    const newConfig = { ...localConfig, [key]: value };
+    let newConfig = { ...localConfig, [key]: value };
+
+    if (nodeType === 'trigger.cron') {
+      if (key === 'schedule') {
+        const cronValue = CRON_SCHEDULES[String(value)] || '';
+        if (cronValue) {
+          newConfig = { ...newConfig, cron: cronValue };
+        }
+      }
+      if (key === 'cron') {
+        const matched = Object.entries(CRON_SCHEDULES).find(([, cron]) => cron === value);
+        if (matched && newConfig.schedule !== matched[0]) {
+          newConfig = { ...newConfig, schedule: matched[0] };
+        }
+      }
+    }
+
     setLocalConfig(newConfig);
     onConfigChange(nodeId, newConfig);
   };
@@ -132,6 +221,179 @@ export function NodeConfigEditor({
     } finally {
       setTesting(false);
     }
+  };
+
+  const resolveValueFromPath = (source: unknown, path: string | undefined): unknown => {
+    if (!path) return undefined;
+    if (!path.includes('.')) {
+      if (source && typeof source === 'object' && path in (source as Record<string, unknown>)) {
+        return (source as Record<string, unknown>)[path];
+      }
+      return path;
+    }
+    try {
+      return path.split('.').reduce<unknown>((acc, key) => {
+        if (acc && typeof acc === 'object') {
+          return (acc as Record<string, unknown>)[key];
+        }
+        return undefined;
+      }, source ?? {});
+    } catch {
+      return undefined;
+    }
+  };
+
+  const sendWhatsappViaPlugin = async (
+    connectionId: unknown,
+    payload: {
+      to?: string;
+      message?: string;
+      template?: string;
+      variables?: Record<string, unknown>;
+      sender?: string;
+    }
+  ) => {
+    const connectionKey = String(connectionId || 'whatsapp_api') as 'whatsapp_api' | 'evolution_api';
+
+    if (connectionKey === 'evolution_api') {
+      const cfg = await fetchPluginConfig('evolution_api');
+      const baseUrl = String(cfg.baseUrl ?? cfg['baseUrl'] ?? '').trim();
+      if (!baseUrl) throw new Error('Evolution API base URL missing in plugin configuration');
+      const urlBase = baseUrl.replace(/\/$/, '');
+      const authType = String(cfg.authType ?? cfg['authType'] ?? 'header');
+      const tokenOrKey = String(cfg.tokenOrKey ?? cfg['tokenOrKey'] ?? '');
+      const authHeader = String(cfg.authHeader ?? cfg['authHeader'] ?? 'apikey');
+      const senderOverride = typeof payload.sender === 'string' ? payload.sender.trim() : '';
+      const defaultSender = String(cfg.defaultSender ?? cfg['defaultSender'] ?? '').trim();
+      const resolvedSender = senderOverride || defaultSender;
+      if (!resolvedSender) throw new Error('Evolution API default sender is not configured');
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authType === 'header') {
+        if (!tokenOrKey) throw new Error('Evolution API access token is missing');
+        headers[authHeader || 'apikey'] = tokenOrKey;
+      } else if (authType === 'bearer') {
+        if (!tokenOrKey) throw new Error('Evolution API bearer token is missing');
+        headers.Authorization = `Bearer ${tokenOrKey}`;
+      } else if (tokenOrKey) {
+        headers.apikey = tokenOrKey;
+      }
+
+      const url = `${urlBase}/message/sendText/${encodeURIComponent(resolvedSender)}`;
+      const messageText = String(payload.message ?? payload.template ?? '').trim();
+      const body = {
+        number: payload.to,
+        text: messageText,
+        options: { delay: 250, presence: 'composing' },
+        textMessage: { text: messageText },
+      };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json().catch(async () => {
+        const txt = await response.text().catch(() => '');
+        return txt ? { raw: txt } : {};
+      });
+
+      if (!response.ok) {
+        const errorMessage = (data as { error?: string; message?: string })?.error || (data as { message?: string })?.message || 'Evolution API request failed';
+        throw new Error(errorMessage);
+      }
+
+      return data;
+    }
+
+    const cfg = await fetchPluginConfig('whatsapp_api');
+    const provider = String(cfg.provider ?? cfg['provider'] ?? 'meta');
+    const templateName = String(payload.template || cfg.defaultTemplate?.['name'] || '').trim();
+    const templateLang = String(cfg.defaultTemplate?.['lang'] ?? 'en_US');
+    const messageText = String(payload.message ?? '').trim();
+
+    if (provider === 'meta') {
+      const phoneNumberId = String(cfg.phoneNumberId ?? cfg['phoneNumberId'] ?? '').trim();
+      const accessToken = String(cfg.accessToken ?? cfg['accessToken'] ?? '').trim();
+      if (!phoneNumberId || !accessToken) {
+        throw new Error('Meta WhatsApp credentials are missing in plugin configuration');
+      }
+      const url = `https://graph.facebook.com/v17.0/${phoneNumberId}/messages`;
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      };
+      const body = templateName
+        ? {
+            messaging_product: 'whatsapp',
+            to: payload.to,
+            type: 'template' as const,
+            template: {
+              name: templateName,
+              language: { code: templateLang },
+              components: payload.variables
+                ? [
+                    {
+                      type: 'body',
+                      parameters: Object.values(payload.variables).map((value) => ({
+                        type: 'text' as const,
+                        text: String(value ?? ''),
+                      })),
+                    },
+                  ]
+                : undefined,
+            },
+          }
+        : {
+            messaging_product: 'whatsapp',
+            to: payload.to,
+            type: 'text' as const,
+            text: { body: messageText || 'Test message' },
+          };
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body),
+      });
+      const data = await response.json().catch(async () => {
+        const txt = await response.text().catch(() => '');
+        return txt ? { raw: txt } : {};
+      });
+      if (!response.ok) {
+        const errorMessage = (data as { error?: string; message?: string })?.error || 'WhatsApp Meta request failed';
+        throw new Error(errorMessage);
+      }
+      return data;
+    }
+
+    const baseUrl = String(cfg.baseUrl ?? cfg['baseUrl'] ?? '').trim();
+    if (!baseUrl) throw new Error('Custom WhatsApp base URL missing in plugin configuration');
+    const urlBase = baseUrl.replace(/\/$/, '');
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const accessToken = String(cfg.accessToken ?? cfg['accessToken'] ?? '').trim();
+    if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+
+    const response = await fetch(`${urlBase}/messages`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        to: payload.to,
+        message: messageText || payload.template,
+        template: payload.template,
+        variables: payload.variables,
+      }),
+    });
+    const data = await response.json().catch(async () => {
+      const txt = await response.text().catch(() => '');
+      return txt ? { raw: txt } : {};
+    });
+    if (!response.ok) {
+      const errorMessage = (data as { error?: string; message?: string })?.error || 'Custom WhatsApp request failed';
+      throw new Error(errorMessage);
+    }
+    return data;
   };
 
   // Simulate individual node execution
@@ -206,14 +468,27 @@ export function NodeConfigEditor({
         };
       }
         
-      case 'whatsapp.send':
-        if (!config.template) throw new Error('Message template is required');
+      case 'whatsapp.send': {
+        const to = String(resolveValueFromPath(input, typeof config.toPath === 'string' ? config.toPath : undefined) ?? '').trim();
+        if (!to) {
+          throw new Error('Phone number path did not resolve to a recipient');
+        }
+        const message = typeof config.template === 'string' ? config.template : undefined;
+        if (!message || message.trim().length === 0) {
+          throw new Error('Message template is required');
+        }
+        const result = await sendWhatsappViaPlugin(config.connectionId, {
+          to,
+          message,
+          template: message,
+          sender: typeof config.sender === 'string' ? config.sender : undefined,
+        });
         return {
-          message_id: `msg_${Date.now()}`,
-          status: 'sent',
-          recipient: config.toPath || 'test-number',
-          sent_at: new Date().toISOString()
+          delivered: true,
+          recipient: to,
+          response: result,
         };
+      }
         
       case 'email.send':
         if (!config.template) throw new Error('Email template is required');
@@ -233,7 +508,10 @@ export function NodeConfigEditor({
         };
         
       case 'util.delay': {
-        const delayMs = Number(config.ms) || 1000;
+        const amount = Math.max(0, Number(config.amount) || 0);
+        const unit = String(config.unit || 'seconds');
+        const multiplier = unit === 'hours' ? 60 * 60 * 1000 : unit === 'minutes' ? 60 * 1000 : 1000;
+        const delayMs = amount * multiplier;
         return {
           delayed_for: delayMs,
           completed_at: new Date().toISOString(),
@@ -300,16 +578,22 @@ export function NodeConfigEditor({
           <Select
             value={String(value)}
             onValueChange={(newValue) => handleConfigChange(field.key, newValue)}
+            disabled={field.key === 'subscriptionId' && webhookLoading}
           >
             <SelectTrigger>
               <SelectValue placeholder={field.placeholder} />
             </SelectTrigger>
             <SelectContent>
-              {field.options?.map((option) => (
+              {(field.key === 'subscriptionId' ? webhookOptions : field.options ?? []).map((option) => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
                 </SelectItem>
               ))}
+              {field.key === 'subscriptionId' && (webhookError || (!webhookLoading && webhookOptions.length === 0)) && (
+                <SelectItem value="__no-webhooks" disabled>
+                  {webhookError ? `Error: ${webhookError}` : 'No saved webhooks found'}
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         );
@@ -353,9 +637,8 @@ export function NodeConfigEditor({
               <SelectValue placeholder="Select connection..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="evolution-api-1">Evolution API #1</SelectItem>
-              <SelectItem value="smtp-gmail">Gmail SMTP</SelectItem>
-              <SelectItem value="razorpay-prod">Razorpay Production</SelectItem>
+              <SelectItem value="whatsapp_api">WhatsApp API (Plugins Manager)</SelectItem>
+              <SelectItem value="evolution_api">Evolution API (Plugins Manager)</SelectItem>
             </SelectContent>
           </Select>
         );
@@ -835,6 +1118,11 @@ export function NodeConfigEditor({
                 {field.type !== 'boolean' && (
                   <div>
                     {renderConfigField(field)}
+                  </div>
+                )}
+                {field.key === 'subscriptionId' && webhookLoading && (
+                  <div className="flex items-center text-xs text-muted-foreground gap-2">
+                    <Loader2 className="h-3 w-3 animate-spin" /> Loading saved webhooks...
                   </div>
                 )}
                 

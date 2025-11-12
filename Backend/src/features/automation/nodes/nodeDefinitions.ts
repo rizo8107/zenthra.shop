@@ -63,7 +63,7 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'trigger.cron',
     category: 'trigger',
     label: 'Cron Trigger',
-    description: 'Trigger flow on a schedule using cron expression',
+    description: 'Trigger flow on a simple recurring schedule',
     icon: '⏰',
     color: '#10B981',
     outputs: [
@@ -71,13 +71,25 @@ export const nodeDefinitions: NodeDefinition[] = [
     ],
     config: [
       {
-        key: 'cron',
-        label: 'Cron Expression',
-        type: 'text',
+        key: 'schedule',
+        label: 'How often?',
+        type: 'select',
         required: true,
+        defaultValue: '15m',
+        options: [
+          { value: '5m', label: 'Every 5 minutes' },
+          { value: '15m', label: 'Every 15 minutes' },
+          { value: '1h', label: 'Every hour' },
+          { value: '6h', label: 'Every 6 hours' },
+          { value: '1d', label: 'Every day (9 AM)' }
+        ]
+      },
+      {
+        key: 'cron',
+        label: 'Cron Expression (advanced)',
+        type: 'text',
         placeholder: '*/15 * * * *',
-        description: 'Cron expression (e.g., */15 * * * * for every 15 minutes)',
-        defaultValue: '0 9 * * *'
+        description: 'Optional custom cron expression. Leave empty to use schedule above.'
       }
     ]
   },
@@ -93,12 +105,19 @@ export const nodeDefinitions: NodeDefinition[] = [
     ],
     config: [
       {
-        key: 'path',
-        label: 'Webhook Path',
-        type: 'text',
+        key: 'subscriptionId',
+        label: 'Webhook Subscription',
+        type: 'select',
         required: true,
-        placeholder: '/hooks/order-paid',
-        description: 'URL path for the webhook endpoint'
+        placeholder: 'Select saved webhook',
+        description: 'Choose from webhook subscriptions configured in Settings'
+      },
+      {
+        key: 'path',
+        label: 'Endpoint Path (optional)',
+        type: 'text',
+        placeholder: '/custom/order-paid',
+        description: 'Override the subscription path if you need a custom endpoint'
       },
       {
         key: 'secret',
@@ -120,7 +139,7 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'trigger.pbChange',
     category: 'trigger',
     label: 'PocketBase Change',
-    description: 'Trigger on PocketBase record changes',
+    description: 'Trigger when a PocketBase record is created or updated',
     icon: '🗄️',
     color: '#10B981',
     outputs: [
@@ -322,16 +341,29 @@ export const nodeDefinitions: NodeDefinition[] = [
       {
         key: 'collection',
         label: 'Collection',
-        type: 'text',
+        type: 'select',
         required: true,
-        placeholder: 'events'
+        options: [
+          { value: 'users', label: 'Users' },
+          { value: 'orders', label: 'Orders' },
+          { value: 'products', label: 'Products' },
+          { value: 'categories', label: 'Categories' },
+          { value: 'coupons', label: 'Coupons' },
+          { value: 'addresses', label: 'Addresses' },
+          { value: 'reviews', label: 'Reviews' },
+          { value: 'wishlists', label: 'Wishlists' },
+          { value: 'carts', label: 'Carts' },
+          { value: 'notifications', label: 'Notifications' },
+          { value: 'flows', label: 'Automation Flows' }
+        ],
+        description: 'Select the PocketBase collection to create records in'
       },
       {
         key: 'data',
-        label: 'Data Template',
+        label: 'Fields',
         type: 'json',
         placeholder: '{"name": "{{input.name}}", "status": "active"}',
-        description: 'JSON template for the new record data'
+        description: 'Key/value pairs for the new record. Supports {{template}} values.'
       }
     ]
   },
@@ -352,9 +384,20 @@ export const nodeDefinitions: NodeDefinition[] = [
       {
         key: 'collection',
         label: 'Collection',
-        type: 'text',
+        type: 'select',
         required: true,
-        placeholder: 'orders'
+        options: [
+          { value: 'users', label: 'Users' },
+          { value: 'orders', label: 'Orders' },
+          { value: 'products', label: 'Products' },
+          { value: 'categories', label: 'Categories' },
+          { value: 'coupons', label: 'Coupons' },
+          { value: 'addresses', label: 'Addresses' },
+          { value: 'reviews', label: 'Reviews' },
+          { value: 'wishlists', label: 'Wishlists' },
+          { value: 'carts', label: 'Carts' }
+        ],
+        description: 'Select the PocketBase collection to update'
       },
       {
         key: 'id',
@@ -365,10 +408,10 @@ export const nodeDefinitions: NodeDefinition[] = [
       },
       {
         key: 'data',
-        label: 'Update Data',
+        label: 'Fields to Update',
         type: 'json',
         placeholder: '{"status": "paid", "updated": "{{now}}"}',
-        description: 'JSON template for update data'
+        description: 'Key/value pairs to update. Supports {{template}} values.'
       }
     ]
   },
@@ -503,12 +546,24 @@ export const nodeDefinitions: NodeDefinition[] = [
     ],
     config: [
       {
-        key: 'ms',
-        label: 'Delay (milliseconds)',
+        key: 'amount',
+        label: 'Delay length',
         type: 'number',
         required: true,
-        defaultValue: 5000,
-        description: 'Delay in milliseconds (5000 = 5 seconds)'
+        defaultValue: 5,
+        description: 'Enter the delay amount'
+      },
+      {
+        key: 'unit',
+        label: 'Time unit',
+        type: 'select',
+        required: true,
+        defaultValue: 'seconds',
+        options: [
+          { value: 'seconds', label: 'Seconds' },
+          { value: 'minutes', label: 'Minutes' },
+          { value: 'hours', label: 'Hours' }
+        ]
       }
     ]
   },
@@ -536,12 +591,90 @@ export const nodeDefinitions: NodeDefinition[] = [
         description: 'Evolution API connection to use'
       },
       {
+        key: 'sender',
+        label: 'Evolution Instance ID',
+        type: 'text',
+        placeholder: 'Leave blank to use plugin default',
+        description: 'Override the Evolution instance ID (sender)'
+      },
+      {
+        key: 'messageType',
+        label: 'Message Type',
+        type: 'select',
+        required: true,
+        defaultValue: 'text',
+        options: [
+          { value: 'text', label: 'Text Message' },
+          { value: 'media', label: 'Media Message' }
+        ],
+        description: 'Choose whether to send a plain text or media message'
+      },
+      {
         key: 'template',
         label: 'Message Template',
         type: 'textarea',
         required: true,
         placeholder: 'Hello {{input.customerName}}, your order {{input.orderId}} is confirmed!',
         description: 'Message template with variables'
+      },
+      {
+        key: 'mediaType',
+        label: 'Media Type',
+        type: 'select',
+        defaultValue: 'image',
+        options: [
+          { value: 'image', label: 'Image' },
+          { value: 'video', label: 'Video' },
+          { value: 'document', label: 'Document' },
+          { value: 'audio', label: 'Audio' }
+        ],
+        description: 'Type of media to send when using media messages'
+      },
+      {
+        key: 'mediaRecordId',
+        label: 'Media Library Record',
+        type: 'text',
+        placeholder: 'Select media from library',
+        description: 'PocketBase content record id of the media asset'
+      },
+      {
+        key: 'mediaFileName',
+        label: 'Media File Name',
+        type: 'text',
+        placeholder: 'Auto-filled when selecting media',
+        description: 'Name of the media file to send'
+      },
+      {
+        key: 'mediaCaption',
+        label: 'Media Caption',
+        type: 'textarea',
+        placeholder: 'Optional caption for media messages'
+      },
+      {
+        key: 'delayMs',
+        label: 'Typing Delay (ms)',
+        type: 'number',
+        defaultValue: 250,
+        description: 'Delay before sending (applies to Evolution API)'
+      },
+      {
+        key: 'presence',
+        label: 'Presence Indicator',
+        type: 'select',
+        defaultValue: 'composing',
+        options: [
+          { value: 'composing', label: 'Composing' },
+          { value: 'recording', label: 'Recording' },
+          { value: 'paused', label: 'Paused' }
+        ],
+        description: 'Presence value to send with Evolution API messages'
+      },
+      {
+        key: 'linkPreview',
+        label: 'Enable Link Preview',
+        type: 'boolean',
+        defaultValue: true,
+        description: 'Include link previews for text messages'
       },
       {
         key: 'toPath',
