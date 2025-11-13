@@ -33,6 +33,8 @@ export function Logo({ className, variant = 'default' }: LogoProps) {
         src={logoUrl} 
         alt="Karigai Logo" 
         className={cn("h-8 w-auto", "opacity-100", "transition-opacity")}
+        width={144}
+        height={56}
         loading="eager"
         onError={handleError}
       />
