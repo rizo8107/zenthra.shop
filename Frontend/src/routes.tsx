@@ -22,6 +22,7 @@ import PuckHome from "./pages/PuckHome"
 // Lazy load non-critical pages
 const Shop = lazy(() => import("./pages/Shop"))
 const ProductDetail = lazy(() => import("./pages/ProductDetail"))
+const Cart = lazy(() => import("./pages/Cart"))
 const Bestsellers = lazy(() => import("./pages/Bestsellers"))
 const NewArrivals = lazy(() => import("./pages/NewArrivals"))
 const About = lazy(() => import("./pages/About"))
@@ -132,6 +133,7 @@ export function Routes() {
 
                       <Route path="/shop" element={<Shop />} />
                       <Route path="/product/:id" element={<ProductDetail />} />
+                      <Route path="/cart" element={<Cart />} />
                       <Route path="/bestsellers" element={<Bestsellers />} />
                       <Route path="/new-arrivals" element={<NewArrivals />} />
                       <Route path="/about" element={<About />} />

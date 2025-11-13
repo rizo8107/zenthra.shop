@@ -738,18 +738,40 @@ export const getMonthlyRevenueData = async () => {
 };
 
 export const getImageUrl = (collectionId: string, recordId: string, fileName: string) => {
+  const placeholder = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
+
   if (!collectionId || !recordId || !fileName) {
     console.warn('Missing parameters for getImageUrl', { collectionId, recordId, fileName });
-    return 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
+    return placeholder;
   }
+
+  if (typeof fileName === 'string' && /^https?:\/\//i.test(fileName)) {
+    return fileName;
+  }
+
   const envBase = (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined)
     || ((import.meta as any)?.env?.VITE_POCKETBASE_URL as string | undefined);
   const fallbackEnv = (typeof process !== 'undefined' ? process.env?.VITE_PB_FALLBACK_URL : undefined)
     || ((import.meta as any)?.env?.VITE_PB_FALLBACK_URL as string | undefined)
     || (typeof process !== 'undefined' ? process.env?.PUBLIC_PB_URL : undefined)
     || ((import.meta as any)?.env?.PUBLIC_PB_URL as string | undefined);
-  // Last-resort hardcoded fallback (update if backend host changes)
+  // Prefer the PocketBase client's current base URL, then envs, then hardcoded legacy
   const hardcoded = 'https://backend-pocketbase.p3ibd8.easypanel.host';
-  const base = envBase || fallbackEnv || hardcoded;
-  return `${base}/api/files/${collectionId}/${recordId}/${fileName}`;
+  const base = (pb?.baseUrl && typeof pb.baseUrl === 'string' ? pb.baseUrl : undefined)
+    || envBase
+    || fallbackEnv
+    || hardcoded;
+
+  // Normalise file names that may already include recordId or leading slashes
+  const normalised = String(fileName).replace(/^\/+/, '');
+  let relativePath = `${recordId}/${normalised}`;
+
+  if (normalised.startsWith(`${recordId}/`)) {
+    relativePath = normalised;
+  } else if (normalised.includes('/')) {
+    // If another path segment is included (e.g. generated/id/filename), use the last segment
+    relativePath = `${recordId}/${normalised.split('/').pop()}`;
+  }
+
+  return `${base.replace(/\/+$/, '')}/api/files/${collectionId}/${relativePath}`;
 };
