@@ -122,7 +122,7 @@ export default function ThemeManager() {
         spacing: 'compact'
       });
     }
-  }, [selectedId]);
+  }, [selected]);
 
   const hexToHslString = (hex: string) => {
     const r = parseInt(hex.slice(1, 3), 16) / 255;
@@ -304,24 +304,74 @@ export default function ThemeManager() {
     }
   };
 
+  const previewStyle = useMemo(() => {
+    if (!editing) return {};
+
+    const primaryHsl = editing.primary_color_hsl
+      || (editing.primary_color ? hexToHslString(editing.primary_color) : null)
+      || '26 29% 51%';
+
+    const accentHsl = editing.accent_color_hsl
+      || (editing.accent_color ? hexToHslString(editing.accent_color) : null)
+      || '26 29% 65%';
+
+    const primaryHoverHsl = editing.primary_color_hover
+      ? hexToHslString(editing.primary_color_hover)
+      : primaryHsl;
+
+    const primaryForegroundHsl = editing.text_on_primary
+      ? (editing.text_on_primary.startsWith('#')
+          ? hexToHslString(editing.text_on_primary)
+          : editing.text_on_primary)
+      : '0 0% 100%';
+
+    const darkPrimaryHsl = editing.dark_mode_primary_color_hsl || '26 29% 35%';
+    const darkAccentHsl = editing.dark_mode_accent_color_hsl || '26 29% 25%';
+
+    return {
+      ['--primary' as any]: primaryHsl,
+      ['--primary-foreground' as any]: primaryForegroundHsl,
+      ['--accent' as any]: accentHsl,
+      ['--primary-hover' as any]: primaryHoverHsl,
+      ['--dark-primary' as any]: darkPrimaryHsl,
+      ['--dark-accent' as any]: darkAccentHsl,
+    } satisfies React.CSSProperties;
+  }, [editing]);
+
   const Preview = () => {
-    const style: React.CSSProperties = editing ? {
-      ['--primary' as any]: editing.primary_color_hsl || '26 29% 51%',
-      ['--accent' as any]: editing.accent_color_hsl || '26 29% 65%',
-    } : {};
     return (
-      <div className="rounded-md border p-4" style={style}>
+      <div className="rounded-md border p-4" style={previewStyle}>
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm text-muted-foreground">Preview</span>
           <Button variant="outline" onClick={() => navigate('/')} size="sm">Open Home</Button>
         </div>
         <div className="space-y-3">
-          <button className="h-10 px-4 rounded-md bg-primary text-primary-foreground">Primary Button</button>
-          <div className="h-10 w-full rounded-md bg-accent" />
+          <button
+            className="h-10 px-4 rounded-md bg-primary text-primary-foreground"
+            style={previewStyle}
+          >
+            Primary Button
+          </button>
+          <div className="h-10 w-full rounded-md bg-accent" style={previewStyle} />
         </div>
       </div>
     );
   };
+
+  // When the selected theme is active, live-sync root CSS variables so the whole UI reflects it while editing
+  useEffect(() => {
+    if (!selected?.is_active || !editing) return;
+    const root = document.documentElement;
+    const primaryHsl = editing.primary_color_hsl || (editing.primary_color ? hexToHslString(editing.primary_color) : undefined);
+    const accentHsl = editing.accent_color_hsl || (editing.accent_color ? hexToHslString(editing.accent_color) : undefined);
+    const pfHsl = editing.text_on_primary
+      ? (editing.text_on_primary.startsWith('#') ? hexToHslString(editing.text_on_primary) : editing.text_on_primary)
+      : undefined;
+    if (primaryHsl) root.style.setProperty('--primary', primaryHsl);
+    if (accentHsl) root.style.setProperty('--accent', accentHsl);
+    if (pfHsl) root.style.setProperty('--primary-foreground', pfHsl);
+    if (radius) root.style.setProperty('--radius', radius);
+  }, [selected?.is_active, editing?.primary_color_hsl, editing?.primary_color, editing?.accent_color_hsl, editing?.accent_color, editing?.text_on_primary, radius]);
 
   return (
     <div className="container mx-auto py-8">

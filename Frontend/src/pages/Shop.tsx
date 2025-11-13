@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getProducts, type Product } from '@/lib/pocketbase';
 import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
@@ -7,9 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/components/ui/use-toast';
 import { cn } from '@/lib/utils';
-import { Heart, Star, ImageIcon, Loader2, ShoppingBag, Search, SlidersHorizontal, Plus, Minus } from 'lucide-react';
+import { Heart, Star, ImageIcon, Loader2, ShoppingBag, Search, SlidersHorizontal, Plus, Minus, X } from 'lucide-react';
 import { ProductImage } from '@/components/ProductImage';
 import { Sheet, SheetClose, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { Separator } from '@/components/ui/separator';
@@ -24,15 +26,54 @@ export default function Shop() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [sortBy, setSortBy] = useState<"default" | "name" | "price" | "bestseller">('default');
   const [category, setCategory] = useState<string>('all');
   const [visibleProducts, setVisibleProducts] = useState<Set<string>>(new Set());
+  const priceBounds = useMemo(() => {
+    if (!products || products.length === 0) return [0, 0] as [number, number];
+    const prices = products.map((p) => Number(p.price || 0));
+    return [Math.min(...prices), Math.max(...prices)] as [number, number];
+  }, [products]);
+  const [priceRange, setPriceRange] = useState<[number, number]>([0, 0]);
+  useEffect(() => {
+    setPriceRange((prev) => {
+      const [min, max] = priceBounds;
+      if (!filtersInitializedRef.current) {
+        return priceBounds;
+      }
+      const nextMin = Math.max(min, Math.min(prev[0], max));
+      const nextMax = Math.max(min, Math.min(prev[1], max));
+      if (nextMin === prev[0] && nextMax === prev[1]) {
+        return prev;
+      }
+      return [nextMin, nextMax];
+    });
+  }, [priceBounds]);
+  const availableTags = useMemo(() => {
+    const set = new Set<string>();
+    products.forEach((p) => {
+      const tags = Array.isArray(p.tags) ? p.tags : [];
+      tags.forEach((t) => set.add(t));
+    });
+    return Array.from(set).sort();
+  }, [products]);
+  const [selectedTags, setSelectedTags] = useState<Set<string>>(new Set());
   const { addItem } = useCart();
   const { toast } = useToast();
   const [wishlistedItems, setWishlistedItems] = useState<Set<string>>(new Set());
   const [productQuantities, setProductQuantities] = useState<Record<string, number>>({});
   const productGridRef = useRef<HTMLDivElement>(null);
   const observersRef = useRef<Map<string, IntersectionObserver>>(new Map());
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filtersInitializedRef = useRef(false);
+
+  useEffect(() => {
+    const handler = window.setTimeout(() => {
+      setSearchTerm(searchInput);
+    }, 250);
+    return () => window.clearTimeout(handler);
+  }, [searchInput]);
   
   // Calculate the filtered products (memoized)
   const categories = useMemo(
@@ -46,7 +87,10 @@ export default function Shop() {
       const matchesSearch = product.name.toLowerCase().includes(lower) ||
         product.description.toLowerCase().includes(lower);
       const matchesCategory = category === 'all' || product.category === category;
-      return matchesSearch && matchesCategory;
+      const matchesPrice = Number(product.price || 0) >= priceRange[0] && Number(product.price || 0) <= priceRange[1];
+      const tagsArr = Array.isArray(product.tags) ? product.tags : [];
+      const matchesTags = selectedTags.size === 0 || tagsArr.some((t) => selectedTags.has(t));
+      return matchesSearch && matchesCategory && matchesPrice && matchesTags;
     });
     // Preserve backend order when sortBy is 'default'
     if (sortBy === 'default') return list;
@@ -63,7 +107,147 @@ export default function Shop() {
           return 0;
       }
     });
-  }, [products, searchTerm, category, sortBy]);
+  }, [products, searchTerm, category, sortBy, priceRange, selectedTags]);
+
+  useEffect(() => {
+    if (filtersInitializedRef.current) {
+      return;
+    }
+
+    const paramsEntries = Object.fromEntries(searchParams.entries());
+    let initialized = false;
+
+    if (paramsEntries.q) {
+      setSearchTerm(paramsEntries.q);
+      setSearchInput(paramsEntries.q);
+      initialized = true;
+    }
+    if (paramsEntries.category) {
+      setCategory(paramsEntries.category);
+      initialized = true;
+    }
+    if (paramsEntries.sort) {
+      const sortValue = paramsEntries.sort as typeof sortBy;
+      if (['default', 'name', 'price', 'bestseller'].includes(sortValue)) {
+        setSortBy(sortValue);
+        initialized = true;
+      }
+    }
+    if (paramsEntries.tags) {
+      const tags = paramsEntries.tags.split(',').filter(Boolean);
+      if (tags.length > 0) {
+        setSelectedTags(new Set(tags));
+        initialized = true;
+      }
+    }
+    if (paramsEntries.price) {
+      const [min, max] = paramsEntries.price.split('-').map((value) => Number(value));
+      if (!Number.isNaN(min) && !Number.isNaN(max) && min <= max) {
+        setPriceRange([min, max]);
+        initialized = true;
+      }
+    }
+
+    if (!initialized && typeof window !== 'undefined') {
+      try {
+        const stored = window.localStorage.getItem('shopFilters');
+        if (stored) {
+          const parsed = JSON.parse(stored) as {
+            searchTerm?: string;
+            category?: string;
+            sortBy?: typeof sortBy;
+            selectedTags?: string[];
+            priceRange?: [number, number];
+          };
+          if (parsed.searchTerm) {
+            setSearchTerm(parsed.searchTerm);
+            setSearchInput(parsed.searchTerm);
+          }
+          if (parsed.category) {
+            setCategory(parsed.category);
+          }
+          if (parsed.sortBy && ['default', 'name', 'price', 'bestseller'].includes(parsed.sortBy)) {
+            setSortBy(parsed.sortBy);
+          }
+          if (parsed.selectedTags && parsed.selectedTags.length > 0) {
+            setSelectedTags(new Set(parsed.selectedTags));
+          }
+          if (parsed.priceRange && parsed.priceRange.length === 2) {
+            setPriceRange(parsed.priceRange);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to parse stored shop filters', error);
+      }
+    }
+
+    filtersInitializedRef.current = true;
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!filtersInitializedRef.current) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    const trimmedSearch = searchTerm.trim();
+    if (trimmedSearch) {
+      params.set('q', trimmedSearch);
+    }
+    if (category !== 'all') {
+      params.set('category', category);
+    }
+    if (sortBy !== 'default') {
+      params.set('sort', sortBy);
+    }
+    if (selectedTags.size > 0) {
+      params.set('tags', Array.from(selectedTags).join(','));
+    }
+    const [defaultMin, defaultMax] = priceBounds;
+    if (priceRange[0] !== defaultMin || priceRange[1] !== defaultMax) {
+      params.set('price', `${priceRange[0]}-${priceRange[1]}`);
+    }
+
+    const newParamsString = params.toString();
+    const currentParamsString = searchParams.toString();
+    if (newParamsString !== currentParamsString) {
+      setSearchParams(params, { replace: true });
+    }
+
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(
+        'shopFilters',
+        JSON.stringify({
+          searchTerm: trimmedSearch,
+          category,
+          sortBy,
+          selectedTags: Array.from(selectedTags),
+          priceRange,
+        })
+      );
+    }
+  }, [searchTerm, category, sortBy, selectedTags, priceRange, priceBounds, searchParams, setSearchParams]);
+
+  const selectedTagsArray = useMemo(() => Array.from(selectedTags), [selectedTags]);
+  const isDefaultPrice = priceRange[0] === priceBounds[0] && priceRange[1] === priceBounds[1];
+  const hasActiveFilters = Boolean(searchTerm.trim()) || category !== 'all' || selectedTags.size > 0 || !isDefaultPrice || sortBy !== 'default';
+
+  const handleRemoveTag = useCallback((tag: string) => {
+    setSelectedTags((prev) => {
+      const next = new Set(prev);
+      next.delete(tag);
+      return next;
+    });
+  }, []);
+
+  const handleClearFilters = useCallback(() => {
+    setCategory('all');
+    setSelectedTags(new Set());
+    setSearchInput('');
+    setSearchTerm('');
+    setSortBy('default');
+    setPriceRange(priceBounds);
+  }, [priceBounds]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -307,8 +491,8 @@ export default function Shop() {
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -354,12 +538,122 @@ export default function Shop() {
                           ))}
                         </div>
                       </div>
+                      <div>
+                        <h4 className="mb-2 text-sm font-medium">Price</h4>
+                        <div className="text-xs text-muted-foreground mb-2">₹{priceRange[0]} – ₹{priceRange[1]}</div>
+                        <Slider
+                          min={priceBounds[0]}
+                          max={priceBounds[1]}
+                          step={1}
+                          value={[priceRange[0], priceRange[1]]}
+                          onValueChange={(v) => setPriceRange([Number(v[0]), Number(v[1])])}
+                        />
+                      </div>
+                      <div>
+                        <h4 className="mb-2 text-sm font-medium">Tags</h4>
+                        <div className="space-y-2">
+                          {availableTags.length === 0 && (
+                            <div className="text-xs text-muted-foreground">No tags</div>
+                          )}
+                          {availableTags.map((tag) => (
+                            <label key={tag} className="flex items-center gap-2">
+                              <Checkbox
+                                checked={selectedTags.has(tag)}
+                                onCheckedChange={(v) =>
+                                  setSelectedTags((prev) => {
+                                    const next = new Set(prev);
+                                    if (Boolean(v)) next.add(tag);
+                                    else next.delete(tag);
+                                    return next;
+                                  })
+                                }
+                              />
+                              <span className="text-sm">{tag}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="pt-2">
+                        <Button
+                          variant="outline"
+                          onClick={handleClearFilters}
+                        >
+                          Clear all filters
+                        </Button>
+                      </div>
                     </div>
                   </ScrollArea>
                 </SheetContent>
               </Sheet>
             </div>
           </div>
+
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2">
+              {searchTerm.trim() && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 rounded-full px-3"
+                  onClick={() => {
+                    setSearchInput('');
+                    setSearchTerm('');
+                  }}
+                >
+                  <span className="mr-1">Search: {searchTerm.trim()}</span>
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+              {category !== 'all' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 rounded-full px-3 capitalize"
+                  onClick={() => setCategory('all')}
+                >
+                  <span className="mr-1">Category: {category}</span>
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+              {!isDefaultPrice && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 rounded-full px-3"
+                  onClick={() => setPriceRange(priceBounds)}
+                >
+                  <span className="mr-1">₹{priceRange[0]} – ₹{priceRange[1]}</span>
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+              {selectedTagsArray.map((tag) => (
+                <Button
+                  key={tag}
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 rounded-full px-3"
+                  onClick={() => handleRemoveTag(tag)}
+                >
+                  <span className="mr-1">#{tag}</span>
+                  <X className="h-3 w-3" />
+                </Button>
+              ))}
+              {sortBy !== 'default' && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="h-7 rounded-full px-3"
+                  onClick={() => setSortBy('default')}
+                >
+                  <span className="mr-1">Sort: {sortBy}</span>
+                  <X className="h-3 w-3" />
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" className="h-7 px-3" onClick={handleClearFilters}>
+                Clear all
+              </Button>
+            </div>
+          )}
 
           {/* Product Grid */}
           {filteredProducts.length === 0 ? (

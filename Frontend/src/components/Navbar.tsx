@@ -12,16 +12,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ShoppingBag, Menu, Award, Sparkles, Info, Package, Heart, Settings, LogOut, Gift, Mail, Rss } from "lucide-react"
+import { ShoppingBag, Menu, Award, Sparkles, Info, Package, Heart, Settings, LogOut, Gift, Mail, Rss, Search } from "lucide-react"
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Cart } from "./Cart"
 import { Logo } from '@/components/Logo'
-import { getNavbarConfig, type NavbarConfig } from "@/lib/navbar-config-service";
+import { getNavbarConfig, type NavbarConfig, type NavItem } from "@/lib/navbar-config-service";
+import SearchCommand from "@/components/SearchCommand";
 
 export default function Navbar() {
   const { user, signOut } = useAuth()
   const { itemCount } = useCart()
   const [navConfig, setNavConfig] = useState<NavbarConfig | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
     const fetchConfig = async () => {
@@ -32,8 +34,9 @@ export default function Navbar() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center relative">
+    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto max-w-7xl px-4 lg:px-6 flex h-14 lg:h-16 items-center gap-3 relative">
+
         {/* Mobile menu button (left side) */}
         <Sheet>
           <SheetTrigger asChild>
@@ -46,7 +49,7 @@ export default function Navbar() {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="w-[300px] sm:w-[400px] p-0">
-            <nav className="flex flex-col h-full bg-white">
+            <nav className="flex flex-col h-full bg-background">
               {/* Header */}
               <div className="border-b p-6">
                 <SheetClose asChild>
@@ -59,11 +62,12 @@ export default function Navbar() {
               {/* Menu Items */}
               <div className="flex-1 overflow-y-auto">
                 <div className="flex flex-col gap-1 p-4">
+
                   {navConfig?.showShop && (
                     <SheetClose asChild>
                       <Link 
                         to="/shop" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
                         <ShoppingBag className="h-5 w-5 text-gray-500" />
                         Shop
@@ -136,6 +140,55 @@ export default function Navbar() {
                       </Link>
                     </SheetClose>
                   )}
+                  {/* Custom items */}
+                  {navConfig?.items?.map((item: NavItem) => (
+                    <div key={item.id} className="flex flex-col">
+                      {(() => {
+                        const label = item.label || '';
+                        const to = item.pagePath || '';
+                        const ext = item.url;
+                        const target = item.openInNewTab ? '_blank' : undefined;
+                        if (ext) {
+                          return (
+                            <a href={ext} target={target} rel={item.openInNewTab ? 'noopener noreferrer' : undefined} className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                              {label}
+                            </a>
+                          );
+                        }
+                        return (
+                          <SheetClose asChild>
+                            <Link to={to || '#'} className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                              {label}
+                            </Link>
+                          </SheetClose>
+                        );
+                      })()}
+                      {Array.isArray(item.children) && item.children.length > 0 && (
+                        <div className="ml-6 mt-1 flex flex-col">
+                          {item.children.map((ch) => {
+                            const label = ch.label || '';
+                            const to = ch.pagePath || '';
+                            const ext = ch.url;
+                            const target = ch.openInNewTab ? '_blank' : undefined;
+                            if (ext) {
+                              return (
+                                <a key={ch.id} href={ext} target={target} rel={ch.openInNewTab ? 'noopener noreferrer' : undefined} className="px-4 py-2 text-sm rounded-md hover:bg-accent">
+                                  {label}
+                                </a>
+                              );
+                            }
+                            return (
+                              <SheetClose asChild key={ch.id}>
+                                <Link to={to || '#'} className="px-4 py-2 text-sm rounded-md hover:bg-accent">
+                                  {label}
+                                </Link>
+                              </SheetClose>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))}
                 </div>
               </div>
               
@@ -182,11 +235,11 @@ export default function Navbar() {
         </Link>
 
         {/* Desktop navigation */}
-        <nav className="hidden lg:flex items-center space-x-6 justify-center mx-auto">
+        <nav className="hidden lg:flex items-center gap-1 justify-center mx-auto">
           {navConfig?.showShop && (
             <Link
               to="/shop"
-              className="text-sm font-medium transition-colors hover:text-primary"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50"
             >
               Shop
             </Link>
@@ -194,7 +247,7 @@ export default function Navbar() {
           {navConfig?.showBestsellers && (
             <Link
               to="/bestsellers"
-              className="text-sm font-medium transition-colors hover:text-primary"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50"
             >
               Bestsellers
             </Link>
@@ -202,7 +255,7 @@ export default function Navbar() {
           {navConfig?.showNewArrivals && (
             <Link
               to="/new-arrivals"
-              className="text-sm font-medium transition-colors hover:text-primary"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50"
             >
               New Arrivals
             </Link>
@@ -210,7 +263,7 @@ export default function Navbar() {
           {navConfig?.showAbout && (
             <Link
               to="/about"
-              className="text-sm font-medium transition-colors hover:text-primary"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50"
             >
               About
             </Link>
@@ -218,7 +271,7 @@ export default function Navbar() {
           {navConfig?.showGifting && (
             <Link
               to="/gifting"
-              className="text-sm font-medium transition-colors hover:text-primary"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50"
             >
               Gifting
             </Link>
@@ -226,7 +279,7 @@ export default function Navbar() {
           {navConfig?.showContact && (
             <Link
               to="/contact"
-              className="text-sm font-medium transition-colors hover:text-primary"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50"
             >
               Contact
             </Link>
@@ -234,16 +287,112 @@ export default function Navbar() {
           {navConfig?.showBlog && (
             <Link
               to="/blog"
-              className="text-sm font-medium transition-colors hover:text-primary"
+              className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50"
             >
               Blog
             </Link>
           )}
+          {navConfig?.items?.map((item: NavItem) => {
+            const label = item.label || '';
+            const to = item.pagePath || '';
+            const ext = item.url;
+            const target = item.openInNewTab ? '_blank' : undefined;
+            const hasChildren = Array.isArray(item.children) && item.children.length > 0;
+            if (!hasChildren) {
+              if (ext) {
+                return (
+                  <a key={item.id} href={ext} target={target} rel={item.openInNewTab ? 'noopener noreferrer' : undefined} className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50">
+                    {label}
+                  </a>
+                );
+              }
+              return (
+                <Link key={item.id} to={to || '#'} className="text-sm font-medium text-foreground/80 hover:text-foreground rounded-md px-3 py-2 transition-colors hover:bg-accent/50">
+                  {label}
+                </Link>
+              );
+            }
+            // With children: normal dropdown or mega menu
+            if (item.mega) {
+              const cols = Math.min(4, Math.max(1, item.columns || 3));
+              const gridColsClass = cols === 1 ? 'grid-cols-1' : cols === 2 ? 'grid-cols-2' : cols === 3 ? 'grid-cols-3' : 'grid-cols-4';
+              return (
+                <DropdownMenu key={item.id}>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="px-3 py-2 h-auto text-sm font-medium text-foreground/80 hover:text-foreground rounded-md hover:bg-accent/50">
+                      {label}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="rounded-xl p-4 shadow-lg border bg-popover/95 backdrop-blur-sm w-[min(90vw,820px)]">
+                    <div className={`grid ${gridColsClass} gap-3`}>
+                      {item.children!.map((ch) => {
+                        const clabel = ch.label || '';
+                        const cto = ch.pagePath || '';
+                        const cext = ch.url;
+                        const ctarget = ch.openInNewTab ? '_blank' : undefined;
+                        if (cext) {
+                          return (
+                            <DropdownMenuItem key={ch.id} asChild className="rounded-md">
+                              <a href={cext} target={ctarget} rel={ch.openInNewTab ? 'noopener noreferrer' : undefined} className="block px-3 py-2 rounded-md hover:bg-accent/60">{clabel}</a>
+                            </DropdownMenuItem>
+                          );
+                        }
+                        return (
+                          <DropdownMenuItem key={ch.id} asChild className="rounded-md">
+                            <Link to={cto || '#'} className="block px-3 py-2 rounded-md hover:bg-accent/60">{clabel}</Link>
+                          </DropdownMenuItem>
+                        );
+                      })}
+                      {item.imageUrl && (
+                        <div className="col-span-full md:col-span-1">
+                          <div className="rounded-lg overflow-hidden border">
+                            <img src={item.imageUrl} alt={`${label} promo`} className="w-full h-32 object-cover" />
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              );
+            }
+            return (
+              <DropdownMenu key={item.id}>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="px-3 py-2 h-auto text-sm font-medium text-foreground/80 hover:text-foreground rounded-md hover:bg-accent/50">
+                    {label}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="rounded-xl p-1 shadow-lg border bg-popover/95 backdrop-blur-sm">
+                  {item.children!.map((ch) => {
+                    const clabel = ch.label || '';
+                    const cto = ch.pagePath || '';
+                    const cext = ch.url;
+                    const ctarget = ch.openInNewTab ? '_blank' : undefined;
+                    if (cext) {
+                      return (
+                        <DropdownMenuItem key={ch.id} asChild className="rounded-md">
+                          <a href={cext} target={ctarget} rel={ch.openInNewTab ? 'noopener noreferrer' : undefined}>{clabel}</a>
+                        </DropdownMenuItem>
+                      );
+                    }
+                    return (
+                      <DropdownMenuItem key={ch.id} asChild className="rounded-md">
+                        <Link to={cto || '#'}>{clabel}</Link>
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            );
+          })}
         </nav>
 
-        {/* Cart and user menu */}
+        {/* Search, cart and user menu */}
         <div className="flex flex-1 items-center justify-end space-x-4">
           <nav className="flex items-center space-x-2">
+            <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label="Search (Ctrl/Cmd+K)">
+              <Search className="h-5 w-5" />
+            </Button>
             <Cart>
               <Button variant="ghost" size="icon" className="relative">
                 <ShoppingBag className="h-6 w-6" />
@@ -296,6 +445,7 @@ export default function Navbar() {
             </div>
           </nav>
         </div>
+        <SearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
       </div>
     </header>
   )

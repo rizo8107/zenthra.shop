@@ -650,8 +650,9 @@ export const getDashboardMetrics = async () => {
     await ensureAdminAuth();
 
     // Get all orders to calculate metrics
-    const ordersResult = await pb.collection('orders').getFullList({
+    const ordersResult = await pb.collection('orders').getFullList(200, {
       sort: '-created',
+      fields: 'payment_status,status,total,created',
     });
 
     // Calculate the metrics using ONLY paid orders
@@ -702,8 +703,9 @@ export const getMonthlyRevenueData = async () => {
     await ensureAdminAuth();
     
     // Get all orders
-    const ordersResult = await pb.collection('orders').getFullList({
+    const ordersResult = await pb.collection('orders').getFullList(200, {
       sort: 'created',
+      fields: 'total,created',
     });
     
     // Get current year
@@ -735,6 +737,87 @@ export const getMonthlyRevenueData = async () => {
     console.error('Error fetching monthly revenue data:', error);
     throw error;
   }
+};
+
+// Navbar configuration helpers
+export interface NavbarConfigRecord extends Record<string, unknown> {
+  id: string;
+  name?: string;
+  is_active?: boolean;
+  show_shop?: boolean;
+  show_about?: boolean;
+  show_contact?: boolean;
+  show_gifting?: boolean;
+  show_blog?: boolean;
+  show_bestsellers?: boolean;
+  show_new_arrivals?: boolean;
+  created?: string;
+  updated?: string;
+}
+
+export const listNavbarConfigs = async (): Promise<NavbarConfigRecord[]> => {
+  await ensureAdminAuth();
+  const items = await pb.collection('navbar_config').getFullList({ sort: '-created' });
+  return items as unknown as NavbarConfigRecord[];
+};
+
+export const getActiveNavbarConfig = async (): Promise<NavbarConfigRecord | null> => {
+  await ensureAdminAuth();
+  const res = await pb.collection('navbar_config').getList(1, 1, { filter: 'is_active = true', sort: '-created' });
+  return res.items?.[0] as unknown as NavbarConfigRecord ?? null;
+};
+
+export const createNavbarConfig = async (data: Partial<NavbarConfigRecord>): Promise<NavbarConfigRecord> => {
+  await ensureAdminAuth();
+  // If setting active, deactivate others first
+  if (data.is_active) {
+    const all = await pb.collection('navbar_config').getFullList({});
+    await Promise.all(all.map((it: any) => it.is_active ? pb.collection('navbar_config').update(it.id, { is_active: false }) : Promise.resolve()));
+  }
+  const rec = await pb.collection('navbar_config').create(data);
+  return rec as unknown as NavbarConfigRecord;
+};
+
+export const updateNavbarConfig = async (id: string, data: Partial<NavbarConfigRecord>): Promise<NavbarConfigRecord> => {
+  await ensureAdminAuth();
+  if (data.is_active) {
+    const all = await pb.collection('navbar_config').getFullList({});
+    await Promise.all(all.filter((it: any) => it.id !== id).map((it: any) => it.is_active ? pb.collection('navbar_config').update(it.id, { is_active: false }) : Promise.resolve()));
+  }
+  const rec = await pb.collection('navbar_config').update(id, data);
+  return rec as unknown as NavbarConfigRecord;
+};
+
+export const activateNavbarConfig = async (id: string): Promise<NavbarConfigRecord> => {
+  await ensureAdminAuth();
+  const all = await pb.collection('navbar_config').getFullList({});
+  await Promise.all(all.map((it: any) => pb.collection('navbar_config').update(it.id, { is_active: it.id === id })));
+  const rec = await pb.collection('navbar_config').getOne(id);
+  return rec as unknown as NavbarConfigRecord;
+};
+
+export const deleteNavbarConfig = async (id: string): Promise<boolean> => {
+  await ensureAdminAuth();
+  await pb.collection('navbar_config').delete(id);
+  return true;
+};
+
+// Puck CMS pages (lite) for pickers
+export interface PageLite extends Record<string, unknown> {
+  id: string;
+  title?: string;
+  slug?: string;
+  published?: boolean;
+  updated?: string;
+}
+
+export const listPagesLite = async (): Promise<PageLite[]> => {
+  await ensureAdminAuth();
+  const items = await pb.collection('pages').getFullList({
+    sort: '-updated',
+    fields: 'id,title,slug,published,updated'
+  });
+  return items as unknown as PageLite[];
 };
 
 export const getImageUrl = (collectionId: string, recordId: string, fileName: string) => {
