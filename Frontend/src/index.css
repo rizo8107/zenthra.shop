@@ -13,8 +13,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 229 35% 18%;
 
-    --primary: 223 90% 60% !important;
-    --primary-foreground: 0 0% 100% !important;
+    --primary: 223 90% 60%;
+    --primary-foreground: 0 0% 100%;
 
     --secondary: 224 68% 94%;
     --secondary-foreground: 229 35% 18%;
@@ -22,7 +22,7 @@
     --muted: 226 44% 92%;
     --muted-foreground: 228 24% 44%;
 
-    --accent: 224 100% 92% !important;
+    --accent: 224 100% 92%;
     --accent-foreground: 229 35% 18%;
 
     --destructive: 0 72% 58%;
@@ -45,8 +45,8 @@
     --popover: 226 45% 12%;
     --popover-foreground: 220 30% 96%;
 
-    --primary: 210 88% 58% !important;
-    --primary-foreground: 210 40% 98% !important;
+    --primary: 210 88% 58%;
+    --primary-foreground: 210 40% 98%;
 
     --secondary: 225 38% 18%;
     --secondary-foreground: 220 30% 96%;
@@ -54,8 +54,8 @@
     --muted: 225 30% 20%;
     --muted-foreground: 216 20% 72%;
 
-    --accent: 214 90% 45% !important;
-    --accent-foreground: 210 40% 98% !important;
+    --accent: 214 90% 45%;
+    --accent-foreground: 210 40% 98%;
 
     --destructive: 350 82% 55%;
     --destructive-foreground: 210 40% 98%;
@@ -129,18 +129,7 @@
   }
 }
 
-/* Force brand primary blue across utilities */
-.bg-primary {
-  background-color: hsl(223 90% 60%) !important;
-}
-
-.text-primary-foreground {
-  color: hsl(0 0% 100%) !important;
-}
-
-.hover\:bg-primary\/90:hover {
-  background-color: hsl(223 90% 60% / 0.9) !important;
-}
+/* Removed hardcoded utility overrides to allow dynamic theme tokens to apply */
 
 /* Hide scrollbar but maintain functionality for breadcrumbs */
 .scrollbar-hide {

@@ -16,7 +16,8 @@ import {
   MessageSquare,
   Mail,
   MapPin,
-  Workflow
+  Workflow,
+  Menu
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -85,6 +86,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { title: 'Products', path: '/admin/products', icon: Package },
     { title: 'Automation', path: '/admin/automation', icon: Workflow, badge: 'Beta' },
     { title: 'Pages', path: '/admin/pages', icon: FileText },
+    { title: 'Navbar', path: '/admin/navbar', icon: Menu },
     { title: 'Themes', path: '/admin/themes', icon: Palette },
     { title: 'Plugins', path: '/admin/plugins', icon: Puzzle },
     { title: 'Settings', path: '/admin/settings', icon: Settings },
