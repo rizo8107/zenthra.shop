@@ -88,12 +88,15 @@ export function Cart({ children }: CartProps) {
               <div className="space-y-3">
                 {items.map((item, index) => (
                   <div key={`${item.productId}-${item.color}-${index}`} className="flex gap-3 rounded-xl border border-gray-100 p-3">
-                    <div className="relative aspect-square h-20">
+                    <div className="relative aspect-square h-20 w-20">
                       {item.product && item.product.images && item.product.images[0] ? (
                         <ProductImage
                           url={item.product.images[0]}
                           alt={item.product.name}
                           className="rounded-lg object-cover"
+                          width={80}
+                          height={80}
+                          useResponsive={false}
                         />
                       ) : (
                         <div className="bg-muted w-full h-full rounded-lg flex items-center justify-center">
