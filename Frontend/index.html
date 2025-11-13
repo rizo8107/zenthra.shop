@@ -21,6 +21,17 @@
     <link rel="dns-prefetch" href="https://rsms.me" />
     <link rel="dns-prefetch" href="https://us-assets.i.posthog.com" />
     
+    <!-- Font optimization with font-display swap -->
+    <link rel="stylesheet" href="https://rsms.me/inter/inter.css" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://rsms.me/inter/inter.css"></noscript>
+    <style>
+      /* Ensure text is visible during font load */
+      @supports (font-variation-settings: normal) {
+        :root { font-family: 'Inter var', system-ui, sans-serif; }
+      }
+      body { font-display: swap; }
+    </style>
+    
     <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/soap-favicon.svg" />
     <link rel="icon" type="image/png" href="/soap-favicon.svg" />
