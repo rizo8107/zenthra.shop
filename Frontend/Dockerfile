@@ -6,9 +6,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Clean install dependencies
-RUN npm cache clean --force && \
-    npm ci --production=false
+# Configure npm for more reliable installs in CI environments
+RUN npm config set registry https://registry.npmjs.org/ && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000
+
+# Clean install dependencies with fallback for flaky networks
+RUN npm ci --production=false --no-audit --no-fund || npm install --production=false --no-audit --no-fund
 
 # Copy source code
 COPY . .
