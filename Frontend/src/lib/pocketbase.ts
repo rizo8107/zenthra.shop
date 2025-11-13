@@ -370,27 +370,13 @@ export async function getProducts(filter?: ProductFilter, signal?: AbortSignal):
             };
         }) as unknown as Product[];
 
-        // Try to get review counts, but don't block product display if this fails
-        try {
-            const reviewCounts = await Promise.all(
-                records.items.map(record => 
-                    pocketbase.collection('reviews').getList(1, 1, {
-                        filter: `product = "${record.id}"`,
-                        fields: 'id',
-                        $autoCancel: false
-                    })
-                )
-            );
-            
-            // Update products with review counts
-            processedProducts = processedProducts.map((product, index) => ({
-                ...product,
-                reviews: reviewCounts[index].totalItems
-            }));
-        } catch (reviewError) {
-            console.warn('Failed to fetch review counts:', reviewError);
-            // Continue with products that have default review count of 0
-        }
+        // PERFORMANCE FIX: Removed individual review count requests that were causing
+        // 90+ sequential API calls. Instead, set reviews to 0 by default.
+        // Review counts can be fetched on-demand when viewing individual products.
+        processedProducts = processedProducts.map(product => ({
+            ...product,
+            reviews: 0 // Default to 0, actual count loaded on product detail page
+        }));
 
         // Ordering: first by positive list_order (ascending), then random for items with list_order <= 0 or undefined
         const withOrder = processedProducts
