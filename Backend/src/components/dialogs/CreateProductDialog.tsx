@@ -33,6 +33,18 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 
+const generateRowId = () => {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2);
+};
+
+const renameFile = (file: File, newName: string) => new File([file], newName, {
+  type: file.type,
+  lastModified: file.lastModified,
+});
+
 // Define the type for ProductFormValues
 type ProductFormValues = {
   name: string;
@@ -83,7 +95,7 @@ export function CreateProductDialog({
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
   // Variant images state (per size value)
-  const [selectedVariantSize, setSelectedVariantSize] = useState<string>("");
+  const [selectedVariantSizeId, setSelectedVariantSizeId] = useState<string>("");
   const [variantFilesBySize, setVariantFilesBySize] = useState<Record<string, File[]>>({});
   const [variantPreviewsBySize, setVariantPreviewsBySize] = useState<Record<string, string[]>>({});
   const [variantFilenamesBySize, setVariantFilenamesBySize] = useState<Record<string, string[]>>({});
@@ -133,8 +145,8 @@ export function CreateProductDialog({
 
   const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   type ColorRow = { name: string; hex: string; value: string; inStock?: boolean };
-  type SizeRow = { name?: string; value: string; unit?: string; useBasePrice?: boolean; sizePrice?: number; inStock?: boolean };
-  type ComboRow = { name: string; value: string; type?: 'bogo'|'bundle'|'custom'; items?: number; priceOverride?: number; description?: string; discountType?: 'amount'|'percent'; discountValue?: number };
+  type SizeRow = { id: string; name?: string; value: string; unit?: string; useBasePrice?: boolean; sizePrice?: number; inStock?: boolean };
+  type ComboRow = { id: string; name: string; value: string; type?: 'bogo'|'bundle'|'custom'; items?: number; priceOverride?: number; description?: string; discountType?: 'amount'|'percent'; discountValue?: number };
   const [colorRows, setColorRows] = useState<ColorRow[]>([]);
   const [sizeRows, setSizeRows] = useState<SizeRow[]>([]);
   const [comboRows, setComboRows] = useState<ComboRow[]>([]);
@@ -148,9 +160,9 @@ export function CreateProductDialog({
       unit: s.unit,
       inStock: s.inStock !== false,
       priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined),
-      images: variantFilenamesBySize[String(s.value)] || [],
+      images: variantFilenamesBySize[s.id] || [],
     }));
-    if (comboRows.length) variants.combos = comboRows.map(cb => ({ name: cb.name, value: cb.value || slugify(cb.name), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue, images: comboFilenamesByKey[String(cb.value || slugify(cb.name))] || [] }));
+    if (comboRows.length) variants.combos = comboRows.map(cb => ({ name: cb.name, value: cb.value || slugify(cb.name), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue, images: comboFilenamesByKey[cb.id] || [] }));
     const json = JSON.stringify(variants);
     form.setValue('variants', json);
   };
@@ -193,13 +205,20 @@ export function CreateProductDialog({
   });
 
   // Rebuild variants JSON when rows change (after form exists)
-  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows, variantFilenamesBySize]);
+  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows, variantFilenamesBySize, comboFilenamesByKey]);
   // Initialize selected variant size when sizes are present
   useEffect(() => {
-    if (!selectedVariantSize && sizeRows.length > 0) {
-      setSelectedVariantSize(String(sizeRows[0].value));
+    if (!sizeRows.length) {
+      if (selectedVariantSizeId) setSelectedVariantSizeId("");
+      return;
     }
-  }, [sizeRows, selectedVariantSize]);
+    const hasSelected = sizeRows.some(row => row.id === selectedVariantSizeId);
+    if (!hasSelected) {
+      setSelectedVariantSizeId(sizeRows[0].id);
+    } else if (!selectedVariantSizeId) {
+      setSelectedVariantSizeId(sizeRows[0].id);
+    }
+  }, [sizeRows, selectedVariantSizeId]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -225,10 +244,14 @@ export function CreateProductDialog({
 
   // Variant images upload for the chosen size
   const handleVariantImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const sizeKey = selectedVariantSize.trim();
+    const sizeKey = selectedVariantSizeId.trim();
     if (!sizeKey) return;
     if (!e.target.files || e.target.files.length === 0) return;
-    const newFiles = Array.from(e.target.files);
+    const newFiles = Array.from(e.target.files).map((file, index) => {
+      const ext = file.name.includes('.') ? `.${file.name.split('.').pop()?.toLowerCase() || 'jpg'}` : '';
+      const unique = generateRowId();
+      return renameFile(file, `${sizeKey}-${unique}-${index}${ext}`);
+    });
 
     setVariantFilesBySize(prev => ({
       ...prev,
@@ -249,10 +272,14 @@ export function CreateProductDialog({
   };
 
   // Helper: upload for a specific size row directly
-  const handleSizeRowImageUpload = (sizeKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const key = String(sizeKey || '').trim();
+  const handleSizeRowImageUpload = (sizeId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const key = String(sizeId || '').trim();
     if (!key || !e.target.files || e.target.files.length === 0) return;
-    const newFiles = Array.from(e.target.files);
+    const newFiles = Array.from(e.target.files).map((file, index) => {
+      const ext = file.name.includes('.') ? `.${file.name.split('.').pop()?.toLowerCase() || 'jpg'}` : '';
+      const unique = generateRowId();
+      return renameFile(file, `${key}-${unique}-${index}${ext}`);
+    });
     setVariantFilesBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles] }));
     const previews = newFiles.map(f => URL.createObjectURL(f));
     setVariantPreviewsBySize(prev => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
@@ -260,10 +287,14 @@ export function CreateProductDialog({
   };
 
   // Combo uploads per-row
-  const handleComboImageUpload = (comboKey: string, e: React.ChangeEvent<HTMLInputElement>) => {
-    const key = String(comboKey || '').trim();
+  const handleComboImageUpload = (comboId: string, e: React.ChangeEvent<HTMLInputElement>) => {
+    const key = String(comboId || '').trim();
     if (!key || !e.target.files || e.target.files.length === 0) return;
-    const newFiles = Array.from(e.target.files);
+    const newFiles = Array.from(e.target.files).map((file, index) => {
+      const ext = file.name.includes('.') ? `.${file.name.split('.').pop()?.toLowerCase() || 'jpg'}` : '';
+      const unique = generateRowId();
+      return renameFile(file, `${key}-${unique}-${index}${ext}`);
+    });
     setComboFilesByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...newFiles] }));
     const previews = newFiles.map(f => URL.createObjectURL(f));
     setComboPreviewsByKey(prev => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
@@ -278,20 +309,20 @@ export function CreateProductDialog({
     buildVariantsFromRows();
   };
 
-  const removeVariantImage = (sizeKey: string, index: number) => {
+  const removeVariantImage = (sizeId: string, index: number) => {
     setVariantFilesBySize(prev => ({
       ...prev,
-      [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index),
+      [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== index),
     }));
-    const url = (variantPreviewsBySize[sizeKey] || [])[index];
+    const url = (variantPreviewsBySize[sizeId] || [])[index];
     if (url) URL.revokeObjectURL(url);
     setVariantPreviewsBySize(prev => ({
       ...prev,
-      [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index),
+      [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== index),
     }));
     setVariantFilenamesBySize(prev => ({
       ...prev,
-      [sizeKey]: (prev[sizeKey] || []).filter((_, i) => i !== index),
+      [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== index),
     }));
     // Update variants JSON reflecting removal
     buildVariantsFromRows();
@@ -459,6 +490,10 @@ export function CreateProductDialog({
       setVariantFilesBySize({});
       setVariantPreviewsBySize({});
       setVariantFilenamesBySize({});
+      setComboFilesByKey({});
+      setComboPreviewsByKey({});
+      setComboFilenamesByKey({});
+      setSelectedVariantSizeId("");
       onOpenChange(false);
       toast.success('Product created successfully');
     } catch (error) {
@@ -733,12 +768,12 @@ export function CreateProductDialog({
                           <select
                             id="variant-size-select"
                             className="h-8 rounded-md border bg-background px-2 text-sm"
-                            value={selectedVariantSize}
-                            onChange={(e) => setSelectedVariantSize(e.target.value)}
+                            value={selectedVariantSizeId}
+                            onChange={(e) => setSelectedVariantSizeId(e.target.value)}
                           >
                             <option value="" disabled>Select a size</option>
-                            {sizeRows.map((s, i) => (
-                              <option key={i} value={String(s.value)}>{s.name || (s.unit ? `${s.value} ${s.unit}` : s.value)}</option>
+                            {sizeRows.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name || (s.unit ? `${s.value} ${s.unit}` : s.value)}</option>
                             ))}
                           </select>
                           <div className="ml-auto">
@@ -752,18 +787,18 @@ export function CreateProductDialog({
                               multiple
                               className="sr-only"
                               onChange={handleVariantImageUpload}
-                              disabled={!selectedVariantSize}
+                              disabled={!selectedVariantSizeId}
                             />
                           </div>
                         </div>
-                        {selectedVariantSize ? (
+                        {selectedVariantSizeId ? (
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {(variantPreviewsBySize[selectedVariantSize] || []).map((url, index) => (
+                            {(variantPreviewsBySize[selectedVariantSizeId] || []).map((url, index) => (
                               <div key={index} className="relative group overflow-hidden rounded-md border">
                                 <AspectRatio ratio={1 / 1}>
                                   <img
                                     src={url}
-                                    alt={`Variant ${selectedVariantSize} image ${index + 1}`}
+                                    alt={`Variant image ${index + 1}`}
                                     className="object-cover w-full h-full"
                                     onError={(e) => {
                                       (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
@@ -772,7 +807,7 @@ export function CreateProductDialog({
                                 </AspectRatio>
                                 <button
                                   type="button"
-                                  onClick={() => removeVariantImage(selectedVariantSize, index)}
+                                  onClick={() => removeVariantImage(selectedVariantSizeId, index)}
                                   className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
                                   aria-label={`Remove variant image ${index + 1}`}
                                 >
@@ -923,13 +958,27 @@ export function CreateProductDialog({
                         <div className="space-y-2">
                           <FormLabel className="text-sm">Sizes</FormLabel>
                           <div className="space-y-2">
-                            {sizeRows.map((s, i) => (
-                              <div key={i} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
+                            {sizeRows.map((s) => (
+                              <div key={s.id} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
                                 <div className="col-span-12 sm:col-span-3">
-                                  <Input value={s.value} onChange={(e)=>{ const v=[...sizeRows]; v[i]={...v[i],value:e.target.value}; setSizeRows(v); }} placeholder="100" />
+                                  <Input
+                                    value={s.value}
+                                    onChange={(e) => {
+                                      const { value } = e.target;
+                                      const targetId = s.id;
+                                      setSizeRows(prev => prev.map(row => row.id === targetId ? { ...row, value } : row));
+                                    }}
+                                    placeholder="100"
+                                  />
                                 </div>
                                 <div className="col-span-12 sm:col-span-3">
-                                  <Select value={s.unit || 'ml'} onValueChange={(val)=>{ const v=[...sizeRows]; v[i]={...v[i],unit: val}; setSizeRows(v); }}>
+                                  <Select
+                                    value={s.unit || 'ml'}
+                                    onValueChange={(val) => {
+                                      const targetId = s.id;
+                                      setSizeRows(prev => prev.map(row => row.id === targetId ? { ...row, unit: val } : row));
+                                    }}
+                                  >
                                     <SelectTrigger><SelectValue placeholder="Unit" /></SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="ml">ml</SelectItem>
@@ -942,13 +991,31 @@ export function CreateProductDialog({
                                 </div>
                                 <div className="col-span-12 sm:col-span-3">
                                   <div className="flex items-center gap-2">
-                                    <Switch checked={!!s.useBasePrice} onCheckedChange={(val)=>{ const v=[...sizeRows]; v[i]={...v[i],useBasePrice: val, sizePrice: val ? undefined : v[i].sizePrice}; setSizeRows(v); }} />
+                                    <Switch
+                                      checked={!!s.useBasePrice}
+                                      onCheckedChange={(val) => {
+                                        const targetId = s.id;
+                                        setSizeRows(prev => prev.map(row => row.id === targetId
+                                          ? { ...row, useBasePrice: val, sizePrice: val ? undefined : row.sizePrice }
+                                          : row));
+                                      }}
+                                    />
                                     <span className="text-sm">Use base price</span>
                                   </div>
                                 </div>
                                 <div className="col-span-12 sm:col-span-2">
                                   {!s.useBasePrice && (
-                                    <Input className="w-28" type="number" value={s.sizePrice ?? '' as any} onChange={(e)=>{ const v=[...sizeRows]; v[i]={...v[i],sizePrice:e.target.value?Number(e.target.value):undefined}; setSizeRows(v); }} placeholder="Price" />
+                                    <Input
+                                      className="w-28"
+                                      type="number"
+                                      value={s.sizePrice ?? '' as any}
+                                      onChange={(e) => {
+                                        const targetId = s.id;
+                                        const nextPrice = e.target.value ? Number(e.target.value) : undefined;
+                                        setSizeRows(prev => prev.map(row => row.id === targetId ? { ...row, sizePrice: nextPrice } : row));
+                                      }}
+                                      placeholder="Price"
+                                    />
                                   )}
                                 </div>
                                 <div className="hidden sm:block col-span-1 text-xs text-muted-foreground">
@@ -962,30 +1029,62 @@ export function CreateProductDialog({
                                   })()}
                                 </div>
                                 <div className="absolute top-2 right-2">
-                                  <Button type="button" size="sm" variant="outline" onClick={()=>{ const v=[...sizeRows]; v.splice(i,1); setSizeRows(v); }}>Remove</Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const removedId = s.id;
+                                      setSizeRows(prev => {
+                                        const next = prev.filter(row => row.id !== removedId);
+                                        if (removedId === selectedVariantSizeId) {
+                                          setSelectedVariantSizeId(next[0]?.id ?? '');
+                                        } else if (next.length === 0) {
+                                          setSelectedVariantSizeId('');
+                                        }
+                                        return next;
+                                      });
+                                      setVariantFilesBySize(prev => {
+                                        const next = { ...prev };
+                                        delete next[removedId];
+                                        return next;
+                                      });
+                                      setVariantPreviewsBySize(prev => {
+                                        const next = { ...prev };
+                                        (prev[removedId] || []).forEach(url => URL.revokeObjectURL(url));
+                                        delete next[removedId];
+                                        return next;
+                                      });
+                                      setVariantFilenamesBySize(prev => {
+                                        const next = { ...prev };
+                                        delete next[removedId];
+                                        return next;
+                                      });
+                                    }}
+                                  >Remove</Button>
                                 </div>
                                 <div className="col-span-12 flex items-center gap-2">
-                                  <label htmlFor={`size-upload-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                                  <label htmlFor={`size-upload-${s.id}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
                                     <Upload className="h-4 w-4" /> Upload images for {s.name || (s.unit ? `${s.value} ${s.unit}` : s.value) || 'size'}
                                   </label>
                                   <input
-                                    id={`size-upload-${i}`}
+                                    id={`size-upload-${s.id}`}
                                     type="file"
                                     accept="image/*"
                                     multiple
                                     className="sr-only"
-                                    onChange={(e)=>handleSizeRowImageUpload(String(s.value), e)}
+                                    onChange={(e)=>handleSizeRowImageUpload(s.id, e)}
                                   />
-                                  <span className="text-xs text-muted-foreground">{(variantFilenamesBySize[String(s.value)] || []).length} selected</span>
+                                  <span className="text-xs text-muted-foreground">{(variantFilenamesBySize[s.id] || []).length} selected</span>
                                 </div>
-                                {(variantPreviewsBySize[String(s.value)] || []).length > 0 && (
+                                {(variantPreviewsBySize[s.id] || []).length > 0 && (
                                   <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                    {(variantPreviewsBySize[String(s.value)] || []).map((url, idx)=> (
+                                    {(variantPreviewsBySize[s.id] || []).map((url, idx)=> (
                                       <div key={idx} className="relative group overflow-hidden rounded-md border">
                                         <AspectRatio ratio={1/1}>
                                           <img src={url} alt="Variant preview" className="object-cover w-full h-full" onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Preview+Not+Found'; }} />
                                         </AspectRatio>
-                                        <button type="button" onClick={()=>removeVariantImage(String(s.value), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70">
+                                        <button type="button" onClick={()=>removeVariantImage(s.id, idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70">
                                           <X className="h-4 w-4" />
                                         </button>
                                       </div>
@@ -994,31 +1093,53 @@ export function CreateProductDialog({
                                 )}
                               </div>
                             ))}
-                            <Button type="button" variant="secondary" onClick={()=>setSizeRows([...sizeRows,{value:'',unit:'ml',useBasePrice:true}])}>Add Size</Button>
+                            <Button
+                              type="button"
+                              variant="secondary"
+                              onClick={() => {
+                                const newRow: SizeRow = { id: generateRowId(), value: '', unit: 'ml', useBasePrice: true };
+                                setSizeRows(prev => [...prev, newRow]);
+                                setSelectedVariantSizeId(newRow.id);
+                              }}
+                            >Add Size</Button>
                           </div>
                         </div>
                         <div className="space-y-2">
                           <FormLabel className="text-sm">Combos</FormLabel>
                           <div className="flex flex-wrap gap-2 mb-2">
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
-                            <Button type="button" variant="secondary" onClick={()=>setComboRows([...comboRows,{name:'',value:'',type:'bundle'}])}>Add Custom</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
+                            <Button type="button" variant="secondary" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'',value:'',type:'bundle'}])}>Add Custom</Button>
                           </div>
                           <div className="flex flex-wrap gap-2 mb-2">
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
                           </div>
                           <div className="space-y-2">
-                            {comboRows.map((cb, i) => (
-                              <div key={i} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
+                            {comboRows.map((cb) => (
+                              <div key={cb.id} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
                                 <div className="col-span-3">
-                                  <Input value={cb.name} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],name:e.target.value, value: v[i].value || slugify(e.target.value)}; setComboRows(v); }} placeholder="2-Pack" />
+                                  <Input
+                                    value={cb.name}
+                                    onChange={(e) => {
+                                      const targetId = cb.id;
+                                      const { value } = e.target;
+                                      setComboRows(prev => prev.map(row => row.id === targetId ? { ...row, name: value, value: row.value || slugify(value) } : row));
+                                    }}
+                                    placeholder="2-Pack"
+                                  />
                                 </div>
                                 <div className="col-span-12 sm:col-span-2">
-                                  <Select value={cb.type || 'bundle'} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],type: val as any}; setComboRows(v); }}>
+                                  <Select
+                                    value={cb.type || 'bundle'}
+                                    onValueChange={(val) => {
+                                      const targetId = cb.id;
+                                      setComboRows(prev => prev.map(row => row.id === targetId ? { ...row, type: val as any } : row));
+                                    }}
+                                  >
                                     <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="bundle">bundle</SelectItem>
@@ -1028,10 +1149,25 @@ export function CreateProductDialog({
                                   </Select>
                                 </div>
                                 <div className="col-span-12 sm:col-span-2">
-                                  <Input type="number" value={cb.items ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],items: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Items" />
+                                  <Input
+                                    type="number"
+                                    value={cb.items ?? '' as any}
+                                    onChange={(e)=>{
+                                      const targetId = cb.id;
+                                      const items = e.target.value ? Number(e.target.value) : undefined;
+                                      setComboRows(prev => prev.map(row => row.id === targetId ? { ...row, items } : row));
+                                    }}
+                                    placeholder="Items"
+                                  />
                                 </div>
                                 <div className="col-span-12 sm:col-span-2">
-                                  <Select value={cb.discountType || undefined as any} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],discountType: val as any}; setComboRows(v); }}>
+                                  <Select
+                                    value={cb.discountType || undefined as any}
+                                    onValueChange={(val)=>{
+                                      const targetId = cb.id;
+                                      setComboRows(prev => prev.map(row => row.id === targetId ? { ...row, discountType: val as any } : row));
+                                    }}
+                                  >
                                     <SelectTrigger><SelectValue placeholder="Discount" /></SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="amount">Amount</SelectItem>
@@ -1040,121 +1176,79 @@ export function CreateProductDialog({
                                   </Select>
                                 </div>
                                 <div className="col-span-12 sm:col-span-2">
-                                  <Input type="number" value={cb.discountValue ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],discountValue: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Value" />
+                                  <Input
+                                    type="number"
+                                    value={cb.discountValue ?? '' as any}
+                                    onChange={(e)=>{
+                                      const targetId = cb.id;
+                                      const discountValue = e.target.value ? Number(e.target.value) : undefined;
+                                      setComboRows(prev => prev.map(row => row.id === targetId ? { ...row, discountValue } : row));
+                                    }}
+                                    placeholder="Value"
+                                  />
                                 </div>
                                 <div className="col-span-12 sm:col-span-1">
-                                  <Input type="number" value={cb.priceOverride ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],priceOverride: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Price" />
+                                  <Input
+                                    type="number"
+                                    value={cb.priceOverride ?? '' as any}
+                                    onChange={(e)=>{
+                                      const targetId = cb.id;
+                                      const priceOverride = e.target.value ? Number(e.target.value) : undefined;
+                                      setComboRows(prev => prev.map(row => row.id === targetId ? { ...row, priceOverride } : row));
+                                    }}
+                                    placeholder="Price"
+                                  />
                                 </div>
                                 <div className="col-span-0 md:col-span-0 lg:col-span-0"></div>
                                 <div className="absolute top-2 right-2">
-                                  <Button type="button" size="sm" variant="outline" onClick={()=>{ const v=[...comboRows]; v.splice(i,1); setComboRows(v); }}>Remove</Button>
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      const removedId = cb.id;
+                                      setComboRows(prev => prev.filter(row => row.id !== removedId));
+                                      setComboFilesByKey(prev => {
+                                        const next = { ...prev };
+                                        delete next[removedId];
+                                        return next;
+                                      });
+                                      setComboPreviewsByKey(prev => {
+                                        const next = { ...prev };
+                                        (prev[removedId] || []).forEach(url => URL.revokeObjectURL(url));
+                                        delete next[removedId];
+                                        return next;
+                                      });
+                                      setComboFilenamesByKey(prev => {
+                                        const next = { ...prev };
+                                        delete next[removedId];
+                                        return next;
+                                      });
+                                    }}
+                                  >Remove</Button>
                                 </div>
                                 <div className="col-span-12 flex items-center gap-2">
-                                  <label htmlFor={`combo-upload-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                                  <label htmlFor={`combo-upload-${cb.id}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
                                     <Upload className="h-4 w-4" /> Upload images for {cb.name || cb.value || 'combo'}
                                   </label>
                                   <input
-                                    id={`combo-upload-${i}`}
+                                    id={`combo-upload-${cb.id}`}
                                     type="file"
                                     accept="image/*"
                                     multiple
                                     className="sr-only"
-                                    onChange={(e)=>handleComboImageUpload(String(cb.value || slugify(cb.name)), e)}
+                                    onChange={(e)=>handleComboImageUpload(cb.id, e)}
                                   />
-                                  <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[String(cb.value || slugify(cb.name))] || []).length} selected</span>
+                                  <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[cb.id] || []).length} selected</span>
                                 </div>
-                                {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).length > 0 && (
+                                {(comboPreviewsByKey[cb.id] || []).length > 0 && (
                                   <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                    {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).map((url, idx)=> (
+                                    {(comboPreviewsByKey[cb.id] || []).map((url, idx)=> (
                                       <div key={idx} className="relative group overflow-hidden rounded-md border">
                                         <AspectRatio ratio={1/1}>
                                           <img src={url} alt="Combo preview" className="object-cover w-full h-full" onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Preview+Not+Found'; }} />
                                         </AspectRatio>
-                                        <button type="button" onClick={()=>removeComboImage(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove combo image">
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <FormLabel className="text-sm">Combos</FormLabel>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
-                            <Button type="button" variant="secondary" onClick={()=>setComboRows([...comboRows,{name:'',value:'',type:'bundle'}])}>Add Custom</Button>
-                          </div>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows([...comboRows,{name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
-                          </div>
-                          <div className="space-y-2">
-                            {comboRows.map((cb, i) => (
-                              <div key={i} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
-                                <div className="col-span-3">
-                                  <Input value={cb.name} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],name:e.target.value, value: v[i].value || slugify(e.target.value)}; setComboRows(v); }} placeholder="2-Pack" />
-                                </div>
-                                <div className="col-span-12 sm:col-span-2">
-                                  <Select value={cb.type || 'bundle'} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],type: val as any}; setComboRows(v); }}>
-                                    <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="bundle">bundle</SelectItem>
-                                      <SelectItem value="bogo">bogo</SelectItem>
-                                      <SelectItem value="custom">custom</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="col-span-12 sm:col-span-2">
-                                  <Input type="number" value={cb.items ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],items: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Items" />
-                                </div>
-                                <div className="col-span-12 sm:col-span-2">
-                                  <Select value={cb.discountType || undefined as any} onValueChange={(val)=>{ const v=[...comboRows]; v[i]={...v[i],discountType: val as any}; setComboRows(v); }}>
-                                    <SelectTrigger><SelectValue placeholder="Discount" /></SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="amount">Amount</SelectItem>
-                                      <SelectItem value="percent">Percent</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="col-span-12 sm:col-span-2">
-                                  <Input type="number" value={cb.discountValue ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],discountValue: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Value" />
-                                </div>
-                                <div className="col-span-12 sm:col-span-1">
-                                  <Input type="number" value={cb.priceOverride ?? '' as any} onChange={(e)=>{ const v=[...comboRows]; v[i]={...v[i],priceOverride: e.target.value?Number(e.target.value):undefined}; setComboRows(v); }} placeholder="Price" />
-                                </div>
-                                <div className="col-span-0 md:col-span-0 lg:col-span-0"></div>
-                                <div className="absolute top-2 right-2">
-                                  <Button type="button" size="sm" variant="outline" onClick={()=>{ const v=[...comboRows]; v.splice(i,1); setComboRows(v); }}>Remove</Button>
-                                </div>
-                                <div className="col-span-12 flex items-center gap-2">
-                                  <label htmlFor={`combo-upload-${i}`} className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
-                                    <Upload className="h-4 w-4" /> Upload images for {cb.name || cb.value || 'combo'}
-                                  </label>
-                                  <input
-                                    id={`combo-upload-${i}`}
-                                    type="file"
-                                    accept="image/*"
-                                    multiple
-                                    className="sr-only"
-                                    onChange={(e)=>handleComboImageUpload(String(cb.value || slugify(cb.name)), e)}
-                                  />
-                                  <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[String(cb.value || slugify(cb.name))] || []).length} selected</span>
-                                </div>
-                                {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).length > 0 && (
-                                  <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                    {(comboPreviewsByKey[String(cb.value || slugify(cb.name))] || []).map((url, idx)=> (
-                                      <div key={idx} className="relative group overflow-hidden rounded-md border">
-                                        <AspectRatio ratio={1/1}>
-                                          <img src={url} alt="Combo preview" className="object-cover w-full h-full" />
-                                        </AspectRatio>
-                                        <button type="button" onClick={()=>removeComboImage(String(cb.value || slugify(cb.name)), idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove combo image">
+                                        <button type="button" onClick={()=>removeComboImage(cb.id, idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70" aria-label="Remove combo image">
                                           <X className="h-4 w-4" />
                                         </button>
                                       </div>

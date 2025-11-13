@@ -178,7 +178,7 @@ export default function OrderConfirmation() {
     <div className="min-h-screen bg-background py-10 px-4">
       <div className="mx-auto max-w-[420px]">
         <div className="text-center mb-5 text-foreground">
-          <CheckCircle className="h-10 w-10 text-emerald-600 mx-auto mb-2" />
+          <CheckCircle className="h-10 w-10 text-blue-600 mx-auto mb-2" />
           <div className="text-lg font-semibold">{isPaid ? 'Payment Successful' : 'Order Placed'}</div>
           <div className="text-muted-foreground text-sm">Order #{order.id}</div>
         </div>
@@ -196,7 +196,7 @@ export default function OrderConfirmation() {
                 </div>
                 <div className="text-right text-xs text-muted-foreground">
                   <div>{new Date().toLocaleDateString()}</div>
-                  <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                  <div className="mt-1 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-medium text-blue-700">
                     <ShieldCheck className="h-3.5 w-3.5" /> {isPaid ? 'PAID' : 'PENDING'}
                   </div>
                 </div>
@@ -248,7 +248,7 @@ export default function OrderConfirmation() {
                   <span>{shippingNum ? formatCurrency(shippingNum) : 'Free'}</span>
                 </div>
                 {discountNum > 0 && (
-                  <div className="flex justify-between text-emerald-600">
+                  <div className="flex justify-between text-blue-600">
                     <span>Discount</span>
                     <span>-{formatCurrency(discountNum)}</span>
                   </div>

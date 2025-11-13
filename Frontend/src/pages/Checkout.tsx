@@ -2101,19 +2101,19 @@ export default function CheckoutPage() {
         <div className="max-w-md mx-auto">
           <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
             {/* Receipt Header */}
-            <div className="bg-gradient-to-r from-emerald-500 to-emerald-600 p-6 text-white text-center">
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 p-6 text-white text-center">
               <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <ShoppingBag className="w-8 h-8" />
               </div>
-              <p className="text-emerald-100 text-sm">Complete your purchase</p>
+              <p className="text-blue-100 text-sm">Complete your purchase</p>
             </div>
 
             <form onSubmit={handleSubmit} className="p-6 space-y-6">
               {/* Contact Section */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
-                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                    <span className="text-emerald-600 font-semibold text-sm">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-600 font-semibold text-sm">
                       1
                     </span>
                   </div>
@@ -2128,7 +2128,7 @@ export default function CheckoutPage() {
                       onChange={handleInputChange}
                       placeholder="Full Name"
                       required
-                      className={`rounded-xl border-gray-200 focus:border-emerald-400 focus:ring-emerald-400 ${!formData.name ? "border-red-300" : ""}`}
+                      className={`rounded-xl border-gray-200 focus:border-blue-400 focus:ring-blue-400 ${!formData.name ? "border-red-300" : ""}`}
                     />
                     {!formData.name && (
                       <p className="text-xs text-red-500 mt-1">
@@ -2145,7 +2145,7 @@ export default function CheckoutPage() {
                       onChange={handleInputChange}
                       placeholder="Email Address"
                       required
-                      className={`rounded-xl border-gray-200 focus:border-emerald-400 focus:ring-emerald-400 ${!formData.email || (formData.email && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) ? "border-red-300" : ""}`}
+                      className={`rounded-xl border-gray-200 focus:border-blue-400 focus:ring-blue-400 ${!formData.email || (formData.email && !formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) ? "border-red-300" : ""}`}
                     />
                     {!formData.email ? (
                       <p className="text-xs text-red-500 mt-1">
@@ -2164,8 +2164,8 @@ export default function CheckoutPage() {
               {/* Shipping Section */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
-                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                    <span className="text-emerald-600 font-semibold text-sm">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-600 font-semibold text-sm">
                       2
                     </span>
                   </div>
@@ -2398,7 +2398,7 @@ export default function CheckoutPage() {
                     </div>
                   )}
                   {appliedCoupon && (
-                    <div className="flex justify-between text-sm text-emerald-600">
+                    <div className="flex justify-between text-sm text-blue-600">
                       <span>Discount ({appliedCoupon.code})</span>
                       <span className="font-medium">
                         -₹{(appliedCoupon.discountAmount || 0).toFixed(2)}
@@ -2409,7 +2409,7 @@ export default function CheckoutPage() {
 
                 <div className="border-t-2 border-gray-300 pt-3 flex justify-between">
                   <span className="font-bold text-gray-800">Total</span>
-                  <span className="font-bold text-xl text-emerald-600">
+                  <span className="font-bold text-xl text-blue-600">
                     ₹{(calculateFinalTotal()?.finalTotal || 0).toFixed(2)}
                   </span>
                 </div>
@@ -2436,8 +2436,8 @@ export default function CheckoutPage() {
               {/* Coupon Code Section */}
               <div className="space-y-4">
                 <div className="flex items-center space-x-2 pb-2 border-b border-gray-100">
-                  <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
-                    <span className="text-emerald-600 font-semibold text-sm">
+                  <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                    <span className="text-blue-600 font-semibold text-sm">
                       3
                     </span>
                   </div>
@@ -2453,12 +2453,12 @@ export default function CheckoutPage() {
                       onChange={(e) => setCouponCode(e.target.value)}
                       placeholder="Enter promo code"
                       data-testid="coupon-input"
-                      className="rounded-xl border-gray-200 focus:border-emerald-400 focus:ring-emerald-400"
+                      className="rounded-xl border-gray-200 focus:border-blue-400 focus:ring-blue-400"
                     />
                     {couponLoading ? (
                       <Button
                         disabled
-                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 shrink-0"
+                        className="rounded-xl bg-blue-600 hover:bg-blue-700 px-6 shrink-0"
                       >
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Applying
@@ -2467,7 +2467,7 @@ export default function CheckoutPage() {
                       <Button
                         type="button"
                         onClick={applyCoupon}
-                        className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 shrink-0"
+                        className="rounded-xl bg-blue-600 hover:bg-blue-700 px-6 shrink-0"
                         data-testid="apply-coupon-btn"
                       >
                         Apply
@@ -2478,17 +2478,17 @@ export default function CheckoutPage() {
                     <p className="text-xs text-red-500">{couponError}</p>
                   )}
                   {appliedCoupon && (
-                    <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-200">
+                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl border border-blue-200">
                       <div className="flex items-center space-x-2">
-                        <Tag className="w-4 h-4 text-emerald-600" />
-                        <span className="text-sm font-medium text-emerald-700">
+                        <Tag className="w-4 h-4 text-blue-600" />
+                        <span className="text-sm font-medium text-blue-700">
                           {appliedCoupon.code} applied
                         </span>
                       </div>
                       <button
                         type="button"
                         onClick={removeCoupon}
-                        className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                        className="text-xs text-blue-600 hover:text-blue-700 font-medium"
                       >
                         Remove
                       </button>
@@ -2511,12 +2511,12 @@ export default function CheckoutPage() {
                           key={coupon.id}
                           type="button"
                           onClick={() => handleApplyCoupon(coupon.code)}
-                          className="inline-flex items-center px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg text-xs font-medium text-emerald-700 transition-colors"
+                          className="inline-flex items-center px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg text-xs font-medium text-blue-700 transition-colors"
                         >
                           <Tag className="w-3 h-3 mr-1" />
                           <span>{coupon.code}</span>
                           {coupon.description && (
-                            <span className="ml-1 text-emerald-600">
+                            <span className="ml-1 text-blue-600">
                               · {coupon.description}
                             </span>
                           )}
@@ -2539,7 +2539,7 @@ export default function CheckoutPage() {
               ) : (
                 <Button
                   type="submit"
-                  className="w-full py-6 text-lg rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
+                  className="w-full py-6 text-lg rounded-2xl bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all duration-200"
                   disabled={
                     !isFormValid ||
                     items.length === 0 ||

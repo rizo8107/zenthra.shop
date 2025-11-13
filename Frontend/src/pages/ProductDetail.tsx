@@ -56,6 +56,11 @@ const generatePlaceholder = (color = '#f3f4f6') => {
   return `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='${color.replace('#', '%23')}'/%3E%3C/svg%3E`;
 };
 
+const stripPcsSuffix = (value?: string | null) => {
+  if (!value) return '';
+  return value.replace(/\s*(pcs|piece|pieces)\.?$/i, '').trim();
+};
+
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -116,6 +121,69 @@ const ProductDetail = () => {
   const [orderConfig, setOrderConfig] = useState(DEFAULT_CONFIG);
   const [productSettings, setProductSettings] = useState(getProductSettings());
 
+  const variantImagesMap = useMemo(() => {
+    if (!product) {
+      return { sizes: new Map<string, string[]>(), combos: new Map<string, string[]>() };
+    }
+
+    const baseImages = Array.isArray(product.images) ? product.images : [];
+    const extractName = (path: string) => path?.split('/')?.pop() || path;
+    const stem = (name: string) => (name || '')
+      .toLowerCase()
+      .replace(/\.[a-z0-9]+$/i, '')
+      .replace(/[^a-z0-9]+/g, '');
+
+    const resolveToStored = (raw: string): string | null => {
+      if (!raw) return null;
+      if (raw.includes('/')) return raw;
+      const rawStem = stem(raw);
+      if (!rawStem) return null;
+      const candidates = baseImages.map((img) => ({
+        full: img,
+        st: stem(extractName(img)),
+      }));
+      let hit = candidates.find((c) => c.st === rawStem);
+      if (hit) return hit.full;
+      hit = candidates.find((c) => c.st.includes(rawStem) || rawStem.includes(c.st));
+      if (hit) return hit.full;
+      return `${product.id}/${raw}`;
+    };
+
+    const variantData: any = (product as any).variants || {};
+    const sizeMap = new Map<string, string[]>();
+    const comboMap = new Map<string, string[]>();
+
+    if (Array.isArray(variantData.sizes)) {
+      variantData.sizes.forEach((sz: any) => {
+        const key = sz?.value != null ? String(sz.value) : '';
+        if (!key) return;
+        const imgs = Array.isArray(sz.images) ? sz.images : [];
+        const resolved = imgs
+          .map((img: string) => resolveToStored(img))
+          .filter((img: string | null): img is string => typeof img === 'string' && img.length > 0);
+        if (resolved.length) {
+          sizeMap.set(key, resolved);
+        }
+      });
+    }
+
+    if (Array.isArray(variantData.combos)) {
+      variantData.combos.forEach((cb: { value: string | null; images: string[] }) => {
+        const key = cb?.value != null ? String(cb.value) : '';
+        if (!key) return;
+        const imgs = Array.isArray(cb.images) ? cb.images : [];
+        const resolved = imgs
+          .map((img: string) => resolveToStored(img))
+          .filter((img: string | null): img is string => typeof img === 'string' && img.length > 0);
+        if (resolved.length) {
+          comboMap.set(key, resolved);
+        }
+      });
+    }
+
+    return { sizes: sizeMap, combos: comboMap };
+  }, [product]);
+
   // Check if the current product is already in cart and get its quantity
   const { isInCart, currentItemQty } = useMemo(() => {
     const match = items.find(item =>
@@ -159,12 +227,14 @@ const ProductDetail = () => {
 
   const formatSizeOptionLabel = (size?: { name?: string; value?: unknown; unit?: string } | null) => {
     if (!size) return '';
-    const name = typeof size.name === 'string' ? size.name.trim() : '';
-    const value = size?.value !== undefined && size?.value !== null ? String(size.value).trim() : '';
-    const unit = typeof size?.unit === 'string' ? size.unit.trim() : '';
+    const name = typeof size.name === 'string' ? stripPcsSuffix(size.name) : '';
+    const value = size?.value !== undefined && size?.value !== null ? stripPcsSuffix(String(size.value)) : '';
+    const unitRaw = typeof size?.unit === 'string' ? size.unit.trim() : '';
+    const unit = ['pcs', 'piece', 'pieces'].includes(unitRaw.toLowerCase()) ? '' : unitRaw;
     const base = name || value;
-    if (!unit || !base) return base || unit;
-    return base.toLowerCase().includes(unit.toLowerCase()) ? base : `${base} ${unit}`;
+    if (!unit || !base) return stripPcsSuffix(base || unit);
+    const combined = base.toLowerCase().includes(unit.toLowerCase()) ? base : `${base} ${unit}`;
+    return stripPcsSuffix(combined);
   };
 
   // Human label for selected size (e.g., 300 ml)
@@ -186,68 +256,20 @@ const ProductDetail = () => {
   useEffect(() => {
     if (!product) return;
     const base = Array.isArray(product.images) ? [...product.images] : [];
-    const extractName = (path: string) => path?.split('/')?.pop() || path;
-    const stem = (name: string) => (name || '')
-      .toLowerCase()
-      .replace(/\.[a-z0-9]+$/i, '') // remove extension
-      .replace(/[^a-z0-9]+/g, ''); // strip non-alnum
-    // Try to resolve raw filename to an actually stored filename in product.images
-    const resolveToStored = (raw: string): string | null => {
-      if (!raw) return null;
-      // If already full path id/filename
-      if (raw.includes('/')) {
-        // Ensure it exists in base list; if not, still return for best-effort
-        return raw;
-      }
-      const rawStem = stem(raw);
-      if (!rawStem) return null;
-      // Find best match in stored images by stem containment either way
-      const candidates = base.map((b) => ({ full: b, name: extractName(b), st: stem(extractName(b)) }));
-      // Exact stem
-      let hit = candidates.find(c => c.st === rawStem);
-      if (hit) return hit.full;
-      // Containment checks
-      hit = candidates.find(c => c.st.includes(rawStem) || rawStem.includes(c.st));
-      if (hit) return hit.full;
-      return null;
-    };
-    const norm = (img: string) => {
-      if (!img) return '';
-      if (img.startsWith('http')) return img;
-      // If already has a slash, assume it's id/filename shape
-      if (img.includes('/')) return img;
-      // Prefer resolving to actually stored filename to handle PocketBase renames
-      const stored = resolveToStored(img);
-      if (stored) return stored;
-      // Fallback to id/filename (may 404 if PB renamed, but we tried)
-      return `${product.id}/${img}`;
-    };
-    const v: any = (product as any).variants || {};
-    const variantImgs: string[] = [];
-    if (selectedSize && Array.isArray(v.sizes)) {
-      const match = v.sizes.find((s: any) => String(s.value) === String(selectedSize.value));
-      if (match && Array.isArray(match.images)) {
-        match.images.forEach((m: string) => variantImgs.push(norm(m)));
-      }
-    }
-    const comboImgs: string[] = [];
-    if (selectedCombo && Array.isArray(v.combos)) {
-      const match = v.combos.find((c: any) => String(c.value) === String(selectedCombo.value));
-      if (match && Array.isArray(match.images)) {
-        match.images.forEach((m: string) => comboImgs.push(norm(m)));
-      }
-    }
-    // Choose order by the most recent click: size or combo
-    const first = lastVariantPick === 'combo' ? comboImgs : variantImgs;
-    const second = lastVariantPick === 'combo' ? variantImgs : comboImgs;
+    const sizeKey = selectedSize ? String(selectedSize.value ?? '') : null;
+    const comboKey = selectedCombo ? String(selectedCombo.value ?? '') : null;
+    const sizeImages = sizeKey ? variantImagesMap.sizes.get(sizeKey) || [] : [];
+    const comboImages = comboKey ? variantImagesMap.combos.get(comboKey) || [] : [];
+
+    const first = lastVariantPick === 'combo' ? comboImages : sizeImages;
+    const second = lastVariantPick === 'combo' ? sizeImages : comboImages;
     const combined = [...first, ...second, ...base].filter(Boolean);
     const unique: string[] = [];
     combined.forEach((img) => { if (!unique.includes(img)) unique.push(img); });
     setDisplayImages(unique);
-    // Prefer the first from the most recently clicked bucket, then the other, then base
     const preferred = (first[0] || second[0] || unique[0] || null) as string | null;
     setSelectedImage(preferred);
-  }, [product, selectedSize, selectedCombo, lastVariantPick]);
+  }, [product, selectedSize, selectedCombo, lastVariantPick, variantImagesMap]);
 
   // Load order configuration from PocketBase
   useEffect(() => {
@@ -1066,7 +1088,7 @@ const ProductDetail = () => {
               <h1 className="text-xl md:text-3xl font-bold mb-0.5 text-foreground flex items-center gap-2">
                 <span>{product.name}</span>
                 {selectedSizeLabel && (
-                  <Badge className="rounded-full bg-emerald-50 text-emerald-700 px-2.5 py-0.5 text-xs md:text-sm font-semibold border border-dotted border-emerald-600">
+                  <Badge className="rounded-full bg-blue-50 text-blue-700 px-2.5 py-0.5 text-xs md:text-sm font-semibold border border-dotted border-blue-600">
                     {selectedSizeLabel}
                   </Badge>
                 )}
@@ -1108,7 +1130,7 @@ const ProductDetail = () => {
               )}
               {orderConfig.showStarRating && (
                 <div className="hidden md:flex items-center gap-2 mt-1">
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-semibold">
                     {averageRating.toFixed(1)}
                   </span>
                   {product.reviews && product.reviews > 0 ? (
@@ -1189,16 +1211,17 @@ const ProductDetail = () => {
                           className={cn(
                             "px-2.5 py-1 rounded-full text-xs border transition-all",
                             selectedCombo?.value === cb.value 
-                              ? "bg-emerald-50 text-emerald-700 border-emerald-600 border-dotted" 
+                              ? "bg-blue-50 text-blue-700 border-blue-600 border-dotted" 
                               : "bg-background text-foreground hover:bg-accent border-muted"
                           )}
                           title={cb.description || cb.name}
                         >
                           {(() => {
+                            const baseName = stripPcsSuffix(cb.name || '');
                             const suffix = cb.discountType && typeof cb.discountValue === 'number'
                               ? ` −${cb.discountType === 'percent' ? `${cb.discountValue}%` : `₹${cb.discountValue}`}`
                               : '';
-                            return `${cb.name}${suffix}`;
+                            return `${baseName}${suffix}`.trim();
                           })()}
                         </button>
                       ))}
@@ -1219,7 +1242,7 @@ const ProductDetail = () => {
                   <ul className="space-y-2">
                     {product.features.slice(0, 6).map((feature, idx) => (
                       <li key={idx} className="flex items-center gap-2">
-                        <span className="h-5 w-5 rounded-full bg-green-100 text-green-600 grid place-items-center">
+                        <span className="h-5 w-5 rounded-full bg-blue-100 text-blue-600 grid place-items-center">
                           <Check className="h-3 w-3" />
                         </span>
                         <span className="text-[13px] text-gray-600">{feature}</span>
@@ -1232,7 +1255,7 @@ const ProductDetail = () => {
                 {/* Super Saver strip (shows when original_price exists) */}
                 {product.original_price && product.original_price > effectivePrice && (
                   <div className="mt-3">
-                    <div className="flex items-center justify-between bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-md">
+                    <div className="flex items-center justify-between bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-md">
                       <span className="text-sm font-medium">Save ₹{(product.original_price - effectivePrice).toFixed(0)}</span>
                       <Link to="/page/offers" className="text-xs underline">View all offers</Link>
                     </div>
@@ -1332,16 +1355,18 @@ const ProductDetail = () => {
                             className={cn(
                               "px-3 py-1.5 rounded-full text-sm border transition-all",
                               selectedCombo?.value === cb.value 
-                                ? "bg-emerald-50 text-emerald-700 border-emerald-600 border-dotted" 
+                                ? "bg-blue-50 text-blue-700 border-blue-600 border-dotted" 
                                 : "bg-background text-foreground hover:bg-accent border-muted"
                             )}
                             title={cb.description || cb.name}
                           >
                             {(() => {
-                              const suffix = cb.discountType && typeof cb.discountValue === 'number'
+                              const baseName = stripPcsSuffix(cb.name || '');
+                            const suffix = cb.discountType && typeof cb.discountValue === 'number'
                                 ? ` −${cb.discountType === 'percent' ? `${cb.discountValue}%` : `₹${cb.discountValue}`}`
                                 : '';
-                              return `${cb.name}${suffix}`;
+                              const combined = `${baseName}${suffix}`.trim();
+                              return combined;
                             })()}
                           </button>
                         ))}
@@ -1381,11 +1406,11 @@ const ProductDetail = () => {
                 {/* Purchase Controls */}
                 <div className="mt-4 rounded-2xl border border-border/60 bg-gradient-to-br from-white via-white to-muted/60 p-4 shadow-sm">
                   <div className="flex items-center justify-between text-[11px] font-medium text-muted-foreground">
-                    <span className="inline-flex items-center gap-2 text-emerald-600">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="inline-flex items-center gap-2 text-blue-600">
+                      <span className="h-2 w-2 rounded-full bg-blue-500 animate-pulse" />
                       Delivery in 2–5 days
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-emerald-700">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-2 py-0.5 text-blue-700">
                       <Check className="h-3 w-3" /> {product?.inStock ? 'In stock' : 'Preorder'}
                     </span>
                   </div>
@@ -1424,7 +1449,7 @@ const ProductDetail = () => {
 
                   <Button
                     onClick={handleAddToCart}
-                    className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-emerald-600 via-emerald-500 to-emerald-600 text-sm font-semibold shadow-lg hover:from-emerald-500 hover:via-emerald-500 hover:to-emerald-500"
+                    className="mt-4 h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 via-blue-500 to-blue-600 text-sm font-semibold shadow-lg hover:from-blue-500 hover:via-blue-500 hover:to-blue-500"
                     size="lg"
                     disabled={!product?.inStock}
                   >
@@ -1497,7 +1522,7 @@ const ProductDetail = () => {
                         <ul className="space-y-2">
                           {product.usage_guidelines.recommended_use.map((t, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="h-5 w-5 rounded-full bg-green-100 text-green-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
+                              <span className="h-5 w-5 rounded-full bg-blue-100 text-blue-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
                               <span>{t}</span>
                             </li>
                           ))}
@@ -1510,7 +1535,7 @@ const ProductDetail = () => {
                         <ul className="space-y-2">
                           {product.usage_guidelines.pro_tips.map((t, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="h-5 w-5 rounded-full bg-green-100 text-green-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
+                              <span className="h-5 w-5 rounded-full bg-blue-100 text-blue-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
                               <span>{t}</span>
                             </li>
                           ))}
@@ -1534,7 +1559,7 @@ const ProductDetail = () => {
                         <ul className="space-y-2">
                           {product.care_instructions.cleaning.map((t, i) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="h-5 w-5 rounded-full bg-green-100 text-green-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
+                              <span className="h-5 w-5 rounded-full bg-blue-100 text-blue-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
                               <span>{t}</span>
                             </li>
                           ))}
@@ -1547,7 +1572,7 @@ const ProductDetail = () => {
                         <ul className="space-y-2">
                           {(product.care_instructions?.storage || (product as any).care || []).map((t: string, i: number) => (
                             <li key={i} className="flex items-start gap-2 text-sm text-foreground">
-                              <span className="h-5 w-5 rounded-full bg-green-100 text-green-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
+                              <span className="h-5 w-5 rounded-full bg-blue-100 text-blue-600 grid place-items-center mt-0.5"><Check className="h-3 w-3" /></span>
                               <span>{t}</span>
                             </li>
                           ))}
@@ -1699,7 +1724,7 @@ const ProductDetail = () => {
             className="fixed bottom-24 right-4 z-50 md:bottom-8 md:right-8"
             aria-label="Order via WhatsApp"
           >
-            <div className="h-14 w-14 rounded-full bg-green-500 hover:bg-green-600 shadow-xl flex items-center justify-center text-white">
+            <div className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 shadow-xl flex items-center justify-center text-white">
               {/* WhatsApp Icon (inline SVG) */}
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" className="h-7 w-7 fill-current">
                 <path d="M27.1 4.9A13.9 13.9 0 0 0 16 .1C7.3.1.2 7.2.2 15.9c0 2.8.8 5.5 2.2 7.8L.1 32l8.5-2.2c2.2 1.2 4.7 1.9 7.3 1.9 8.7 0 15.8-7.1 15.8-15.8 0-4.2-1.7-8.2-4.6-11zm-11.1 24c-2.3 0-4.6-.6-6.6-1.8l-.5-.3-5.1 1.3 1.4-5-.3-.5c-1.3-2.1-2-4.5-2-7 0-7.3 6-13.3 13.3-13.3 3.6 0 6.9 1.4 9.4 3.9 2.5 2.5 3.9 5.8 3.9 9.4 0 7.3-6 13.3-13.3 13.3zm7.3-9.9c-.4-.2-2.3-1.1-2.6-1.2-.4-.1-.6-.2-.9.2-.3.4-1 1.2-1.2 1.4-.2.2-.4.3-.8.1-.4-.2-1.6-.6-3-1.9-1.1-1-1.9-2.3-2.1-2.7-.2-.4 0-.6.2-.8.2-.2.4-.4.5-.6.2-.2.3-.4.4-.6.1-.2 0-.5 0-.7s-.9-2.1-1.2-2.9c-.3-.7-.6-.6-.9-.6h-.8c-.3 0-.7.1-1 .5-.3.4-1.3 1.3-1.3 3.2s1.4 3.7 1.6 4 .3.6.6 1c.8 1.1 1.8 2.1 3 2.8 1 .6 2 .8 2.7 1 .9.3 1.8.2 2.5.1.8-.1 2.3-.9 2.6-1.8.3-.9.3-1.6.2-1.8-.1-.2-.3-.3-.7-.5z"/>
@@ -1738,7 +1763,7 @@ const ProductDetail = () => {
                   <span className="text-xs text-muted-foreground">Selected total</span>
                 </div>
                 <Button
-                  className="flex-1 max-w-[200px] shadow-lg bg-green-700 hover:bg-green-800"
+                  className="flex-1 max-w-[200px] shadow-lg bg-blue-700 hover:bg-blue-800"
                   onClick={handleAddToCart}
                   size="lg"
                   disabled={!product?.inStock}
