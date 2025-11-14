@@ -16,6 +16,8 @@ export default function ThemeManager() {
   const navigate = useNavigate();
   const [radius, setRadius] = useState<string>(() => localStorage.getItem('theme_radius') || '0.5rem');
   const [pc, setPc] = useState<ProductCardSettings>({ corner: 'rounded', shadow: 'soft', showWishlist: true, showTags: true, showDescription: true, ctaLabel: 'Add to Cart', ctaStyle: 'pill' });
+  const [bgHex, setBgHex] = useState<string>('#ffffffff');
+  const [darkBgHex, setDarkBgHex] = useState<string>('#0f172a');
 
   // Premade template themes (no backend schema change required)
   const templates = [
@@ -89,6 +91,12 @@ export default function ThemeManager() {
         dark_mode_accent_color_hsl: d.dark?.accentHsl || selected.dark_mode_accent_color_hsl || '26 29% 25%',
       });
       if (d.radiusRem) setRadius(d.radiusRem);
+      if (d.background?.hex) {
+        setBgHex(d.background.hex);
+      }
+      if (d.darkBackground?.hsl) {
+        setDarkBgHex(hslStringToHex(d.darkBackground.hsl));
+      }
       if (d.productCard) setPc({
         corner: d.productCard.corner || 'rounded',
         shadow: d.productCard.shadow || 'soft',
@@ -183,6 +191,8 @@ export default function ThemeManager() {
           dark: { primaryHsl: "26 29% 35%", accentHsl: "26 29% 25%" },
           radiusRem: radius,
           productCard: pc,
+          background: { hex: bgHex, hsl: hexToHslString(bgHex) },
+          darkBackground: { hsl: hexToHslString(darkBgHex) },
         }
       });
       const list = await getAllThemes();
@@ -237,6 +247,8 @@ export default function ThemeManager() {
           },
           radiusRem: radius,
           productCard: pc,
+          background: { hex: bgHex, hsl: hexToHslString(bgHex) },
+          darkBackground: { hsl: hexToHslString(darkBgHex) },
         }
       });
       setThemes(prev => prev.map(t => t.id === updated.id ? updated : t));
@@ -244,12 +256,16 @@ export default function ThemeManager() {
       // If the theme is active, reflect changes immediately
       if (updated.is_active) {
         const root = document.documentElement;
-        root.style.setProperty('--primary', (updated as any).data?.primary?.hsl || updated.primary_color_hsl || '26 29% 51%');
+        const data = (updated as any).data as any | undefined;
+        root.style.setProperty('--primary', data?.primary?.hsl || updated.primary_color_hsl || '26 29% 51%');
         const pfVal = ((updated as any).data?.textOnPrimary || updated.text_on_primary || '#ffffff') as string;
         const pfHsl = pfVal.startsWith('#') ? hexToHslString(pfVal) : pfVal;
         root.style.setProperty('--primary-foreground', pfHsl);
-        root.style.setProperty('--accent', (updated as any).data?.accent?.hsl || updated.accent_color_hsl || '26 29% 65%');
-        const r = (updated as any).data?.radiusRem || radius;
+        root.style.setProperty('--accent', data?.accent?.hsl || updated.accent_color_hsl || '26 29% 65%');
+        if (data?.background?.hsl) {
+          root.style.setProperty('--background', data.background.hsl);
+        }
+        const r = data?.radiusRem || radius;
         if (r) {
           localStorage.setItem('theme_radius', r);
           root.style.setProperty('--radius', r);
@@ -515,6 +531,29 @@ export default function ThemeManager() {
                       <div className="grid gap-2">
                         <Label>Dark mode accent</Label>
                         <input type="color" title="Dark mode accent" className="h-10 w-16 rounded-md border border-input bg-background" value={hslStringToHex(editing.dark_mode_accent_color_hsl || "26 29% 25%")} onChange={(e) => setEditing({ ...editing, dark_mode_accent_color_hsl: hexToHslString(e.target.value) })} />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid gap-2">
+                        <Label>Background</Label>
+                        <input
+                          type="color"
+                          title="Page background"
+                          className="h-10 w-16 rounded-md border border-input bg-background"
+                          value={bgHex}
+                          onChange={(e) => setBgHex(e.target.value)}
+                        />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Dark mode background</Label>
+                        <input
+                          type="color"
+                          title="Dark mode background"
+                          className="h-10 w-16 rounded-md border border-input bg-background"
+                          value={darkBgHex}
+                          onChange={(e) => setDarkBgHex(e.target.value)}
+                        />
                       </div>
                     </div>
                   </div>

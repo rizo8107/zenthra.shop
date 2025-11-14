@@ -199,7 +199,7 @@ export function Routes() {
                       
                       {/* Builder.io routes */}
                       <Route path="/builder/*" element={<BuilderPage />} />
-                      <Route path="/builder-preview/:path*" element={<BuilderPage />} />
+                      <Route path="/builder-preview/:path/*" element={<BuilderPage />} />
                       <Route path="/builder-example" element={<BuilderExample />} />
 
                       {/* Fallback */}

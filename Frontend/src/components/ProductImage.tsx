@@ -182,7 +182,6 @@ export const ProductImage = memo(function ProductImage({
                             isLoading ? "opacity-0" : "opacity-100"
                         )}
                         loading={priority ? "eager" : "lazy"}
-                        fetchPriority={priority ? "high" : "auto"}
                         onLoad={handleImageLoad}
                         onError={handleImageError}
                         decoding={priority ? "sync" : "async"}
@@ -200,7 +199,6 @@ export const ProductImage = memo(function ProductImage({
                         isLoading ? "opacity-0" : "opacity-100"
                     )}
                     loading={priority ? "eager" : "lazy"}
-                    fetchPriority={priority ? "high" : "auto"}
                     onLoad={handleImageLoad}
                     onError={handleImageError}
                     decoding={priority ? "sync" : "async"}
