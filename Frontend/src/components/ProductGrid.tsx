@@ -22,10 +22,10 @@ const ProductGrid = ({ products, title, loading = false }: ProductGridProps) => 
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, index) => (
           <div key={index} className="animate-pulse">
-            <div className="aspect-square bg-gray-100 rounded-lg mb-4"></div>
+            <div className="aspect-square bg-muted rounded-lg mb-4"></div>
             <div className="space-y-3">
-              <div className="h-4 bg-gray-100 rounded w-3/4"></div>
-              <div className="h-4 bg-gray-100 rounded w-1/2"></div>
+              <div className="h-4 bg-muted rounded w-3/4"></div>
+              <div className="h-4 bg-muted rounded w-1/2"></div>
             </div>
           </div>
         ))}
@@ -49,7 +49,7 @@ const ProductGrid = ({ products, title, loading = false }: ProductGridProps) => 
         <div className="text-center mt-12">
           <Button 
             onClick={showMore}
-            variant="outline"
+            variant="default"
             size="lg"
             className="gap-2"
           >

@@ -177,9 +177,9 @@ export const OfferBanner: ComponentConfig<OfferBannerProps> = {
       primary: "bg-primary",
       secondary: "bg-secondary",
       accent: "bg-accent",
-      red: "bg-red-600",
-      green: "bg-green-600",
-      blue: "bg-blue-600",
+      red: "bg-destructive",
+      green: "bg-emerald-600",
+      blue: "bg-primary", // map legacy blue option to theme primary
     };
 
     const textColorClasses = {
@@ -233,7 +233,7 @@ export const OfferBanner: ComponentConfig<OfferBannerProps> = {
                   variant="secondary"
                   asChild={!puck?.isEditing}
                   disabled={puck?.isEditing}
-                  className="ml-2 whitespace-nowrap bg-white text-black hover:bg-gray-100"
+                  className="ml-2 whitespace-nowrap bg-background text-foreground hover:bg-muted"
                 >
                   {puck?.isEditing ? buttonText : <a href={buttonHref}>{buttonText}</a>}
                 </UIButton>
@@ -300,7 +300,7 @@ export const OfferBanner: ComponentConfig<OfferBannerProps> = {
                   variant="secondary"
                   asChild={!puck?.isEditing}
                   disabled={puck?.isEditing}
-                  className="bg-white text-black hover:bg-gray-100"
+                  className="bg-background text-foreground hover:bg-muted"
                 >
                   {puck?.isEditing ? (
                     buttonText

@@ -954,8 +954,8 @@ const ProductDetail = () => {
               )}
             </Card>
 
-            {/* thumbnails */}
-            {displayImages?.length > 0 && (
+            {/* thumbnails (show only when there are multiple images) */}
+            {displayImages?.length > 1 && (
               <div className="grid grid-cols-4 gap-3">
                 {displayImages.map((image, index) => (
                   <button
@@ -1241,30 +1241,11 @@ const ProductDetail = () => {
                 </Button>
               </div>
             </Card>
-
-            {/* key features small list */}
-            {product.features && product.features.length > 0 && (
-              <div className="space-y-2 rounded-xl bg-white p-4 shadow-sm">
-                <p className="text-sm font-semibold text-foreground">
-                  Highlights
-                </p>
-                <ul className="space-y-1.5 text-sm text-muted-foreground">
-                  {product.features.slice(0, 4).map((feature, idx) => (
-                    <li key={idx} className="flex items-start gap-2">
-                      <span className="mt-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-100">
-                        <Check className="h-3 w-3 text-emerald-700" />
-                      </span>
-                      <span>{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         </div>
 
         {/* description / reviews tabs full width */}
-        <div className="mt-10 rounded-xl bg-white p-4 shadow-sm md:p-6">
+        <div className="mt-8 rounded-xl bg-white p-4 shadow-sm md:p-6">
           <Tabs defaultValue="description" className="w-full">
             <TabsList className="inline-flex h-11 rounded-full bg-muted">
               <TabsTrigger value="description" className="px-5 text-sm">
@@ -1318,7 +1299,7 @@ const ProductDetail = () => {
 
         {/* related products */}
         {relatedProducts.length > 0 && (
-          <div className="mt-12" id="related-products">
+          <div className="mt-8 md:mt-10" id="related-products">
             <h2 className="mb-6 text-xl font-semibold tracking-tight text-foreground md:text-2xl">
               You may also like
             </h2>

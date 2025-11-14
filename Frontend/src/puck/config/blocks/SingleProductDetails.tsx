@@ -56,9 +56,9 @@ function SingleProductClient({ productId, showGallery = true, showPrice = true, 
 
   // Must be declared before any early returns to keep hook order stable
   const themeStyles = useMemo(() => {
-    if (theme === "brand") return { btn: "from-violet-600 to-fuchsia-500", badge: "bg-violet-600/90" };
+    if (theme === "brand") return { btn: "from-primary to-accent", badge: "bg-primary/90" };
     if (theme === "neutral") return { btn: "from-stone-700 to-stone-500", badge: "bg-stone-700/90" };
-    return { btn: "from-blue-600 to-blue-500", badge: "bg-blue-700/90" };
+    return { btn: "from-primary to-accent", badge: "bg-primary/90" };
   }, [theme]);
 
   if (!productId) {

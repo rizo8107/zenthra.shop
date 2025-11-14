@@ -185,7 +185,7 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
         )}
         <div className={cn("grid gap-6", gridCols)}>
           {Array.from({ length: limit || 8 }).map((_, i) => (
-            <div key={i} className="bg-gray-200 animate-pulse h-80 rounded" />
+            <div key={i} className="bg-muted animate-pulse h-80 rounded" />
           ))}
         </div>
       </section>

@@ -194,7 +194,7 @@ export const CategorySection: ComponentConfig<CategorySectionProps> = {
                   }
                 }}
               >
-                <div className="relative overflow-hidden rounded-lg bg-gray-100 aspect-[4/3] mb-4">
+                <div className="relative overflow-hidden rounded-lg bg-muted aspect-[4/3] mb-4">
                   <img
                     src={category.image || "https://via.placeholder.com/300x200"}
                     alt={category.name}

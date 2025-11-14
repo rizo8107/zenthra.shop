@@ -68,13 +68,13 @@ const ImageSelectorContent = ({ value, onChange, fieldName }: { value?: string; 
     return (
       <div className="space-y-3">
         {/* Compact header */}
-        <div className="flex items-center justify-between gap-3 border rounded-md p-2 bg-gray-50">
+        <div className="flex items-center justify-between gap-3 border rounded-md p-2 bg-muted">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-16 rounded bg-gray-200 overflow-hidden flex items-center justify-center">
+            <div className="h-10 w-16 rounded bg-muted overflow-hidden flex items-center justify-center">
               {currentThumb ? (
                 <img src={currentThumb} alt="Selected" className="h-full w-full object-cover" />
               ) : (
-                <ImageIcon className="h-5 w-5 text-gray-400" />
+                <ImageIcon className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
             <div className="min-w-0">
@@ -132,7 +132,7 @@ const ImageSelectorContent = ({ value, onChange, fieldName }: { value?: string; 
         {value && (
           <div className="border rounded-lg p-2">
             <p className="text-xs text-muted-foreground mb-2">Current Image:</p>
-            <div className="relative aspect-video bg-gray-100 rounded overflow-hidden">
+            <div className="relative aspect-video bg-muted rounded overflow-hidden">
               <img 
                 src={value} 
                 alt="Selected" 
@@ -161,10 +161,10 @@ const ImageSelectorContent = ({ value, onChange, fieldName }: { value?: string; 
                     key={item.id}
                     type="button"
                     onClick={() => onChange(imageUrl)}
-                    className={`relative aspect-square bg-gray-100 rounded overflow-hidden border-2 transition-all ${
+                    className={`relative aspect-square bg-muted rounded overflow-hidden border-2 transition-all ${
                       isSelected 
                         ? 'border-primary shadow-md' 
-                        : 'border-transparent hover:border-gray-300'
+                        : 'border-transparent hover:border-border'
                     }`}
                   >
                     <img
@@ -187,7 +187,7 @@ const ImageSelectorContent = ({ value, onChange, fieldName }: { value?: string; 
             </div>
           ) : (
             <div className="text-center py-8 border rounded-lg">
-              <ImageIcon className="h-12 w-12 mx-auto text-gray-400 mb-2" />
+              <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">No images uploaded yet</p>
             </div>
           )}

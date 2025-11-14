@@ -108,7 +108,7 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
           key={index}
           className={cn(
             "text-lg",
-            index < rating ? "text-yellow-400" : "text-gray-300"
+            index < rating ? "text-yellow-400" : "text-muted-foreground/30"
           )}
         >
           ★
@@ -117,7 +117,7 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
     };
 
     return (
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {(title || subtitle) && (
             <div className="text-center mb-12">
@@ -136,7 +136,7 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
             {(testimonials || []).map((testimonial, index) => (
               <div
                 key={index}
-                className="bg-white rounded-lg p-6 shadow-sm border"
+                className="bg-card rounded-lg p-6 shadow-sm border border-border"
               >
                 {showRating && testimonial.rating && (
                   <div className="flex mb-4">
@@ -144,7 +144,7 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
                   </div>
                 )}
                 
-                <blockquote className="text-gray-700 mb-6">
+                <blockquote className="text-foreground mb-6">
                   "{testimonial.content}"
                 </blockquote>
                 
