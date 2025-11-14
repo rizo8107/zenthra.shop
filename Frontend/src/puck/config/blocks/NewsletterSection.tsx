@@ -83,8 +83,8 @@ export const NewsletterSection: ComponentConfig<NewsletterSectionProps> = {
     puck,
   }) => {
     const backgroundClasses = {
-      white: "bg-white",
-      gray: "bg-gray-50",
+      white: "bg-card",
+      gray: "bg-muted",
       primary: "bg-primary",
       secondary: "bg-secondary",
     };
@@ -139,7 +139,7 @@ export const NewsletterSection: ComponentConfig<NewsletterSectionProps> = {
               <Input
                 type="email"
                 placeholder={placeholder || "Enter your email"}
-                className="flex-1 bg-white text-black"
+                className="flex-1 bg-background text-foreground"
                 disabled={puck?.isEditing}
                 required
               />
@@ -147,7 +147,7 @@ export const NewsletterSection: ComponentConfig<NewsletterSectionProps> = {
                 type="submit"
                 variant="secondary"
                 disabled={puck?.isEditing}
-                className="bg-white text-black hover:bg-gray-100"
+                className="bg-background text-foreground hover:bg-muted"
               >
                 {buttonText || "Subscribe"}
               </UIButton>

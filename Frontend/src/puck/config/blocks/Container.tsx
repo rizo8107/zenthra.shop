@@ -66,8 +66,8 @@ export const Container: ComponentConfig<ContainerProps> = {
 
     const backgroundClasses = {
       transparent: "",
-      white: "bg-white",
-      gray: "bg-gray-50",
+      white: "bg-card",
+      gray: "bg-muted",
       primary: "bg-primary text-primary-foreground",
     };
 

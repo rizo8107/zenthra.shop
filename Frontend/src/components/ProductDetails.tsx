@@ -304,14 +304,15 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
   const hasCare = orderConfig?.showCareInstructions !== false && (cleaningList.length > 0 || storageList.length > 0);
   const hasFeatures = orderConfig?.showFeaturesAndBenefits !== false && featureList.length > 0;
   const hasUsage = orderConfig?.showUsageGuidelines !== false && (usageRecommended.length > 0 || usageTips.length > 0);
+  const hasVideo = !!product.videoUrl;
 
   const recommendations = recommendedProducts.filter((item) => item.id !== product.id).slice(0, 4);
   const showRecommendations = recommendedLoading || recommendedError || recommendations.length > 0;
 
   return (
-    <div className="space-y-8 md:space-y-10 pb-10">
-      <div className="grid gap-6 md:grid-cols-2">
-        {product.videoUrl && (
+    <div className="space-y-6 md:space-y-8 pb-8">
+      <div className={`grid gap-6 ${hasVideo ? 'md:grid-cols-2' : ''}`}>
+        {hasVideo && (
           <Card className="overflow-hidden border-none shadow-xl bg-gradient-to-br from-blue-900 via-slate-900 to-slate-950 text-white">
             <CardHeader className="space-y-1">
               <CardTitle className="text-lg font-semibold">Product Story</CardTitle>

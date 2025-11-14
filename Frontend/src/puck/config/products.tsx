@@ -137,7 +137,7 @@ export const StaticProductGrid = {
           <div className={cn("grid gap-6", columnClasses[columns as keyof typeof columnClasses] || columnClasses["4"])}>
             {sampleProducts.map((product) => (
               <div key={product.id} className="group cursor-pointer">
-                <div className="relative overflow-hidden rounded-lg bg-gray-100 aspect-square mb-4">
+                <div className="relative overflow-hidden rounded-lg bg-muted aspect-square mb-4">
                   {product.bestseller && (
                     <Badge className="absolute top-2 left-2 z-10 bg-primary">
                       Bestseller
@@ -182,7 +182,7 @@ export const StaticProductGrid = {
           </div>
           
           <div className="text-center mt-12">
-            <button className="px-6 py-2 border border-primary text-primary hover:bg-primary hover:text-white transition-colors rounded">
+            <button className="px-6 py-2 border border-primary text-primary hover:bg-primary/90 hover:text-primary-foreground transition-colors rounded">
               Load More Products
             </button>
           </div>
@@ -223,7 +223,7 @@ export const HeroSection = {
     <section 
       className="relative h-96 md:h-[500px] flex items-center justify-center bg-cover bg-center"
       style={{
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',
       }}
     >
       <div className="absolute inset-0 bg-black/40" />
@@ -244,7 +244,7 @@ export const HeroSection = {
             <div className="pt-4">
               <a
                 href={buttonLink}
-                className="inline-block bg-white text-black px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                className="inline-block bg-background text-foreground px-8 py-3 rounded-lg font-medium hover:bg-muted transition-colors"
               >
                 {buttonText}
               </a>

@@ -111,7 +111,7 @@ export const ProductGrid = {
             )}
             <div className={cn("grid gap-6", columnClasses[columns as keyof typeof columnClasses] || columnClasses["4"])}>
               {Array.from({ length: limit || 8 }).map((_, index) => (
-                <div key={index} className="bg-gray-200 animate-pulse rounded-lg h-80" />
+                <div key={index} className="bg-muted animate-pulse rounded-lg h-80" />
               ))}
             </div>
           </div>
@@ -135,7 +135,7 @@ export const ProductGrid = {
             <div className={cn("grid gap-6", columnClasses[columns as keyof typeof columnClasses] || columnClasses["4"])}>
               {products.map((product) => (
                 <div key={product.id} className="group cursor-pointer">
-                  <div className="relative overflow-hidden rounded-lg bg-gray-100 aspect-square mb-4">
+                  <div className="relative overflow-hidden rounded-lg bg-muted aspect-square mb-4">
                     {product.bestseller && (
                       <Badge className="absolute top-2 left-2 z-10 bg-primary">
                         Bestseller
@@ -148,8 +148,8 @@ export const ProductGrid = {
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                        <span className="text-gray-400">No Image</span>
+                      <div className="w-full h-full bg-muted flex items-center justify-center">
+                        <span className="text-muted-foreground">No Image</span>
                       </div>
                     )}
                   </div>
@@ -191,7 +191,7 @@ export const ProductGrid = {
           )}
           
           <div className="text-center mt-12">
-            <button className="px-6 py-2 border border-primary text-primary hover:bg-primary hover:text-white transition-colors rounded">
+            <button className="px-6 py-2 border border-primary text-primary hover:bg-primary/90 hover:text-primary-foreground transition-colors rounded">
               Load More Products
             </button>
           </div>
@@ -232,7 +232,9 @@ export const HeroSection = {
     <section 
       className="relative h-96 md:h-[500px] flex items-center justify-center"
       style={{
-        backgroundImage: backgroundImage ? `url(${backgroundImage})` : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+        backgroundImage: backgroundImage
+          ? `url(${backgroundImage})`
+          : 'linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)',
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
@@ -255,7 +257,7 @@ export const HeroSection = {
             <div className="pt-4">
               <a
                 href={buttonLink}
-                className="inline-block bg-white text-black px-8 py-3 rounded-lg font-medium hover:bg-gray-100 transition-colors"
+                className="inline-block bg-background text-foreground px-8 py-3 rounded-lg font-medium hover:bg-muted transition-colors"
               >
                 {buttonText}
               </a>
