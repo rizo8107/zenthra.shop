@@ -1,6 +1,12 @@
 import { ComponentConfig } from "@measured/puck";
 import ProductCard from "@/components/ProductCard";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type TouchEvent,
+} from "react";
 import { getProducts, Product } from "@/lib/pocketbase";
 import { cn } from "@/lib/utils";
 
@@ -20,23 +26,41 @@ export interface ProductGridProps {
   showDots?: boolean;
   // Card overrides
   cardShowDescription?: boolean;
-  cardTitleSize?: 'sm' | 'md' | 'lg';
-  cardDescSize?: 'sm' | 'md' | 'lg';
+  cardTitleSize?: "sm" | "md" | "lg";
+  cardDescSize?: "sm" | "md" | "lg";
   cardCtaLabel?: string;
-  cardImageRatio?: 'portrait' | 'square' | 'wide';
-  cardSpacing?: 'compact' | 'comfortable';
+  cardImageRatio?: "portrait" | "square" | "wide";
+  cardSpacing?: "compact" | "comfortable";
 }
 
-// Wrapper component that can use hooks
-const ProductGridContent = ({ title, description, category, limit, columnsDesktop, columnsTablet, columnsMobile, showFeatured, mode, carouselRows = 1, showArrows = true, showDots = true, cardShowDescription, cardTitleSize, cardDescSize, cardCtaLabel, cardImageRatio, cardSpacing }: ProductGridProps) => {
+const ProductGridContent = ({
+  title,
+  description,
+  category,
+  limit,
+  columnsDesktop,
+  columnsTablet,
+  columnsMobile,
+  showFeatured,
+  mode,
+  carouselRows = 1,
+  showArrows = true,
+  showDots = true,
+  cardShowDescription,
+  cardTitleSize,
+  cardDescSize,
+  cardCtaLabel,
+  cardImageRatio,
+  cardSpacing,
+}: ProductGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [device, setDevice] = useState<"desktop" | "tablet" | "mobile">("desktop");
   const [internalCategory, setInternalCategory] = useState<string>(category || "");
+
   useEffect(() => {
     setInternalCategory(category || "");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
   useEffect(() => {
@@ -44,28 +68,31 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
       try {
         setLoading(true);
         const allProducts = await getProducts();
-        
-        // Filter products
+
         let filtered = allProducts;
-        
+
         if (showFeatured) {
-          filtered = filtered.filter(p => p.bestseller);
+          filtered = filtered.filter((p) => p.bestseller);
         }
-        
+
         if (internalCategory) {
           const term = internalCategory.toLowerCase();
-          filtered = filtered.filter(p => {
+          filtered = filtered.filter((p) => {
             const name = p.name?.toLowerCase() || "";
-            const cat = (p as any).category?.toLowerCase?.() || ("" + (p as any).category || "").toLowerCase();
-            const desc = (p as any).description?.toLowerCase?.() || ("" + (p as any).description || "").toLowerCase();
+            const cat =
+              (p as any).category?.toLowerCase?.() ||
+              ("" + (p as any).category || "").toLowerCase();
+            const desc =
+              (p as any).description?.toLowerCase?.() ||
+              ("" + (p as any).description || "").toLowerCase();
             return name.includes(term) || cat.includes(term) || desc.includes(term);
           });
         }
-        
+
         filtered = filtered.slice(0, limit || 8);
         setProducts(filtered);
       } catch (error) {
-        console.error('Error fetching products:', error);
+        console.error("Error fetching products:", error);
         setProducts([]);
       } finally {
         setLoading(false);
@@ -75,49 +102,61 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
     fetchProducts();
   }, [limit, internalCategory, showFeatured]);
 
-  // Track container device breakpoint with hysteresis to reduce jitter
+  // track breakpoint
   useEffect(() => {
     const el = containerRef.current;
-    const compute = (w: number): "desktop" | "tablet" | "mobile" => (w >= 1024 ? "desktop" : w >= 640 ? "tablet" : "mobile");
-    const H = 24; // px hysteresis
+    const compute = (w: number): "desktop" | "tablet" | "mobile" =>
+      w >= 1024 ? "desktop" : w >= 640 ? "tablet" : "mobile";
+
+    const H = 24;
     let raf: number | null = null;
+
     const update = (w: number) => {
       setDevice((prev) => {
         if (prev === "desktop") return w < 1024 - H ? compute(w) : prev;
-        if (prev === "tablet") return (w > 1024 + H || w < 640 - H) ? compute(w) : prev;
-        // mobile
+        if (prev === "tablet")
+          return w > 1024 + H || w < 640 - H ? compute(w) : prev;
         return w > 640 + H ? compute(w) : prev;
       });
     };
+
     if (!el || typeof ResizeObserver === "undefined") {
       const w = typeof window !== "undefined" ? window.innerWidth : 0;
       update(w);
       return;
     }
+
     const ro = new ResizeObserver((entries) => {
       const w = entries[0]?.contentRect?.width || 0;
       if (raf) cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => update(w));
     });
+
     ro.observe(el);
     update(el.clientWidth);
-    return () => { ro.disconnect(); if (raf) cancelAnimationFrame(raf); };
+
+    return () => {
+      ro.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
   }, []);
 
   const gridCols = useMemo(() => {
-    const m = Math.max(1, (columnsMobile || 1));
-    const t = Math.max(1, (columnsTablet || 2));
-    const d = Math.max(1, (columnsDesktop || 4));
-    const cls = [
-      `grid-cols-${m}`,
-      `sm:grid-cols-${t}`,
-      `lg:grid-cols-${d}`,
-    ];
-    return cls.join(" ");
+    const m = Math.max(1, columnsMobile || 1);
+    const t = Math.max(1, columnsTablet || 2);
+    const d = Math.max(1, columnsDesktop || 4);
+    return [`grid-cols-${m}`, `sm:grid-cols-${t}`, `lg:grid-cols-${d}`].join(" ");
   }, [columnsMobile, columnsTablet, columnsDesktop]);
 
-  const currentCols = device === "desktop" ? (columnsDesktop || 4) : device === "tablet" ? (columnsTablet || 2) : (columnsMobile || 1);
+  const currentCols =
+    device === "desktop"
+      ? columnsDesktop || 4
+      : device === "tablet"
+      ? columnsTablet || 2
+      : columnsMobile || 1;
+
   const itemsPerPage = (currentCols as number) * (carouselRows as number);
+
   const pages = useMemo(() => {
     if (mode !== "carousel" || !products.length) return [] as Product[][];
     const chunks: Product[][] = [];
@@ -127,123 +166,145 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
     return chunks;
   }, [products, itemsPerPage, mode]);
 
-  // Build card overrides once (must be before any early returns)
-  const cardOverrides = useMemo(() => ({
-    showDescription: cardShowDescription,
-    titleSize: cardTitleSize,
-    descSize: cardDescSize,
-    ctaLabel: cardCtaLabel,
-    imageRatio: cardImageRatio,
-    spacing: cardSpacing,
-  }), [cardShowDescription, cardTitleSize, cardDescSize, cardCtaLabel, cardImageRatio, cardSpacing]);
+  const cardOverrides = useMemo(
+    () => ({
+      showDescription: cardShowDescription,
+      titleSize: cardTitleSize,
+      descSize: cardDescSize,
+      ctaLabel: cardCtaLabel,
+      imageRatio: cardImageRatio,
+      spacing: cardSpacing,
+    }),
+    [
+      cardShowDescription,
+      cardTitleSize,
+      cardDescSize,
+      cardCtaLabel,
+      cardImageRatio,
+      cardSpacing,
+    ]
+  );
 
   const [pageIndex, setPageIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
-  
+
   useEffect(() => setPageIndex(0), [itemsPerPage, mode, products.length]);
 
-  // Handle touch events for swipe functionality
-  const handleTouchStart = (e: React.TouchEvent) => {
+  // swipe
+  const handleTouchStart = (e: TouchEvent<HTMLDivElement>) => {
     setTouchEnd(null);
     setTouchStart(e.targetTouches[0].clientX);
   };
 
-  const handleTouchMove = (e: React.TouchEvent) => {
+  const handleTouchMove = (e: TouchEvent<HTMLDivElement>) => {
     setTouchEnd(e.targetTouches[0].clientX);
   };
 
   const handleTouchEnd = () => {
     if (!touchStart || !touchEnd) return;
-    
     const distance = touchStart - touchEnd;
-    const isLeftSwipe = distance > 30; // Reduced threshold for better sensitivity
+    const isLeftSwipe = distance > 30;
     const isRightSwipe = distance < -30;
 
     if (isLeftSwipe && pageIndex < pages.length - 1) {
-      setPageIndex(prev => prev + 1);
+      setPageIndex((prev) => prev + 1);
     }
     if (isRightSwipe && pageIndex > 0) {
-      setPageIndex(prev => prev - 1);
+      setPageIndex((prev) => prev - 1);
     }
-    
-    // Reset touch states
     setTouchStart(null);
     setTouchEnd(null);
   };
 
+  const SectionShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
+    <section className="py-10 md:py-12 bg-background">
+      <div ref={containerRef} className="konipai-container">
+        {(title || description) && (
+          <header className="mb-6 md:mb-8 text-center flex flex-col items-center gap-2">
+            {title && (
+              <h2 className="text-2xl md:text-3xl font-semibold text-foreground">
+                {title}
+              </h2>
+            )}
+            {description && (
+              <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
+                {description}
+              </p>
+            )}
+          </header>
+        )}
+        {children}
+      </div>
+    </section>
+  );
+
+  // Loading
   if (loading) {
     return (
-      <section className="py-12 overflow-x-hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" ref={containerRef}>
-        {title && (
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold">{title}</h2>
-          </div>
-        )}
-        {description && (
-          <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-6">{description}</p>
-        )}
-        <div className={cn("grid gap-6", gridCols)}>
+      <SectionShell>
+        <div className={cn("grid gap-5 md:gap-6", gridCols)}>
           {Array.from({ length: limit || 8 }).map((_, i) => (
-            <div key={i} className="bg-muted animate-pulse h-80 rounded" />
+            <div
+              key={i}
+              className="h-64 sm:h-72 rounded-xl bg-muted/60 animate-pulse border border-border/60"
+            />
           ))}
         </div>
-      </section>
+      </SectionShell>
     );
   }
 
-  // Empty state: show fallback filter chips when no products
+  // Empty state
   if (!loading && products.length === 0) {
     const chips = ["soap", "oil", "powder"];
     return (
-      <section className="py-12 overflow-x-hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" ref={containerRef}>
-        {title && (
-          <div className="text-center mb-2">
-            <h2 className="text-3xl font-bold">{title}</h2>
+      <SectionShell>
+        <div className="mx-auto max-w-xl">
+          <div className="bg-card border border-dashed border-border rounded-2xl p-6 md:p-8 text-center space-y-4">
+            <p className="text-sm md:text-base text-muted-foreground">
+              No products found for this selection.
+            </p>
+            <p className="text-xs md:text-sm text-muted-foreground">
+              Try a quick filter:
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              {chips.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className={cn(
+                    "px-3 py-1.5 rounded-full border text-xs md:text-sm bg-background transition-colors",
+                    internalCategory.toLowerCase() === c
+                      ? "bg-primary text-primary-foreground border-primary"
+                      : "hover:bg-muted"
+                  )}
+                  onClick={() => setInternalCategory(c)}
+                >
+                  {c.charAt(0).toUpperCase() + c.slice(1)}
+                </button>
+              ))}
+              {internalCategory && (
+                <button
+                  type="button"
+                  className="px-3 py-1.5 rounded-full border text-xs md:text-sm hover:bg-muted bg-background"
+                  onClick={() => setInternalCategory("")}
+                >
+                  Clear filter
+                </button>
+              )}
+            </div>
           </div>
-        )}
-        {description && (
-          <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-4">{description}</p>
-        )}
-        <p className="text-center text-sm text-muted-foreground mb-4">No products found. Try a quick filter:</p>
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          {chips.map((c) => (
-            <button
-              key={c}
-              type="button"
-              className={cn("px-3 py-1 rounded-full border text-sm", internalCategory.toLowerCase() === c ? "bg-primary text-primary-foreground border-primary" : "hover:bg-muted")}
-              onClick={() => setInternalCategory(c)}
-            >
-              {c.charAt(0).toUpperCase() + c.slice(1)}
-            </button>
-          ))}
-          {internalCategory && (
-            <button
-              type="button"
-              className="px-3 py-1 rounded-full border text-sm hover:bg-muted"
-              onClick={() => setInternalCategory("")}
-            >
-              Clear
-            </button>
-          )}
         </div>
-      </section>
+      </SectionShell>
     );
   }
 
   // Grid mode
   if (mode !== "carousel") {
     return (
-      <section className="py-12 overflow-x-hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" ref={containerRef}>
-        {title && (
-          <div className="text-center mb-4">
-            <h2 className="text-3xl font-bold">{title}</h2>
-          </div>
-        )}
-        {description && (
-          <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-6">{description}</p>
-        )}
-        <div className={cn("grid gap-6", gridCols)}>
+      <SectionShell>
+        <div className={cn("grid gap-5 md:gap-6", gridCols)}>
           {products.map((product, index) => (
             <ProductCard
               key={product.id}
@@ -253,35 +314,26 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
             />
           ))}
         </div>
-      </section>
+      </SectionShell>
     );
   }
 
   // Carousel mode
   return (
-    <section className="py-12 overflow-x-hidden max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" ref={containerRef}>
-      {title && (
-        <div className="text-center mb-4">
-          <h2 className="text-3xl font-bold">{title}</h2>
-        </div>
-      )}
-      {description && (
-        <p className="text-muted-foreground text-center max-w-2xl mx-auto mb-6">{description}</p>
-      )}
-
+    <SectionShell>
       <div className="relative">
         {showArrows && pages.length > 1 && (
           <>
             <button
               aria-label="Previous"
-              className="absolute left-1 top-1/2 -translate-y-1/2 z-10 h-6 w-6 rounded-full bg-primary/80 text-primary-foreground hover:bg-primary text-xs font-bold shadow-md"
+              className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-background/90 border border-border text-foreground hover:bg-muted shadow-sm items-center justify-center text-sm"
               onClick={() => setPageIndex((p) => Math.max(0, p - 1))}
             >
               ‹
             </button>
             <button
               aria-label="Next"
-              className="absolute right-1 top-1/2 -translate-y-1/2 z-10 h-6 w-6 rounded-full bg-primary/80 text-primary-foreground hover:bg-primary text-xs font-bold shadow-md"
+              className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 h-8 w-8 rounded-full bg-background/90 border border-border text-foreground hover:bg-muted shadow-sm items-center justify-center text-sm"
               onClick={() => setPageIndex((p) => Math.min(pages.length - 1, p + 1))}
             >
               ›
@@ -289,29 +341,32 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
           </>
         )}
 
-        <div 
-          className="overflow-hidden rounded-lg"
+        <div
+          className="overflow-hidden rounded-2xl bg-transparent"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
         >
-          <div 
-            className="flex carousel-smooth" 
-            style={{ 
-              transform: `translate3d(-${pageIndex * 100}%, 0, 0)`
-            }}
+          <div
+            className="flex carousel-smooth"
+            style={{ transform: `translate3d(-${pageIndex * 100}%, 0, 0)` }}
           >
             {pages.map((group, gi) => (
-              <div key={gi} className="shrink-0 w-full px-1">
-                <div 
-                  className={cn("grid gap-6", `grid-cols-${currentCols}`)} 
-                  style={{ 
+              <div key={gi} className="shrink-0 w-full px-1 sm:px-2">
+                <div
+                  className={cn("grid gap-5 md:gap-6", `grid-cols-${currentCols}`)}
+                  style={{
                     gridAutoRows: "1fr",
-                    minHeight: "400px" // Prevent layout shifts
+                    minHeight: "360px",
                   }}
                 >
                   {group.map((product, index) => (
-                    <ProductCard key={product.id} product={product} priority={index < currentCols} overrides={cardOverrides} />
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      priority={index < currentCols}
+                      overrides={cardOverrides}
+                    />
                   ))}
                 </div>
               </div>
@@ -322,12 +377,22 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
         {showDots && pages.length > 1 && (
           <div className="flex items-center justify-center gap-2 mt-4">
             {pages.map((_, di) => (
-              <button key={di} aria-label={`Go to page ${di + 1}`} className={cn("h-2.5 w-2.5 rounded-full", di === pageIndex ? "bg-foreground" : "bg-foreground/40")} onClick={() => setPageIndex(di)} />
+              <button
+                key={di}
+                aria-label={`Go to page ${di + 1}`}
+                className={cn(
+                  "h-2.5 w-2.5 rounded-full transition-colors",
+                  di === pageIndex
+                    ? "bg-primary"
+                    : "bg-muted-foreground/40 hover:bg-muted-foreground/70"
+                )}
+                onClick={() => setPageIndex(di)}
+              />
             ))}
           </div>
         )}
       </div>
-    </section>
+    </SectionShell>
   );
 };
 
@@ -337,19 +402,43 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
     description: { type: "textarea", label: "Description (optional)" },
     category: { type: "text", label: "Category Filter" },
     limit: { type: "number", label: "Number of Products", min: 1, max: 40 },
-    mode: { type: "select", label: "Display Mode", options: [
-      { label: "Grid", value: "grid" },
-      { label: "Carousel", value: "carousel" },
-    ]},
-    columnsDesktop: { type: "select", label: "Desktop Columns", options: [
-      { label: "2", value: 2 }, { label: "3", value: 3 }, { label: "4", value: 4 }
-    ]},
-    columnsTablet: { type: "select", label: "Tablet Columns", options: [
-      { label: "1", value: 1 }, { label: "2", value: 2 }, { label: "3", value: 3 }, { label: "4", value: 4 }
-    ]},
-    columnsMobile: { type: "select", label: "Mobile Columns", options: [
-      { label: "1", value: 1 }, { label: "2", value: 2 }, { label: "3", value: 3 }, { label: "4", value: 4 }
-    ]},
+    mode: {
+      type: "select",
+      label: "Display Mode",
+      options: [
+        { label: "Grid", value: "grid" },
+        { label: "Carousel", value: "carousel" },
+      ],
+    },
+    columnsDesktop: {
+      type: "select",
+      label: "Desktop Columns",
+      options: [
+        { label: "2", value: 2 },
+        { label: "3", value: 3 },
+        { label: "4", value: 4 },
+      ],
+    },
+    columnsTablet: {
+      type: "select",
+      label: "Tablet Columns",
+      options: [
+        { label: "1", value: 1 },
+        { label: "2", value: 2 },
+        { label: "3", value: 3 },
+        { label: "4", value: 4 },
+      ],
+    },
+    columnsMobile: {
+      type: "select",
+      label: "Mobile Columns",
+      options: [
+        { label: "1", value: 1 },
+        { label: "2", value: 2 },
+        { label: "3", value: 3 },
+        { label: "4", value: 4 },
+      ],
+    },
     showFeatured: {
       type: "radio",
       options: [
@@ -357,28 +446,74 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
         { label: "Featured Only", value: true },
       ],
     },
-    carouselRows: { type: "select", label: "Carousel Rows", options: [
-      { label: "1", value: 1 }, { label: "2", value: 2 }
-    ]},
-    showArrows: { type: "radio", label: "Show Arrows", options: [{ label: "No", value: false }, { label: "Yes", value: true }] },
-    showDots: { type: "radio", label: "Show Dots", options: [{ label: "No", value: false }, { label: "Yes", value: true }] },
-    // Card overrides
-    cardShowDescription: { type: 'radio', label: 'Card: Show Description', options: [
-      { label: 'No', value: false }, { label: 'Yes', value: true }
-    ]},
-    cardTitleSize: { type: 'select', label: 'Card: Title Size', options: [
-      { label: 'Small', value: 'sm' }, { label: 'Medium', value: 'md' }, { label: 'Large', value: 'lg' }
-    ]},
-    cardDescSize: { type: 'select', label: 'Card: Description Size', options: [
-      { label: 'Small', value: 'sm' }, { label: 'Medium', value: 'md' }, { label: 'Large', value: 'lg' }
-    ]},
-    cardCtaLabel: { type: 'text', label: 'Card: CTA Label' },
-    cardImageRatio: { type: 'select', label: 'Card: Image Ratio', options: [
-      { label: 'Portrait', value: 'portrait' }, { label: 'Square', value: 'square' }, { label: 'Wide', value: 'wide' }
-    ]},
-    cardSpacing: { type: 'select', label: 'Card: Spacing', options: [
-      { label: 'Compact', value: 'compact' }, { label: 'Comfortable', value: 'comfortable' }
-    ]},
+    carouselRows: {
+      type: "select",
+      label: "Carousel Rows",
+      options: [
+        { label: "1", value: 1 },
+        { label: "2", value: 2 },
+      ],
+    },
+    showArrows: {
+      type: "radio",
+      label: "Show Arrows",
+      options: [
+        { label: "No", value: false },
+        { label: "Yes", value: true },
+      ],
+    },
+    showDots: {
+      type: "radio",
+      label: "Show Dots",
+      options: [
+        { label: "No", value: false },
+        { label: "Yes", value: true },
+      ],
+    },
+    cardShowDescription: {
+      type: "radio",
+      label: "Card: Show Description",
+      options: [
+        { label: "No", value: false },
+        { label: "Yes", value: true },
+      ],
+    },
+    cardTitleSize: {
+      type: "select",
+      label: "Card: Title Size",
+      options: [
+        { label: "Small", value: "sm" },
+        { label: "Medium", value: "md" },
+        { label: "Large", value: "lg" },
+      ],
+    },
+    cardDescSize: {
+      type: "select",
+      label: "Card: Description Size",
+      options: [
+        { label: "Small", value: "sm" },
+        { label: "Medium", value: "md" },
+        { label: "Large", value: "lg" },
+      ],
+    },
+    cardCtaLabel: { type: "text", label: "Card: CTA Label" },
+    cardImageRatio: {
+      type: "select",
+      label: "Card: Image Ratio",
+      options: [
+        { label: "Portrait", value: "portrait" },
+        { label: "Square", value: "square" },
+        { label: "Wide", value: "wide" },
+      ],
+    },
+    cardSpacing: {
+      type: "select",
+      label: "Card: Spacing",
+      options: [
+        { label: "Compact", value: "compact" },
+        { label: "Comfortable", value: "comfortable" },
+      ],
+    },
   },
   defaultProps: {
     title: "Featured Products",
@@ -394,11 +529,8 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
     showDots: true,
     cardShowDescription: true,
   },
-  render: (props) => {
-    return <ProductGridContent {...props} />;
-  },
+  render: (props) => <ProductGridContent {...props} />,
 };
 
-// Backward compatibility exports (kept to avoid breaking existing pages)
 export const KarigaiProductGrid: ComponentConfig<ProductGridProps> = ProductGrid;
 export const poructgrind: ComponentConfig<ProductGridProps> = ProductGrid;
