@@ -4,7 +4,8 @@
 
 @layer base {
   :root {
-    --background: 227 100% 97%;
+    /* Neutral light background (removes blue tint from pages & navbar) */
+    --background: 0 0% 100%;
     --foreground: 229 35% 18%;
 
     --card: 0 0% 100%;

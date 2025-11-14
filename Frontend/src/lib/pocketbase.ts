@@ -674,6 +674,8 @@ export interface ThemeData {
     dark: { primaryHsl: string; accentHsl: string };
     radiusRem?: string;
     productCard?: ProductCardSettings;
+    background?: { hex: string; hsl: string };
+    darkBackground?: { hsl: string };
 }
 
 export interface ThemeSettings extends RecordModel {
@@ -792,7 +794,8 @@ export const getActiveTheme = async (): Promise<ThemeSettings | null> => {
     try {
         const result = await pocketbase.collection(Collections.THEME_SETTINGS).getList(1, 1, {
             filter: 'is_active=true',
-            sort: '-created'
+            sort: '-created',
+            $autoCancel: false
         });
         
         if (result.items.length > 0) {
@@ -808,7 +811,8 @@ export const getActiveTheme = async (): Promise<ThemeSettings | null> => {
 export const getAllThemes = async (): Promise<ThemeSettings[]> => {
     try {
         const result = await pocketbase.collection(Collections.THEME_SETTINGS).getFullList({
-            sort: '-created'
+            sort: '-created',
+            $autoCancel: false
         });
         return result as unknown as ThemeSettings[];
     } catch (error) {

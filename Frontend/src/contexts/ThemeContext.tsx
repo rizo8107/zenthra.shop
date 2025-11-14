@@ -85,6 +85,11 @@ export const DynamicThemeProvider: React.FC<{ children: React.ReactNode }> = ({ 
       };
       root.style.setProperty('--primary-foreground', toHsl(theme.text_on_primary));
       root.style.setProperty('--accent', theme.accent_color_hsl);
+
+      const themeData = (theme as any).data as ThemeData | undefined;
+      if (themeData?.background?.hsl) {
+        root.style.setProperty('--background', themeData.background.hsl);
+      }
       // Apply radius from local preference if any
       const savedRadius = localStorage.getItem('theme_radius');
       if (savedRadius) {
@@ -93,10 +98,14 @@ export const DynamicThemeProvider: React.FC<{ children: React.ReactNode }> = ({ 
       
       // Apply dark mode variables via CSS class
       const darkModeStyle = document.createElement('style');
+      const darkBackgroundLine = themeData?.darkBackground?.hsl
+        ? `--background: ${themeData.darkBackground.hsl};`
+        : '';
       darkModeStyle.innerHTML = `
         .dark {
           --primary: ${theme.dark_mode_primary_color_hsl};
           --accent: ${theme.dark_mode_accent_color_hsl};
+          ${darkBackgroundLine}
         }
       `;
       

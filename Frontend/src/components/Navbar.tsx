@@ -69,7 +69,7 @@ export default function Navbar() {
                         to="/shop" 
                         className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
-                        <ShoppingBag className="h-5 w-5 text-gray-500" />
+                        <ShoppingBag className="h-5 w-5 text-muted-foreground" />
                         Shop
                       </Link>
                     </SheetClose>
@@ -78,9 +78,9 @@ export default function Navbar() {
                     <SheetClose asChild>
                       <Link 
                         to="/bestsellers" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
-                        <Award className="h-5 w-5 text-gray-500" />
+                        <Award className="h-5 w-5 text-muted-foreground" />
                         Bestsellers
                       </Link>
                     </SheetClose>
@@ -89,9 +89,9 @@ export default function Navbar() {
                     <SheetClose asChild>
                       <Link 
                         to="/new-arrivals" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
-                        <Sparkles className="h-5 w-5 text-gray-500" />
+                        <Sparkles className="h-5 w-5 text-muted-foreground" />
                         New Arrivals
                       </Link>
                     </SheetClose>
@@ -100,9 +100,9 @@ export default function Navbar() {
                     <SheetClose asChild>
                       <Link 
                         to="/about" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
-                        <Info className="h-5 w-5 text-gray-500" />
+                        <Info className="h-5 w-5 text-muted-foreground" />
                         About
                       </Link>
                     </SheetClose>
@@ -111,9 +111,9 @@ export default function Navbar() {
                     <SheetClose asChild>
                       <Link 
                         to="/gifting"
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
-                        <Gift className="h-5 w-5 text-gray-500" />
+                        <Gift className="h-5 w-5 text-muted-foreground" />
                         Gifting
                       </Link>
                     </SheetClose>
@@ -122,9 +122,9 @@ export default function Navbar() {
                     <SheetClose asChild>
                       <Link 
                         to="/contact"
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
-                        <Mail className="h-5 w-5 text-gray-500" />
+                        <Mail className="h-5 w-5 text-muted-foreground" />
                         Contact
                       </Link>
                     </SheetClose>
@@ -133,9 +133,9 @@ export default function Navbar() {
                     <SheetClose asChild>
                       <Link 
                         to="/blog"
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-gray-100"
+                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
                       >
-                        <Rss className="h-5 w-5 text-gray-500" />
+                        <Rss className="h-5 w-5 text-muted-foreground" />
                         Blog
                       </Link>
                     </SheetClose>
@@ -202,7 +202,7 @@ export default function Navbar() {
                     </Avatar>
                     <div className="flex-1">
                       <p className="text-sm font-semibold">{user.name}</p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                     </div>
                     <SheetClose asChild>
                       <Button variant="ghost" size="icon" onClick={() => signOut()} aria-label="Log out">
