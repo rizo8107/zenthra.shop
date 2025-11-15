@@ -302,16 +302,16 @@ export default function Shop() {
           console.log(`Successfully loaded ${data.length} products for Shop page`);
           setProducts(data);
           
-          // Preload first 8 images for better initial load performance (using lighter sizes)
+          // Preload first 8 images for better initial load performance
           const criticalImages = data.slice(0, 8)
             .map(product => product.images?.[0])
             .filter(Boolean) as string[];
             
           // Preload with high priority for first 4 (visible above the fold)
-          preloadImages(criticalImages.slice(0, 4), Collections.PRODUCTS, "small", true);
+          preloadImages(criticalImages.slice(0, 4), Collections.PRODUCTS, "medium", true);
           
-          // Preload remaining with normal priority using thumbnails
-          preloadImages(criticalImages.slice(4), Collections.PRODUCTS, "thumbnail", false);
+          // Preload remaining with normal priority
+          preloadImages(criticalImages.slice(4), Collections.PRODUCTS, "small", false);
         }
       } catch (error) {
         if (!(error instanceof Error) || error.name !== 'AbortError') {
