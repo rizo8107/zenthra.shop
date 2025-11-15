@@ -1,35 +1,11 @@
 // Generate and inline critical CSS for the built app (home page)
 // Run after `vite build` using: npm run build:critical
 
+// Load polyfills first, before any other imports
+import './node-polyfills.js';
+
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-// Add Node.js polyfills for missing Web APIs
-if (typeof globalThis.File === 'undefined') {
-  globalThis.File = class File {
-    constructor(fileBits, fileName, options = {}) {
-      this.name = fileName;
-      this.type = options.type || '';
-      this.lastModified = options.lastModified || Date.now();
-      this.size = 0;
-    }
-  };
-}
-
-if (typeof globalThis.FormData === 'undefined') {
-  globalThis.FormData = class FormData {
-    constructor() {
-      this._data = new Map();
-    }
-    append(name, value) {
-      this._data.set(name, value);
-    }
-    get(name) {
-      return this._data.get(name);
-    }
-  };
-}
-
 import { generate } from 'critical';
 
 const __filename = fileURLToPath(import.meta.url);
