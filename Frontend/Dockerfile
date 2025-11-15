@@ -58,8 +58,8 @@ ENV VITE_WEBHOOKS_API_BASE=${VITE_WEBHOOKS_API_BASE}
 ENV VITE_PUBLIC_POSTHOG_KEY=${VITE_PUBLIC_POSTHOG_KEY}
 ENV VITE_PUBLIC_POSTHOG_HOST=${VITE_PUBLIC_POSTHOG_HOST}
 
-# Build the application with critical CSS inlined
-RUN npm run build:critical
+# Build the application
+RUN npm run build
 
 # Production stage
 FROM nginx:alpine

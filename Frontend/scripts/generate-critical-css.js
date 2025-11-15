@@ -1,41 +1,7 @@
-// Generate and inline critical CSS for the built app (home page)
-// Run after `vite build` using: npm run build:critical
+// Critical CSS generation has been disabled to avoid dependency issues
+// The application works perfectly fine without critical CSS optimization
+// This is just a performance enhancement that inlines critical CSS for faster initial page loads
 
-// Load polyfills first, before any other imports
-import './node-polyfills.js';
-
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { generate } from 'critical';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const distDir = path.join(__dirname, '../dist');
-
-async function run() {
-  try {
-    console.log('[critical] Generating critical CSS for dist/index.html...');
-
-    await generate({
-      base: distDir,
-      src: 'index.html',
-      target: {
-        html: 'index.html',
-      },
-      inline: true,
-      minify: true,
-      width: 1280,
-      height: 720,
-    });
-
-    console.log('[critical] Successfully inlined critical CSS into dist/index.html');
-  } catch (error) {
-    console.warn('[critical] Failed to generate critical CSS (this is optional):', error.message);
-    console.log('[critical] Continuing without critical CSS optimization...');
-    // Don't exit with error code - make this step optional
-    process.exit(0);
-  }
-}
-
-run();
+console.log('[critical] Critical CSS generation is disabled');
+console.log('[critical] Application will work normally without this optimization');
+process.exit(0);

@@ -21,10 +21,10 @@ interface ImageSizeConfig {
 }
 
 const IMAGE_SIZES: Record<ImageSize, ImageSizeConfig> = {
-  thumbnail: { width: 100, quality: 65 },
-  small: { width: 400, quality: 75 }, // Optimized for mobile product cards (350-400px)
-  medium: { width: 800, quality: 80 }, // Optimized for tablet/desktop cards
-  large: { width: 1400, quality: 85 }, // For hero/featured images
+  thumbnail: { width: 100, quality: 60 }, // Reduced quality for faster loading
+  small: { width: 300, quality: 70 }, // Reduced size and quality for mobile
+  medium: { width: 600, quality: 75 }, // Reduced size and quality for faster loading
+  large: { width: 1000, quality: 80 }, // Reduced from 1400px for better performance
   original: { width: 0, quality: 100 }, // Original size
 };
 
