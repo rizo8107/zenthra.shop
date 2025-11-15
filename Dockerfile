@@ -31,8 +31,8 @@ ENV VITE_POCKETBASE_URL=$VITE_POCKETBASE_URL \
     VITE_PUBLIC_POSTHOG_KEY=$VITE_PUBLIC_POSTHOG_KEY \
     VITE_PUBLIC_POSTHOG_HOST=$VITE_PUBLIC_POSTHOG_HOST
 
-# Build with critical CSS inlined
-RUN npm run build:critical
+# Build with critical CSS inlined (multiple fallback strategies)
+RUN npm run build:critical || npm run build:critical-alt || npm run build:safe
 
 
 # ---------- Backend (CMS) build (static) ----------
