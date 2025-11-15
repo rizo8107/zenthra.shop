@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, type PointerEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, lazy, Suspense, type PointerEvent } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -38,11 +38,13 @@ import {
   trackAddToCart,
   trackButtonClick,
 } from '@/lib/analytics';
-import { ProductReviews } from '@/components/ProductReviews';
-import { ProductDetails } from '@/components/ProductDetails';
 import { Breadcrumbs, BreadcrumbItem } from '@/components/Breadcrumbs';
 import { DEFAULT_CONFIG, getOrderConfig } from '@/lib/order-config-service';
 import { getProductSettings } from '@/lib/config/product-settings';
+
+// Lazy load heavy components that are below the fold
+const ProductReviews = lazy(() => import('@/components/ProductReviews').then(module => ({ default: module.ProductReviews })));
+const ProductDetails = lazy(() => import('@/components/ProductDetails').then(module => ({ default: module.ProductDetails })));
 
 const stripPcsSuffix = (value?: string | null) => {
   if (!value) return '';
@@ -284,21 +286,35 @@ const ProductDetail = () => {
     const first = lastVariantPick === 'combo' ? comboImages : sizeImages;
     const second = lastVariantPick === 'combo' ? sizeImages : comboImages;
     
-    // Combine images with proper fallback logic
-    const combined = [...first, ...second, ...base].filter(Boolean);
-    const unique: string[] = [];
-    combined.forEach((img) => {
-      if (!unique.includes(img)) unique.push(img);
+    // Combine variant images first
+    const variantImages = [...first, ...second].filter(Boolean);
+    const uniqueVariantImages: string[] = [];
+    variantImages.forEach((img) => {
+      if (!uniqueVariantImages.includes(img)) uniqueVariantImages.push(img);
     });
     
-    // If no images available, use default placeholder
-    const finalImages = unique.length > 0 ? unique : ['/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png'];
+    // If we have variant images, use ONLY variant images (skip main product images)
+    // If no variant images, fall back to main product images
+    let finalImages: string[];
+    if (uniqueVariantImages.length > 0) {
+      finalImages = uniqueVariantImages;
+      console.log('Using variant images only:', finalImages);
+    } else {
+      // No variant images available, use base product images
+      const uniqueBaseImages: string[] = [];
+      base.forEach((img) => {
+        if (!uniqueBaseImages.includes(img)) uniqueBaseImages.push(img);
+      });
+      finalImages = uniqueBaseImages.length > 0 ? uniqueBaseImages : ['/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png'];
+      console.log('Using base product images:', finalImages);
+    }
     
     setDisplayImages(finalImages);
     
     // Set selected image with proper fallback
     const preferred = first[0] || second[0] || base[0] || finalImages[0];
     setSelectedImage(preferred);
+    console.log('Selected image:', preferred);
   }, [product, selectedSize, selectedCombo, lastVariantPick, variantImagesMap]);
 
   useEffect(() => {
@@ -435,64 +451,61 @@ const ProductDetail = () => {
       setError('');
 
       try {
-        let data;
-        try {
-          data = await getProduct(id);
-        } catch (mainError) {
-          console.error('[PROD DEBUG] Main getProduct failed:', mainError);
-          const record = await pocketbase.collection('products').getOne(id, {
-            $autoCancel: false,
-            requestKey: `prod_fallback_${id}_${Date.now()}`,
-          });
+        // Load product and configuration in parallel for faster loading
+        const [data, config, productSettings] = await Promise.all([
+          getProduct(id).catch(async (mainError) => {
+            console.error('[PROD DEBUG] Main getProduct failed:', mainError);
+            const record = await pocketbase.collection('products').getOne(id, {
+              $autoCancel: false,
+              requestKey: `prod_fallback_${id}_${Date.now()}`,
+            });
 
-          data = {
-            ...record,
-            $id: record.id,
-            name: record.name || 'Unknown Product',
-            description: record.description || '',
-            price: record.price || 0,
-            dimensions: record.dimensions || '',
-            material: record.material || '',
-            category: record.category || '',
-            bestseller: record.bestseller || false,
-            new: record.new || false,
-            inStock: record.inStock || false,
-            images: Array.isArray(record.images)
-              ? record.images.map((image: string) => `${record.id}/${image}`)
-              : [],
-            colors:
-              typeof record.colors === 'string'
-                ? JSON.parse(record.colors)
-                : record.colors || [],
-            features:
-              typeof record.features === 'string'
-                ? JSON.parse(record.features)
-                : record.features || [],
-            care:
-              typeof record.care === 'string'
-                ? JSON.parse(record.care)
-                : record.care || [],
-            tags:
-              typeof record.tags === 'string'
-                ? JSON.parse(record.tags)
-                : record.tags || [],
-            specifications: record.specifications || {},
-            reviews: 0,
-          } as Product;
-        }
+            return {
+              ...record,
+              $id: record.id,
+              name: record.name || 'Unknown Product',
+              description: record.description || '',
+              price: record.price || 0,
+              dimensions: record.dimensions || '',
+              material: record.material || '',
+              category: record.category || '',
+              bestseller: record.bestseller || false,
+              new: record.new || false,
+              inStock: record.inStock || false,
+              images: Array.isArray(record.images)
+                ? record.images.map((image: string) => `${record.id}/${image}`)
+                : [],
+              colors:
+                typeof record.colors === 'string'
+                  ? JSON.parse(record.colors)
+                  : record.colors || [],
+              features:
+                typeof record.features === 'string'
+                  ? JSON.parse(record.features)
+                  : record.features || [],
+              care:
+                typeof record.care === 'string'
+                  ? JSON.parse(record.care)
+                  : record.care || [],
+              tags:
+                typeof record.tags === 'string'
+                  ? JSON.parse(record.tags)
+                  : record.tags || [],
+              specifications: record.specifications || {},
+              reviews: 0,
+            } as Product;
+          }),
+          getOrderConfig().catch(() => DEFAULT_CONFIG),
+          Promise.resolve(getProductSettings())
+        ]);
 
         setProduct(data);
+        setOrderConfig(config);
+        setProductSettings(productSettings);
 
-        if (data.images?.length > 0) {
-          const mainImage = data.images[0];
-          setSelectedImage(mainImage);
-          setDisplayImages(data.images);
-        } else {
-          // No images available, use default placeholder
-          const defaultImage = '/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png';
-          setSelectedImage(defaultImage);
-          setDisplayImages([defaultImage]);
-        }
+        // Don't set images here - let the variant image logic handle it
+        // This will be handled by the useEffect that manages variant images
+        console.log('Product loaded with images:', data.images);
 
         const initColors =
           (data as any).variants?.colors &&
@@ -541,37 +554,9 @@ const ProductDetail = () => {
           }
         }
 
-        try {
-          // Try to get related products by category first
-          let relatedData: any[] = [];
-          
-          if (data.category) {
-            try {
-              relatedData = await getProducts({ category: data.category });
-            } catch (categoryError) {
-              console.warn('[PROD DEBUG] Category filter failed, trying without category filter:', categoryError);
-              // If category filter fails, get all products as fallback
-              try {
-                const allProducts = await getProducts();
-                relatedData = allProducts.filter((p) => p.id !== id);
-              } catch (fallbackError) {
-                console.error('[PROD DEBUG] Fallback products fetch also failed:', fallbackError);
-                relatedData = [];
-              }
-            }
-          } else {
-            // No category, get all products
-            relatedData = await getProducts();
-          }
-          
-          const filteredRelated = relatedData.filter((p) => p.id !== id).slice(0, 4);
-          setRelatedProducts(filteredRelated);
-          relatedLoaded.current = true;
-        } catch (relatedError) {
-          console.error('[PROD DEBUG] Error loading related products:', relatedError);
-          // Set empty array as fallback
-          setRelatedProducts([]);
-        }
+        // Don't load related products immediately - use intersection observer instead
+        // This will be handled by the intersection observer for better performance
+        
       } catch (err) {
         console.error('[PROD DEBUG] Error loading product:', err);
         setError('Failed to load product. Please try refreshing the page.');
@@ -586,6 +571,74 @@ const ProductDetail = () => {
       relatedLoaded.current = false;
     };
   }, [id]);
+
+  // Lazy load related products when user scrolls near the section
+  useEffect(() => {
+    if (!product || relatedLoaded.current) return;
+
+    const loadRelatedProducts = async () => {
+      try {
+        let relatedData: Product[] = [];
+        
+        if (product.category) {
+          try {
+            relatedData = await getProducts({ category: product.category });
+          } catch (categoryError) {
+            console.warn('[PROD DEBUG] Category filter failed, trying without category filter:', categoryError);
+            // If category filter fails, get all products as fallback
+            try {
+              const allProducts = await getProducts();
+              relatedData = allProducts.filter((p) => p.id !== product.id);
+            } catch (fallbackError) {
+              console.error('[PROD DEBUG] Fallback products fetch also failed:', fallbackError);
+              relatedData = [];
+            }
+          }
+        } else {
+          // No category, get all products
+          relatedData = await getProducts();
+        }
+        
+        const filteredRelated = relatedData.filter((p) => p.id !== product.id).slice(0, 4);
+        setRelatedProducts(filteredRelated);
+        relatedLoaded.current = true;
+      } catch (relatedError) {
+        console.error('[PROD DEBUG] Error loading related products:', relatedError);
+        setRelatedProducts([]);
+      }
+    };
+
+    // Use intersection observer to load related products when user scrolls near
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !relatedLoaded.current) {
+            loadRelatedProducts();
+            observer.disconnect();
+          }
+        });
+      },
+      { rootMargin: '200px' } // Load when 200px away from the section
+    );
+
+    // Create a target element to observe
+    const target = document.createElement('div');
+    target.id = 'related-products-trigger';
+    target.style.position = 'absolute';
+    target.style.bottom = '400px'; // Trigger when 400px from bottom
+    target.style.height = '1px';
+    target.style.width = '1px';
+    document.body.appendChild(target);
+    observer.observe(target);
+
+    return () => {
+      observer.disconnect();
+      const existingTarget = document.getElementById('related-products-trigger');
+      if (existingTarget) {
+        document.body.removeChild(existingTarget);
+      }
+    };
+  }, [product]);
 
   const handlePrevImage = () => {
     if (!displayImages || displayImages.length === 0 || !selectedImage) return;
@@ -848,7 +901,7 @@ const ProductDetail = () => {
               ))}
             </div>
           </div>
-          <div className="space-y-4">
+          <div className="space-y-3">
             <Skeleton className="h-8 w-2/3" />
             <Skeleton className="h-6 w-1/3" />
             <Skeleton className="h-4 w-full" />
@@ -884,6 +937,16 @@ const ProductDetail = () => {
 
   const selectedTotal = unitPrice * quantity;
 
+  const discountPercent =
+    product && typeof product.original_price === 'number' && product.original_price > unitPrice
+      ? Math.round((1 - unitPrice / product.original_price) * 100)
+      : null;
+
+  const selectionLabelParts: string[] = [];
+  if (selectedSizeLabel) selectionLabelParts.push(selectedSizeLabel);
+  if (selectedCombo?.name) selectionLabelParts.push(selectedCombo.name);
+  const selectionLabel = selectionLabelParts.join(' · ');
+
   const sizeOptions = (product as any).variants?.sizes || [];
   const comboOptions = (product as any).variants?.combos || [];
   const colorOptions =
@@ -901,7 +964,7 @@ const ProductDetail = () => {
         </div>
 
         {/* main grid */}
-        <div className="grid gap-10 md:grid-cols-2 md:pt-4">
+        <div className="grid gap-6 md:gap-10 md:grid-cols-2 md:pt-4">
           {/* IMAGE COLUMN */}
           <div className="md:sticky md:top-20 space-y-4">
             <Card
@@ -1050,64 +1113,116 @@ const ProductDetail = () => {
                 )}
               </div>
 
-              <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
-                {product.name}
-                {selectedSizeLabel && (
-                  <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">
-                    · {selectedSizeLabel}
-                  </span>
-                )}
-              </h1>
+              {/* Desktop title + rating */}
+              <div className="hidden md:block space-y-2">
+                <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+                  {product.name}
+                  {selectedSizeLabel && (
+                    <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">
+                      · {selectedSizeLabel}
+                    </span>
+                  )}
+                </h1>
 
-              {orderConfig.showStarRating && (
-                <div className="flex items-center gap-2 text-sm">
-                  <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                    <span>{averageRating.toFixed(1)}</span>
-                    <Star className="h-3 w-3 fill-current" />
+                {orderConfig.showStarRating && (product.reviews || 0) > 0 && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                      <span>{averageRating.toFixed(1)}</span>
+                      <Star className="h-3 w-3 fill-current" />
+                    </div>
+                    <div className="flex items-center gap-0.5 text-yellow-500">
+                      {Array(5)
+                        .fill(null)
+                        .map((_, i) => (
+                          <Star
+                            key={i}
+                            className={cn(
+                              'h-3.5 w-3.5',
+                              i < Math.round(averageRating) && 'fill-current',
+                            )}
+                          />
+                        ))}
+                    </div>
+                    <Link
+                      to="#reviews"
+                      className="text-xs text-muted-foreground hover:text-primary"
+                    >
+                      ({product.reviews || 0} reviews)
+                    </Link>
                   </div>
-                  <div className="flex items-center gap-0.5 text-yellow-500">
-                    {Array(5)
-                      .fill(null)
-                      .map((_, i) => (
-                        <Star
-                          key={i}
-                          className={cn(
-                            'h-3.5 w-3.5',
-                            i < Math.round(averageRating) && 'fill-current',
-                          )}
-                        />
-                      ))}
-                  </div>
-                  <Link
-                    to="#reviews"
-                    className="text-xs text-muted-foreground hover:text-primary"
-                  >
-                    ({product.reviews || 0} reviews)
-                  </Link>
+                )}
+              </div>
+
+              {/* Mobile compact header: title + price + discount + rating/reviews */}
+              <div className="md:hidden space-y-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                    {product.name}
+                  </h1>
+                  {selectedSizeLabel && (
+                    <span className="ml-1 align-middle text-xs font-medium text-muted-foreground">
+                      · {selectedSizeLabel}
+                    </span>
+                  )}
                 </div>
-              )}
+
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  {/* Price + discount on the left */}
+                  <div className="flex items-baseline gap-1">
+                    <span className="text-lg font-bold text-primary">
+                      ₹{unitPrice.toFixed(2)}
+                    </span>
+                    {discountPercent !== null && product.original_price && (
+                      <span className="text-[11px] text-muted-foreground line-through">
+                        ₹{product.original_price.toFixed(2)}
+                      </span>
+                    )}
+                    {discountPercent !== null && (
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-semibold text-red-600">
+                        {discountPercent}% OFF
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Rating + review count on the right (only when > 0 reviews) */}
+                  {orderConfig.showStarRating && (product.reviews || 0) > 0 && (
+                    <div className="ml-auto flex items-center gap-1">
+                      <div className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        <span>{averageRating.toFixed(1)}</span>
+                        <Star className="h-3 w-3 fill-current" />
+                      </div>
+                      <Link
+                        to="#reviews"
+                        className="text-[11px] text-muted-foreground hover:text-primary"
+                      >
+                        ({product.reviews || 0} reviews)
+                      </Link>
+                    </div>
+                  )}
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Inclusive of all taxes · Free shipping on eligible orders
+                </p>
+              </div>
             </div>
 
-            {/* price block */}
-            <div className="space-y-2 rounded-xl bg-white p-4 shadow-sm">
+            {/* price block (desktop only) */}
+            <div className="hidden md:block space-y-2 rounded-xl bg-white p-4 shadow-sm">
               <div className="flex flex-wrap items-baseline gap-2">
                 <p className="text-2xl font-bold text-primary">
                   ₹{unitPrice.toFixed(2)}
                 </p>
-                {product.original_price &&
-                  product.original_price > unitPrice && (
-                    <>
-                      <p className="text-sm text-muted-foreground line-through">
-                        ₹{product.original_price.toFixed(2)}
-                      </p>
-                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
-                        {Math.round(
-                          (1 - unitPrice / product.original_price) * 100,
-                        )}
-                        % OFF
-                      </span>
-                    </>
-                  )}
+                {discountPercent !== null && product.original_price && (
+                  <span className="text-sm text-muted-foreground line-through">
+                    ₹{product.original_price.toFixed(2)}
+                  </span>
+                )}
+                {discountPercent !== null && (
+                  <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-600">
+                    {discountPercent}% OFF
+                  </span>
+                )}
               </div>
               <p className="text-xs text-muted-foreground">
                 Inclusive of all taxes · Free shipping on eligible orders
@@ -1243,29 +1358,29 @@ const ProductDetail = () => {
               )}
             </div>
 
-            {/* qty + add to cart */}
-            <Card className="flex items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm">
+            {/* qty + add to cart (desktop & tablet only; mobile uses sticky bar) */}
+            <Card className="hidden md:flex items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm">
               <div className="flex items-center gap-3">
                 <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Qty
                 </span>
-                <div className="flex items-center gap-1 rounded-full border bg-white px-1.5 py-1">
+                <div className="flex items-center overflow-hidden rounded-full border bg-white">
                   <button
                     type="button"
                     onClick={decreaseQuantity}
                     disabled={quantity <= 1}
-                    className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                    className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
                     aria-label="Decrease quantity"
                   >
                     <Minus className="h-3.5 w-3.5" />
                   </button>
-                  <span className="min-w-[28px] text-center text-sm font-semibold">
+                  <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
                     {quantity}
                   </span>
                   <button
                     type="button"
                     onClick={increaseQuantity}
-                    className="grid h-7 w-7 place-items-center rounded-full text-muted-foreground transition-colors hover:bg-muted"
+                    className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
                     aria-label="Increase quantity"
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -1293,29 +1408,38 @@ const ProductDetail = () => {
         </div>
 
         {/* description / reviews tabs full width */}
-        <div className="mt-8 rounded-xl bg-white p-4 shadow-sm md:p-6">
+        <div className="mt-3 rounded-xl bg-white p-3 shadow-sm md:p-4">
           <Tabs defaultValue="description" className="w-full">
-            <TabsList className="inline-flex h-11 rounded-full bg-muted">
-              <TabsTrigger value="description" className="px-5 text-sm">
+            <TabsList className="inline-flex h-10 w-full gap-1 rounded-full bg-muted/70 p-1 text-sm">
+              <TabsTrigger
+                value="description"
+                className="flex-1 rounded-full px-4 py-1 text-xs font-medium text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
                 Description
               </TabsTrigger>
-              <TabsTrigger value="reviews" className="px-5 text-sm">
+              <TabsTrigger
+                value="reviews"
+                className="flex-1 rounded-full px-4 py-1 text-xs font-medium text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+              >
                 Reviews ({product.reviews || 0})
               </TabsTrigger>
             </TabsList>
 
-            <Separator className="mt-4" />
+            <Separator className="mt-2" />
 
-            <TabsContent value="description" className="mt-4">
-              <ProductDetails product={product} />
+            <TabsContent value="description" className="mt-2">
+              <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                <ProductDetails product={product} />
+              </Suspense>
             </TabsContent>
 
-            <TabsContent value="reviews" className="mt-4" id="reviews">
+            <TabsContent value="reviews" className="mt-2" id="reviews">
               {orderConfig?.showReviews && (
-                <ProductReviews
-                  productId={id!}
-                  initialReviewCount={product.reviews}
-                  onReviewAdded={async () => {
+                <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
+                  <ProductReviews
+                    productId={id!}
+                    initialReviewCount={product.reviews}
+                    onReviewAdded={async () => {
                     if (!id) return;
                     try {
                       const updatedProduct = await getProduct(id);
@@ -1340,6 +1464,7 @@ const ProductDetail = () => {
                     }
                   }}
                 />
+                </Suspense>
               )}
             </TabsContent>
           </Tabs>
@@ -1446,7 +1571,7 @@ const ProductDetail = () => {
             )}`}
             target="_blank"
             rel="noreferrer"
-            className="fixed bottom-24 right-4 z-50 md:bottom-8 md:right-8"
+            className="fixed bottom-28 right-4 z-50 md:bottom-8 md:right-8"
             aria-label="Order via WhatsApp"
           >
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600">
@@ -1462,8 +1587,50 @@ const ProductDetail = () => {
         )}
 
         {/* mobile bottom bar */}
-        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 py-3 shadow-[0_-6px_16px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
-          <div className="konipai-container mx-auto flex max-w-7xl items-center justify-between px-4">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 py-2.5 shadow-[0_-6px_16px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
+          <div className="konipai-container mx-auto max-w-7xl px-4 space-y-2">
+            {/* variant + qty + button row */}
+            <div className="flex w-full items-center gap-2">
+              <span className="inline-flex min-w-[96px] max-w-[40%] items-center truncate rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {selectionLabel || 'Choose option'}
+              </span>
+
+              <div className="flex flex-1 items-center justify-center overflow-hidden rounded-full border bg-white">
+                <button
+                  type="button"
+                  onClick={decreaseQuantity}
+                  disabled={quantity <= 1}
+                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={increaseQuantity}
+                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
+                  aria-label="Increase quantity"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {!isInCart && (
+                <Button
+                  className="flex-1 max-w-[160px]"
+                  onClick={handleAddToCart}
+                  disabled={!product.inStock}
+                >
+                  <ShoppingCart className="mr-2 h-4 w-4" />
+                  {product.inStock ? 'Add to cart' : 'Out of stock'}
+                </Button>
+              )}
+            </div>
+
+            {/* total + secondary actions */}
             {isInCart ? (
               <div className="flex w-full items-center gap-3">
                 <Button
@@ -1485,24 +1652,12 @@ const ProductDetail = () => {
                 </Button>
               </div>
             ) : (
-              <>
-                <div className="flex flex-col">
-                  <p className="text-sm font-semibold">
-                    ₹{selectedTotal.toFixed(2)}
-                  </p>
-                  <span className="text-[11px] text-muted-foreground">
-                    Total for selected options
-                  </span>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="text-sm font-semibold text-foreground">
+                  ₹{selectedTotal.toFixed(2)}
                 </div>
-                <Button
-                  className="flex-1 max-w-[190px]"
-                  onClick={handleAddToCart}
-                  disabled={!product.inStock}
-                >
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  {product.inStock ? 'Add to cart' : 'Out of stock'}
-                </Button>
-              </>
+                <span>Total for selected options</span>
+              </div>
             )}
           </div>
         </div>

@@ -119,6 +119,16 @@ export const ProductImage = memo(function ProductImage({
     };
 
     const handleImageError = () => {
+        console.warn('Failed to load image:', url);
+        
+        // Try fallback to default placeholder if not already using it
+        if (url !== '/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png') {
+            setImageUrl('/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png');
+            setThumbnailUrl('/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png');
+            setError(null);
+            return;
+        }
+        
         setError('Failed to load image');
         setIsLoading(false);
     };
