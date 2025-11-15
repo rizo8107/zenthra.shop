@@ -270,21 +270,34 @@ const ProductDetail = () => {
 
   useEffect(() => {
     if (!product) return;
+    
+    // Base product images
     const base = Array.isArray(product.images) ? [...product.images] : [];
+    
+    // Get variant-specific images
     const sizeKey = selectedSize ? String(selectedSize.value ?? '') : null;
     const comboKey = selectedCombo ? String(selectedCombo.value ?? '') : null;
     const sizeImages = sizeKey ? variantImagesMap.sizes.get(sizeKey) || [] : [];
     const comboImages = comboKey ? variantImagesMap.combos.get(comboKey) || [] : [];
 
+    // Prioritize variant images based on last selection
     const first = lastVariantPick === 'combo' ? comboImages : sizeImages;
     const second = lastVariantPick === 'combo' ? sizeImages : comboImages;
+    
+    // Combine images with proper fallback logic
     const combined = [...first, ...second, ...base].filter(Boolean);
     const unique: string[] = [];
     combined.forEach((img) => {
       if (!unique.includes(img)) unique.push(img);
     });
-    setDisplayImages(unique);
-    const preferred = (first[0] || second[0] || unique[0] || null) as string | null;
+    
+    // If no images available, use default placeholder
+    const finalImages = unique.length > 0 ? unique : ['/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png'];
+    
+    setDisplayImages(finalImages);
+    
+    // Set selected image with proper fallback
+    const preferred = first[0] || second[0] || base[0] || finalImages[0];
     setSelectedImage(preferred);
   }, [product, selectedSize, selectedCombo, lastVariantPick, variantImagesMap]);
 
@@ -474,6 +487,11 @@ const ProductDetail = () => {
           const mainImage = data.images[0];
           setSelectedImage(mainImage);
           setDisplayImages(data.images);
+        } else {
+          // No images available, use default placeholder
+          const defaultImage = '/product-images/create-a-mockup-of-white-tote-bag--aesthetic-backg.png';
+          setSelectedImage(defaultImage);
+          setDisplayImages([defaultImage]);
         }
 
         const initColors =
@@ -487,9 +505,10 @@ const ProductDetail = () => {
         if (Array.isArray(initSizes) && initSizes.length > 0)
           setSelectedSize(initSizes[0]);
 
-        const initCombos = (data as any).variants?.combos || [];
-        if (Array.isArray(initCombos) && initCombos.length > 0)
-          setSelectedCombo(initCombos[0]);
+        // Don't auto-select combo - let user choose explicitly
+        // const initCombos = (data as any).variants?.combos || [];
+        // if (Array.isArray(initCombos) && initCombos.length > 0)
+        //   setSelectedCombo(initCombos[0]);
 
         const viewedProductKey = `viewed_product_${data.id}`;
         if (!sessionStorage.getItem(viewedProductKey)) {
@@ -523,12 +542,35 @@ const ProductDetail = () => {
         }
 
         try {
-          const relatedData = await getProducts({ category: data.category });
+          // Try to get related products by category first
+          let relatedData: any[] = [];
+          
+          if (data.category) {
+            try {
+              relatedData = await getProducts({ category: data.category });
+            } catch (categoryError) {
+              console.warn('[PROD DEBUG] Category filter failed, trying without category filter:', categoryError);
+              // If category filter fails, get all products as fallback
+              try {
+                const allProducts = await getProducts();
+                relatedData = allProducts.filter((p) => p.id !== id);
+              } catch (fallbackError) {
+                console.error('[PROD DEBUG] Fallback products fetch also failed:', fallbackError);
+                relatedData = [];
+              }
+            }
+          } else {
+            // No category, get all products
+            relatedData = await getProducts();
+          }
+          
           const filteredRelated = relatedData.filter((p) => p.id !== id).slice(0, 4);
           setRelatedProducts(filteredRelated);
           relatedLoaded.current = true;
         } catch (relatedError) {
           console.error('[PROD DEBUG] Error loading related products:', relatedError);
+          // Set empty array as fallback
+          setRelatedProducts([]);
         }
       } catch (err) {
         console.error('[PROD DEBUG] Error loading product:', err);
@@ -1129,6 +1171,7 @@ const ProductDetail = () => {
                         type="button"
                         onClick={() => {
                           setSelectedSize(sz);
+                          setSelectedCombo(null); // Clear combo when size is selected
                           setLastVariantPick('size');
                         }}
                         disabled={sz.inStock === false}
@@ -1153,10 +1196,10 @@ const ProductDetail = () => {
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">
-                      Combo
+                      Combo <span className="text-xs font-normal text-muted-foreground">(Optional)</span>
                     </span>
                     <span className="text-xs text-muted-foreground">
-                      {selectedCombo?.name || 'Choose'}
+                      {selectedCombo?.name || 'None selected'}
                     </span>
                   </div>
                   <div className="flex flex-wrap gap-2">
@@ -1175,7 +1218,12 @@ const ProductDetail = () => {
                           key={cb.value}
                           type="button"
                           onClick={() => {
-                            setSelectedCombo(cb);
+                            // Toggle combo selection - click same combo to deselect
+                            if (selectedCombo?.value === cb.value) {
+                              setSelectedCombo(null);
+                            } else {
+                              setSelectedCombo(cb);
+                            }
                             setLastVariantPick('combo');
                           }}
                           className={cn(

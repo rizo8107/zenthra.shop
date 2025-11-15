@@ -53,20 +53,30 @@ export const ProductImage = memo(function ProductImage({
     };
 
     useEffect(() => {
-        if (!url) {
+        if (!url || url.trim() === '') {
             setError('No image URL provided');
             setIsLoading(false);
             return;
         }
 
         try {
-            // Generate optimized image URLs
-            const optimizedUrl = getPocketBaseImageUrl(url, Collections.PRODUCTS, size, "webp");
-            const thumbUrl = getPocketBaseImageUrl(url, Collections.PRODUCTS, "thumbnail", "webp");
+            // Handle both PocketBase images and static images
+            let optimizedUrl: string;
+            let thumbUrl: string;
+            
+            if (url.startsWith('/') || url.startsWith('http')) {
+                // Static image or absolute URL - use as is
+                optimizedUrl = url;
+                thumbUrl = url;
+            } else {
+                // PocketBase image - generate optimized URLs
+                optimizedUrl = getPocketBaseImageUrl(url, Collections.PRODUCTS, size, "webp");
+                thumbUrl = getPocketBaseImageUrl(url, Collections.PRODUCTS, "thumbnail", "webp");
+            }
             
             setImageUrl(optimizedUrl);
             setThumbnailUrl(thumbUrl);
-            
+            setError(null); // Clear any previous errors
             setIsLoading(true);
         } catch (err) {
             console.error('Error loading image:', err);

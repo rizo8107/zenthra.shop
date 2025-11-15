@@ -124,6 +124,7 @@ export interface Product extends RecordModel {
     bestseller: boolean;
     new: boolean;
     inStock: boolean;
+    tn_shipping_enabled?: boolean;
     reviews?: number;
     createdAt?: string;
     updatedAt?: string;
@@ -298,8 +299,24 @@ export async function getProducts(filter?: ProductFilter, signal?: AbortSignal):
         }
 
         console.log('Fetching products with options:', options);
-        const records = await pocketbase.collection(Collections.PRODUCTS).getList(1, 100, options);
-        console.log(`Successfully fetched ${records.items.length} products`);
+        
+        let records;
+        try {
+            records = await pocketbase.collection(Collections.PRODUCTS).getList(1, 100, options);
+            console.log(`Successfully fetched ${records.items.length} products`);
+        } catch (error: any) {
+            // Handle category validation errors
+            if (error?.status === 400 && error?.data?.category && filterString.includes('category')) {
+                console.warn('Category filter failed, retrying without category filter:', error);
+                // Retry without category filter
+                const optionsWithoutCategory = { ...options };
+                delete optionsWithoutCategory.filter;
+                records = await pocketbase.collection(Collections.PRODUCTS).getList(1, 100, optionsWithoutCategory);
+                console.log(`Fallback: fetched ${records.items.length} products without category filter`);
+            } else {
+                throw error; // Re-throw if it's not a category validation error
+            }
+        }
 
         // Process products even if reviews fail
         let processedProducts = records.items.map(record => {

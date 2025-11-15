@@ -488,6 +488,44 @@ export default function CheckoutPage() {
     setIsFormValid(isAllFilled && isEmailValid && isPhoneValid && isZipValid);
   };
 
+  // Determine if current destination is in Tamil Nadu using pincode or state
+  const isTamilNaduDestination = async (): Promise<boolean> => {
+    const zipRaw = (formData.zipCode || '').trim();
+    const stateRaw = (formData.state || '').trim();
+
+    // Prefer checking ZIP/pincode if available
+    const checkPincode = async (value: string): Promise<boolean> => {
+      if (!/^\d{6}$/.test(value)) return false;
+      if (
+        tnPincodeUtil &&
+        typeof tnPincodeUtil.isTamilNaduPincode === 'function'
+      ) {
+        const result = tnPincodeUtil.isTamilNaduPincode(value);
+        if (result instanceof Promise) {
+          return await result;
+        }
+        return result;
+      }
+      return false;
+    };
+
+    if (zipRaw && (await checkPincode(zipRaw))) {
+      return true;
+    }
+
+    // Some flows use the state field as pincode, mirror that behaviour
+    if (stateRaw && (await checkPincode(stateRaw))) {
+      return true;
+    }
+
+    // Fallback: use state name/abbreviation
+    if (stateRaw && isTamilNaduState(stateRaw)) {
+      return true;
+    }
+
+    return false;
+  };
+
   // Function to validate coupons directly in frontend
   const validateCouponInFrontend = async (
     code: string,
@@ -1194,6 +1232,9 @@ export default function CheckoutPage() {
     try {
       setIsSubmitting(true);
 
+      // Clear previous field-level errors
+      setErrors({});
+
       // For guest checkout, we don't need to check for user.id
       // We'll create a guest order or use the logged-in user information if available
 
@@ -1229,6 +1270,35 @@ export default function CheckoutPage() {
         throw new Error(
           "Some items in your cart are invalid. Please try refreshing the page.",
         );
+      }
+
+      // Enforce Tamil Nadu shipping restrictions based on per-product flag
+      const destinationIsTamilNadu = await isTamilNaduDestination();
+      if (destinationIsTamilNadu) {
+        const hasTnRestrictedProduct = items.some(
+          (item) =>
+            item.product && item.product.tn_shipping_enabled === false,
+        );
+
+        if (hasTnRestrictedProduct) {
+          const msg =
+            'Some items in your cart are not available for delivery to Tamil Nadu. Please remove those items or use a different shipping address.';
+
+          setErrors((prev) => ({
+            ...prev,
+            state: msg,
+            zipCode: msg,
+          }));
+
+          toast({
+            variant: 'destructive',
+            title: 'Delivery Not Available',
+            description: msg,
+          });
+
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       // Update user's phone number if logged in and different from what's stored
