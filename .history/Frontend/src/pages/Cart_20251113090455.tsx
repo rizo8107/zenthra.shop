@@ -100,7 +100,6 @@ export default function Cart() {
                           alt={item.product.name}
                           size="small"
                           className="w-full h-full object-cover rounded-lg"
-                          useResponsive={false}
                         />
                       </div>
 

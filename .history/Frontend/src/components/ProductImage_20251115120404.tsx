@@ -67,7 +67,11 @@ export const ProductImage = memo(function ProductImage({
             setImageUrl(optimizedUrl);
             setThumbnailUrl(thumbUrl);
             
-            setIsLoading(true);
+            if (priority) {
+                setIsLoading(true);
+            } else {
+                setIsLoading(false);
+            }
         } catch (err) {
             console.error('Error loading image:', err);
             setError('Failed to load image');
@@ -89,7 +93,7 @@ export const ProductImage = memo(function ProductImage({
                     });
                 },
                 {
-                    rootMargin: '300px',
+                    rootMargin: '50px',
                     threshold: 0.1
                 }
             );

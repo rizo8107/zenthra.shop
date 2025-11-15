@@ -95,10 +95,9 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
           className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
           aspectRatio="portrait"
           priority={priority}
-          size="small"
+          size="medium"
           width={400}
           height={533}
-          useResponsive={false}
         />
         {/* Tags / badges */}
         <div className="absolute top-3 left-3 flex flex-wrap gap-2 z-10">

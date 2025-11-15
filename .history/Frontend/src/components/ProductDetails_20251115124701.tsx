@@ -534,7 +534,6 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
                   ))}
                 </ul>
               </div>
-            )}
           </CardContent>
         </Card>
       )}

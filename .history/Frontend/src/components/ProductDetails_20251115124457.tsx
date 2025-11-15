@@ -609,77 +609,91 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
                       <div className="aspect-square rounded-xl bg-muted" />
                       <div className="h-4 w-3/4 rounded bg-muted" />
                       <div className="h-4 w-1/2 rounded bg-muted" />
-                    </div>
-                  ))}
-                </div>
+                </Badge>
               )}
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Curated picks that pair well or are loved by similar shoppers.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {recommendedLoading && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {[...Array(4)].map((_, idx) => (
+                  <div key={idx} className="animate-pulse space-y-3 rounded-2xl border border-muted/30 p-4">
+                    <div className="aspect-square rounded-xl bg-muted" />
+                    <div className="h-4 w-3/4 rounded bg-muted" />
+                    <div className="h-4 w-1/2 rounded bg-muted" />
+                  </div>
+                ))}
+              </div>
+            )}
 
-              {recommendedError && !recommendedLoading && (
-                <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
-                  {recommendedError}
-                </div>
-              )}
+            {recommendedError && !recommendedLoading && (
+              <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+                {recommendedError}
+              </div>
+            )}
 
-              {!recommendedLoading && !recommendedError && recommendations.length > 0 && (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  {recommendations.map((item) => (
-                    <Link
-                      key={item.id}
-                      to={`/product/${item.id}`}
-                      className="group flex flex-col overflow-hidden rounded-2xl border border-muted/40 bg-gradient-to-b from-white to-blue-50/30 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
-                    >
-                      <div className="relative aspect-square overflow-hidden">
-                        <ProductImage
-                          url={item.images?.[0] || ''}
-                          alt={item.name}
-                          className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                          size="small"
-                          aspectRatio="square"
-                          useResponsive={false}
-                        />
-                        <div className="absolute inset-x-0 top-2 flex items-center justify-between px-3">
-                          {item.bestseller && (
-                            <Badge className="rounded-full bg-orange-500 text-white">Bestseller</Badge>
-                          )}
-                          {item.new && (
-                            <Badge variant="secondary" className="rounded-full bg-blue-600/90 text-white">
-                              New Arrival
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-1 flex-col gap-2 p-4">
-                        <h3 className="line-clamp-2 text-sm font-semibold text-foreground group-hover:text-blue-600">
-                          {item.name}
-                        </h3>
-                        <p className="text-base font-bold text-blue-700">
-                          ₹{typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
-                        </p>
-                        {Array.isArray(item.colors) && item.colors.length > 0 && (
-                          <div className="flex gap-1">
-                            {item.colors.slice(0, 4).map((color: any) => (
-                              <span
-                                key={`${item.id}-${color.value}`}
-                                className="h-3 w-3 rounded-full border border-white shadow-sm"
-                                style={{ backgroundColor: color.hex || color.value }}
-                              />
-                            ))}
-                            {item.colors.length > 4 && (
-                              <span className="flex h-3 w-3 items-center justify-center rounded-full bg-muted text-[9px] font-medium text-muted-foreground">
-                                +{item.colors.length - 4}
-                              </span>
-                            )}
-                          </div>
+            {!recommendedLoading && !recommendedError && recommendations.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                {recommendations.map((item) => (
+                  <Link
+                    key={item.id}
+                    to={`/product/${item.id}`}
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-muted/40 bg-gradient-to-b from-white to-blue-50/30 shadow-sm transition hover:-translate-y-1 hover:shadow-lg"
+                  >
+                    <div className="relative aspect-square overflow-hidden">
+                      <ProductImage
+                        url={item.images?.[0] || ''}
+                        alt={item.name}
+                        className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                        size="small"
+                        aspectRatio="square"
+                        useResponsive={false}
+                      />
+                      <div className="absolute inset-x-0 top-2 flex items-center justify-between px-3">
+                        {item.bestseller && (
+                          <Badge className="rounded-full bg-orange-500 text-white">Bestseller</Badge>
+                        )}
+                        {item.new && (
+                          <Badge variant="secondary" className="rounded-full bg-blue-600/90 text-white">
+                            New Arrival
+                          </Badge>
                         )}
                       </div>
-                    </Link>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
+                    </div>
+                    <div className="flex flex-1 flex-col gap-2 p-4">
+                      <h3 className="line-clamp-2 text-sm font-semibold text-foreground group-hover:text-blue-600">
+                        {item.name}
+                      </h3>
+                      <p className="text-base font-bold text-blue-700">
+                        ₹{typeof item.price === 'number' ? item.price.toFixed(2) : item.price}
+                      </p>
+                      {Array.isArray(item.colors) && item.colors.length > 0 && (
+                        <div className="flex gap-1">
+                          {item.colors.slice(0, 4).map((color: any) => (
+                            <span
+                              key={`${item.id}-${color.value}`}
+                              className="h-3 w-3 rounded-full border border-white shadow-sm"
+                              style={{ backgroundColor: color.hex || color.value }}
+                            />
+                          ))}
+                          {item.colors.length > 4 && (
+                            <span className="flex h-3 w-3 items-center justify-center rounded-full bg-muted text-[9px] font-medium text-muted-foreground">
+                              +{item.colors.length - 4}
+                            </span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };
