@@ -40,6 +40,7 @@ export interface Product extends BaseRecord {
   new?: boolean;
   inStock?: boolean;
   review?: number;
+  tn_shipping_enabled?: boolean;
   specifications?: string;
   care_instructions?: string;
   usage_guidelines?: string;
@@ -168,6 +169,7 @@ export type CreateProductData = {
   new?: boolean;
   inStock?: boolean;
   review?: number;
+  tn_shipping_enabled?: boolean;
   specifications?: string;
   care_instructions?: string;
   usage_guidelines?: string;

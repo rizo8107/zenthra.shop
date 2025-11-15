@@ -9,7 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { ProductImage } from '@/components/ProductImage';
 import { VideoPlayerFallback } from '@/components/ui/video-player-fallback';
 import { VideoPlayer } from '@/components/ui/video-player';
-import { pocketbase, Collections } from '@/lib/pocketbase';
+import { pocketbase, Collections, getProducts } from '@/lib/pocketbase';
 import { getOrderConfig, type OrderDetailsConfig } from '@/lib/order-config-service';
 
 import { getPocketBaseImageUrl } from '@/utils/imageOptimizer';
@@ -244,28 +244,33 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
     }
 
     let cancelled = false;
-    const categoryFilter = product.category.replace(/"/g, '\\"');
-    const filter = `category = "${categoryFilter}" && id != "${product.id}"`;
 
     setRecommendedLoading(true);
-    pocketbase
-      .collection(Collections.PRODUCTS)
-      .getList(1, 8, { filter, sort: '-bestseller,-created' })
-      .then((result) => {
+    
+    // Use the getProducts function with proper error handling
+    const fetchRecommendations = async () => {
+      try {
+        const products = await getProducts({ category: product.category });
         if (cancelled) return;
-        const items = (result?.items ?? []) as Product[];
-        setRecommendedProducts(items.filter((item) => item.id !== product.id));
+        
+        // Filter out the current product and limit to 8 items
+        const filteredProducts = products
+          .filter((item) => item.id !== product.id)
+          .slice(0, 8);
+        
+        setRecommendedProducts(filteredProducts);
         setRecommendedError(null);
-      })
-      .catch((error) => {
+      } catch (error) {
         if (cancelled) return;
         console.error('Error fetching recommended products:', error);
         setRecommendedError('Unable to load recommendations right now.');
         setRecommendedProducts([]);
-      })
-      .finally(() => {
+      } finally {
         if (!cancelled) setRecommendedLoading(false);
-      });
+      }
+    };
+
+    fetchRecommendations();
 
     return () => {
       cancelled = true;

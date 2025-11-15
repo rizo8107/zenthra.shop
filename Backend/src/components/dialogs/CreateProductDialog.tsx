@@ -78,6 +78,7 @@ type ProductFormValues = {
   videoUrl?: string;
   videoThumbnail?: string;
   videoDescription?: string;
+  tn_shipping_enabled?: boolean;
 };
 
 interface CreateProductDialogProps {
@@ -104,8 +105,8 @@ export function CreateProductDialog({
   const [comboPreviewsByKey, setComboPreviewsByKey] = useState<Record<string, string[]>>({});
   const [comboFilenamesByKey, setComboFilenamesByKey] = useState<Record<string, string[]>>({});
   
-  // Fixed category options
-  const CATEGORY_OPTIONS = ['soap', 'powder', 'gel', 'oil', 'other'] as const;
+  // Category options - includes common product categories
+  const CATEGORY_OPTIONS = ['soap', 'powder', 'gel', 'oil', 'other', 'totes', 'crossbody', 'backpack'] as const;
   
   // Define form schema
   const formSchema = z.object({
@@ -140,6 +141,7 @@ export function CreateProductDialog({
     videoUrl: z.string().optional(),
     videoThumbnail: z.string().optional(),
     videoDescription: z.string().optional(),
+    tn_shipping_enabled: z.boolean().default(true),
   });
 
 
@@ -201,6 +203,7 @@ export function CreateProductDialog({
       videoUrl: '',
       videoThumbnail: '',
       videoDescription: '',
+      tn_shipping_enabled: true,
     },
   });
 
@@ -403,6 +406,7 @@ export function CreateProductDialog({
         inStock: processedValues.inStock,
         review: processedValues.review,
         status: processedValues.status,
+        tn_shipping_enabled: processedValues.tn_shipping_enabled,
       };
 
       // Handle JSON fields
@@ -698,6 +702,21 @@ export function CreateProductDialog({
                             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                               <div className="space-y-0.5">
                                 <FormLabel>Bestseller</FormLabel>
+                              </div>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="tn_shipping_enabled"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <div className="space-y-0.5">
+                                <FormLabel>Allow TN Shipping</FormLabel>
                               </div>
                               <Switch
                                 checked={field.value}
