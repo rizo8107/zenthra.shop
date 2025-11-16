@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft } from 'lucide-react';
+import { Minus, Plus, Trash2, ShoppingBag, ArrowLeft, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -206,7 +206,20 @@ export default function Cart() {
                     </div>
                     <div className="flex justify-between text-sm">
                       <span>Shipping</span>
-                      <span className="text-primary">Free</span>
+                      {(() => {
+                        const allItemsHaveFreeShipping = items.length > 0 && items.every(item => item.product.free_shipping === true);
+                        
+                        if (allItemsHaveFreeShipping) {
+                          return (
+                            <div className="flex items-center gap-1 text-green-600">
+                              <Truck className="h-4 w-4" />
+                              <span className="text-sm font-medium">Free</span>
+                            </div>
+                          );
+                        } else {
+                          return <span className="text-primary">Calculated at checkout</span>;
+                        }
+                      })()}
                     </div>
                     <div className="border-t pt-3">
                       <div className="flex justify-between font-semibold text-lg">

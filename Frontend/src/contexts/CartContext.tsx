@@ -173,7 +173,18 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       return sum + (price * quantity);
     }, 0);
 
-    const shipping = subtotal >= SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+    // Check if all items have free shipping
+    const allItemsHaveFreeShipping = cartItems.length > 0 && cartItems.every(item => item.product.free_shipping === true);
+    
+    // If all items have free shipping, no shipping cost
+    // Otherwise, apply normal shipping logic (free if above threshold, otherwise standard cost)
+    let shipping = 0;
+    if (allItemsHaveFreeShipping) {
+      shipping = 0;
+    } else {
+      shipping = subtotal >= SHIPPING_THRESHOLD ? 0 : SHIPPING_COST;
+    }
+    
     const total = subtotal + shipping;
 
     return { subtotal, shipping, total };

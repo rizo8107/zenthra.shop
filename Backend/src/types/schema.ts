@@ -41,6 +41,7 @@ export interface Product extends BaseRecord {
   inStock?: boolean;
   review?: number;
   tn_shipping_enabled?: boolean;
+  free_shipping?: boolean;
   specifications?: string;
   care_instructions?: string;
   usage_guidelines?: string;
@@ -170,6 +171,7 @@ export type CreateProductData = {
   inStock?: boolean;
   review?: number;
   tn_shipping_enabled?: boolean;
+  free_shipping?: boolean;
   specifications?: string;
   care_instructions?: string;
   usage_guidelines?: string;

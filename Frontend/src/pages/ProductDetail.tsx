@@ -1202,7 +1202,11 @@ const ProductDetail = () => {
                 </div>
 
                 <p className="text-[11px] text-muted-foreground">
-                  Inclusive of all taxes · Free shipping on eligible orders
+                  Inclusive of all taxes · {product.free_shipping ? (
+                    <span className="text-green-600 font-medium">Free Delivery</span>
+                  ) : (
+                    'Free shipping on eligible orders'
+                  )}
                 </p>
               </div>
             </div>
@@ -1225,7 +1229,11 @@ const ProductDetail = () => {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                Inclusive of all taxes · Free shipping on eligible orders
+                Inclusive of all taxes · {product.free_shipping ? (
+                  <span className="text-green-600 font-medium">Free Delivery</span>
+                ) : (
+                  'Free shipping on eligible orders'
+                )}
               </p>
             </div>
 

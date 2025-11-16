@@ -79,6 +79,7 @@ type ProductFormValues = {
   videoThumbnail?: string;
   videoDescription?: string;
   tn_shipping_enabled?: boolean;
+  free_shipping?: boolean;
 };
 
 interface CreateProductDialogProps {
@@ -142,6 +143,7 @@ export function CreateProductDialog({
     videoThumbnail: z.string().optional(),
     videoDescription: z.string().optional(),
     tn_shipping_enabled: z.boolean().default(true),
+    free_shipping: z.boolean().default(false),
   });
 
 
@@ -204,6 +206,7 @@ export function CreateProductDialog({
       videoThumbnail: '',
       videoDescription: '',
       tn_shipping_enabled: true,
+      free_shipping: false,
     },
   });
 
@@ -404,15 +407,10 @@ export function CreateProductDialog({
         bestseller: processedValues.bestseller,
         new: processedValues.new,
         inStock: processedValues.inStock,
-        review: processedValues.review,
         status: processedValues.status,
         tn_shipping_enabled: processedValues.tn_shipping_enabled,
+        free_shipping: processedValues.free_shipping,
       };
-
-      // Handle JSON fields
-      if (processedValues.features) {
-        productData.features = processedValues.features;
-      }
 
       if (processedValues.care) {
         productData.care = processedValues.care;
@@ -717,6 +715,24 @@ export function CreateProductDialog({
                             <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
                               <div className="space-y-0.5">
                                 <FormLabel>Allow TN Shipping</FormLabel>
+                              </div>
+                              <Switch
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                              />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="free_shipping"
+                          render={({ field }) => (
+                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                              <div className="space-y-0.5">
+                                <FormLabel>Free Shipping</FormLabel>
+                                <FormDescription>
+                                  Enable free shipping for this product
+                                </FormDescription>
                               </div>
                               <Switch
                                 checked={field.value}
