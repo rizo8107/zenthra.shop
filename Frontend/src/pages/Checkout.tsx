@@ -2416,6 +2416,35 @@ export default function CheckoutPage() {
                           ) : null;
                         })()}
                         {(() => {
+                          // Handle Buy Any X combo variants
+                          if (item.options?.comboType === 'buy_any_x' && item.options?.variants) {
+                            try {
+                              const variants = JSON.parse(item.options.variants);
+                              return (
+                                <div className="flex flex-wrap gap-1">
+                                  <span className="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-semibold">
+                                    {item.options.combo}
+                                  </span>
+                                  {variants.map((variant: string, idx: number) => {
+                                    const [type, val] = variant.split('-');
+                                    return (
+                                      <span key={idx} className="rounded-full bg-emerald-500 text-white px-2 py-0.5 text-[10px] font-semibold">
+                                        {type === 'size' ? 'Size' : 'Color'}: {val}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            } catch {
+                              return (
+                                <span className="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px] font-semibold">
+                                  {item.options.combo}
+                                </span>
+                              );
+                            }
+                          }
+                          
+                          // Handle regular combo variants
                           interface ComboVariant {
                             value: string | number;
                             name?: string;

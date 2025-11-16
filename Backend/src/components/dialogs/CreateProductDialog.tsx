@@ -28,9 +28,11 @@ import { toast } from 'sonner';
 import { CreateProductData } from '@/types/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
 import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { pb } from '@/lib/pocketbase';
 
 
 const generateRowId = () => {
@@ -150,10 +152,28 @@ export function CreateProductDialog({
   const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
   type ColorRow = { name: string; hex: string; value: string; inStock?: boolean };
   type SizeRow = { id: string; name?: string; value: string; unit?: string; useBasePrice?: boolean; sizePrice?: number; inStock?: boolean };
-  type ComboRow = { id: string; name: string; value: string; type?: 'bogo'|'bundle'|'custom'; items?: number; priceOverride?: number; description?: string; discountType?: 'amount'|'percent'; discountValue?: number };
+  type ComboRow = { 
+    id: string; 
+    name: string; 
+    value: string; 
+    type?: 'bogo'|'bundle'|'custom'|'buy_any_x'; 
+    items?: number; 
+    priceOverride?: number; 
+    description?: string; 
+    discountType?: 'amount'|'percent'; 
+    discountValue?: number;
+    // New fields for "Buy Any X" functionality
+    availableProducts?: string[]; // Array of product IDs that can be selected
+    requiredQuantity?: number; // How many items user must select (e.g., 2 for "Buy Any 2")
+    allowDuplicates?: boolean; // Whether user can select same product multiple times
+  };
   const [colorRows, setColorRows] = useState<ColorRow[]>([]);
   const [sizeRows, setSizeRows] = useState<SizeRow[]>([]);
   const [comboRows, setComboRows] = useState<ComboRow[]>([]);
+  
+  // State for managing available products for "Buy Any X" combos
+  const [availableProducts, setAvailableProducts] = useState<Array<{id: string, name: string, price: number}>>([]);
+  const [loadingProducts, setLoadingProducts] = useState(false);
 
   const buildVariantsFromRows = () => {
     const variants: any = {};
@@ -166,7 +186,21 @@ export function CreateProductDialog({
       priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined),
       images: variantFilenamesBySize[s.id] || [],
     }));
-    if (comboRows.length) variants.combos = comboRows.map(cb => ({ name: cb.name, value: cb.value || slugify(cb.name), type: cb.type || 'bundle', items: cb.items, priceOverride: cb.priceOverride, description: cb.description, discountType: cb.discountType, discountValue: cb.discountValue, images: comboFilenamesByKey[cb.id] || [] }));
+    if (comboRows.length) variants.combos = comboRows.map(cb => ({ 
+      name: cb.name, 
+      value: cb.value || slugify(cb.name), 
+      type: cb.type || 'bundle', 
+      items: cb.items, 
+      priceOverride: cb.priceOverride, 
+      description: cb.description, 
+      discountType: cb.discountType, 
+      discountValue: cb.discountValue, 
+      images: comboFilenamesByKey[cb.id] || [],
+      // Include new "Buy Any X" fields
+      availableProducts: cb.availableProducts || [],
+      requiredQuantity: cb.requiredQuantity || cb.items,
+      allowDuplicates: cb.allowDuplicates !== false
+    }));
     const json = JSON.stringify(variants);
     form.setValue('variants', json);
   };
@@ -225,6 +259,42 @@ export function CreateProductDialog({
       setSelectedVariantSizeId(sizeRows[0].id);
     }
   }, [sizeRows, selectedVariantSizeId]);
+
+  // Fetch available products for "Buy Any X" combo selection
+  useEffect(() => {
+    const fetchProducts = async () => {
+      if (!open) return; // Only fetch when dialog is open
+      
+      setLoadingProducts(true);
+      try {
+        let records;
+        try {
+          // Primary attempt: only active products, sorted by name
+          records = await pb.collection('products').getList(1, 100, {
+            filter: 'status = "active"',
+            sort: 'name',
+          });
+        } catch (error: any) {
+          // If the filtered query fails (e.g. validation/400), retry without filter
+          console.warn('Primary combo product fetch failed, retrying without filter:', error);
+          records = await pb.collection('products').getList(1, 100);
+        }
+
+        setAvailableProducts(records.items.map((item: any) => ({
+          id: item.id,
+          name: item.name,
+          price: typeof item.price === 'number' ? item.price : 0,
+        })));
+      } catch (error) {
+        console.error('Failed to fetch products for combo selection:', error);
+        toast.error('Failed to load products for combo selection');
+      } finally {
+        setLoadingProducts(false);
+      }
+    };
+
+    fetchProducts();
+  }, [open]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -514,239 +584,322 @@ export function CreateProductDialog({
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 overflow-hidden flex flex-col">
             <Tabs defaultValue="basic" className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid grid-cols-6 mb-4">
-                <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                <TabsTrigger value="details">Details</TabsTrigger>
-                <TabsTrigger value="images">Images</TabsTrigger>
-                <TabsTrigger value="attributes">Attributes</TabsTrigger>
-                <TabsTrigger value="care">Care & Usage</TabsTrigger>
-                <TabsTrigger value="specs">Specifications</TabsTrigger>
+              <TabsList className="grid grid-cols-3 mb-4">
+                <TabsTrigger value="basic">Overview</TabsTrigger>
+                <TabsTrigger value="variants">Variants & Combos</TabsTrigger>
+                <TabsTrigger value="advanced">Advanced</TabsTrigger>
               </TabsList>
 
               <div className="flex-1 overflow-auto px-1">
-                <TabsContent value="basic" className="space-y-4 mt-0">
-                  <div className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Name</FormLabel>
-                          <Input {...field} placeholder="Product name" />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="description"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Description</FormLabel>
-                          <Textarea
-                            {...field}
-                            placeholder="Product description"
-                            className="resize-none"
+                <TabsContent value="basic" className="mt-0">
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)] gap-6">
+                    {/* Left column: General info + pricing + status */}
+                    <div className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-sm">General Information</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Name</FormLabel>
+                                <Input {...field} placeholder="Product name" />
+                                <FormMessage />
+                              </FormItem>
+                            )}
                           />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Price</FormLabel>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.01"
-                              onChange={(e) => field.onChange(Number(e.target.value))}
-                              placeholder="0.00"
-                            />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                          <FormField
+                            control={form.control}
+                            name="description"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Description</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  placeholder="Product description"
+                                  className="resize-none"
+                                />
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </CardContent>
+                      </Card>
 
-                      <FormField
-                        control={form.control}
-                        name="original_price"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Original Price</FormLabel>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.01"
-                              onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                              placeholder="0.00"
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-sm">Pricing & Stock</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="price"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Price</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      type="number"
+                                      step="0.01"
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
+                                      placeholder="0.00"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
                             />
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+
+                            <FormField
+                              control={form.control}
+                              name="original_price"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Original Price</FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      {...field}
+                                      type="number"
+                                      step="0.01"
+                                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                                      placeholder="0.00"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="category"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Category</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select category" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {CATEGORY_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt} value={opt}>
+                                          {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Status</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select status" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="active">Active</SelectItem>
+                                      <SelectItem value="inactive">Inactive</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <FormField
+                            control={form.control}
+                            name="stock"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Stock</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    type="number"
+                                    min="0"
+                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                                    placeholder="Available quantity"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-sm">Product Status</CardTitle>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <FormField
+                            control={form.control}
+                            name="inStock"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>In Stock</FormLabel>
+                                </div>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="new"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>New</FormLabel>
+                                </div>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="bestseller"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>Bestseller</FormLabel>
+                                </div>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="tn_shipping_enabled"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>Allow TN Shipping</FormLabel>
+                                </div>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="free_shipping"
+                            render={({ field }) => (
+                              <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
+                                <div className="space-y-0.5">
+                                  <FormLabel>Free Shipping</FormLabel>
+                                  <FormDescription>
+                                    Enable free shipping for this product
+                                  </FormDescription>
+                                </div>
+                                <Switch
+                                  checked={field.value}
+                                  onCheckedChange={field.onChange}
+                                />
+                              </FormItem>
+                            )}
+                          />
+                        </CardContent>
+                      </Card>
                     </div>
 
-                    <FormField
-                      control={form.control}
-                      name="category"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Category</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {CATEGORY_OPTIONS.map((opt) => (
-                                <SelectItem key={opt} value={opt}>
-                                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Status</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="active">Active</SelectItem>
-                              <SelectItem value="inactive">Inactive</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Stock</FormLabel>
-                          <Input
-                            {...field}
-                            type="number"
-                            min="0"
-                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                            placeholder="Available quantity"
-                          />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-sm">Product Status</CardTitle>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-3 gap-4">
-                        <FormField
-                          control={form.control}
-                          name="inStock"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                              <div className="space-y-0.5">
-                                <FormLabel>In Stock</FormLabel>
+                    {/* Right column: Upload images, similar to reference UI */}
+                    <div className="space-y-4">
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-sm">
+                            <ImageIcon className="h-4 w-4" />
+                            Upload Images
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {imagePreviewUrls.map((url, index) => (
+                              <div key={index} className="relative group overflow-hidden rounded-md border">
+                                <AspectRatio ratio={1 / 1}>
+                                  <img
+                                    src={url}
+                                    alt={`Product image ${index + 1}`}
+                                    className="object-cover w-full h-full"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
+                                    }}
+                                  />
+                                </AspectRatio>
+                                <button
+                                  type="button"
+                                  onClick={() => removeImage(index)}
+                                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
+                                  aria-label={`Remove image ${index + 1}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
                               </div>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="new"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                              <div className="space-y-0.5">
-                                <FormLabel>New</FormLabel>
-                              </div>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormItem>
-                          )}
-                        />
-                        
-                        <FormField
-                          control={form.control}
-                          name="bestseller"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                              <div className="space-y-0.5">
-                                <FormLabel>Bestseller</FormLabel>
-                              </div>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="tn_shipping_enabled"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                              <div className="space-y-0.5">
-                                <FormLabel>Allow TN Shipping</FormLabel>
-                              </div>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormItem>
-                          )}
-                        />
-                        <FormField
-                          control={form.control}
-                          name="free_shipping"
-                          render={({ field }) => (
-                            <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3">
-                              <div className="space-y-0.5">
-                                <FormLabel>Free Shipping</FormLabel>
-                                <FormDescription>
-                                  Enable free shipping for this product
-                                </FormDescription>
-                              </div>
-                              <Switch
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
-                              />
-                            </FormItem>
-                          )}
-                        />
-                      </CardContent>
-                    </Card>
+                            ))}
+                            <div className="flex items-center justify-center rounded-md border border-dashed p-4 h-full min-h-[150px]">
+                              <label htmlFor="image-upload" className="flex flex-col items-center justify-center cursor-pointer w-full h-full">
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                  <Upload className="h-8 w-8 text-muted-foreground" />
+                                  <span className="text-sm font-medium text-muted-foreground">Upload Image</span>
+                                  <span className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 5MB</span>
+                                </div>
+                                <input
+                                  id="image-upload"
+                                  type="file"
+                                  accept="image/*"
+                                  multiple
+                                  className="sr-only"
+                                  onChange={handleImageUpload}
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </div>
                   </div>
                 </TabsContent>
 
-                <TabsContent value="images" className="space-y-4 mt-0">
+                <TabsContent value="variants" className="space-y-4 mt-0">
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -861,7 +1014,7 @@ export function CreateProductDialog({
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="details" className="space-y-4 mt-0">
+                <TabsContent value="variants" className="space-y-4 mt-0">
 
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
@@ -1147,6 +1300,8 @@ export function CreateProductDialog({
                             <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
                             <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
                             <Button type="button" variant="secondary" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'',value:'',type:'bundle'}])}>Add Custom</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 2', value:'buy-any-2', type:'buy_any_x', requiredQuantity: 2, allowDuplicates: true, availableProducts: []}])}>Buy Any 2</Button>
+                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 3', value:'buy-any-3', type:'buy_any_x', requiredQuantity: 3, allowDuplicates: true, availableProducts: []}])}>Buy Any 3</Button>
                           </div>
                           <div className="flex flex-wrap gap-2 mb-2">
                             <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
@@ -1180,6 +1335,7 @@ export function CreateProductDialog({
                                       <SelectItem value="bundle">bundle</SelectItem>
                                       <SelectItem value="bogo">bogo</SelectItem>
                                       <SelectItem value="custom">custom</SelectItem>
+                                      <SelectItem value="buy_any_x">buy any x</SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
@@ -1288,6 +1444,85 @@ export function CreateProductDialog({
                                         </button>
                                       </div>
                                     ))}
+                                  </div>
+                                )}
+                                
+                                {/* Product Selection for "Buy Any X" combos */}
+                                {cb.type === 'buy_any_x' && (
+                                  <div className="col-span-12 space-y-3 mt-4 p-3 bg-blue-50 rounded-md border border-blue-200">
+                                    <div className="flex items-center justify-between">
+                                      <h4 className="text-sm font-medium text-blue-900">Available Products for Selection</h4>
+                                      <div className="text-xs text-blue-700">
+                                        Required: {cb.requiredQuantity || cb.items || 2} items
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-40 overflow-y-auto">
+                                      {loadingProducts ? (
+                                        <div className="col-span-full text-center py-4 text-sm text-gray-500">
+                                          Loading products...
+                                        </div>
+                                      ) : availableProducts.length === 0 ? (
+                                        <div className="col-span-full text-center py-4 text-sm text-gray-500">
+                                          No products available
+                                        </div>
+                                      ) : (
+                                        availableProducts.map((product) => (
+                                          <label key={product.id} className="flex items-center space-x-2 p-2 rounded border hover:bg-blue-100 cursor-pointer">
+                                            <input
+                                              type="checkbox"
+                                              checked={(cb.availableProducts || []).includes(product.id)}
+                                              onChange={(e) => {
+                                                const targetId = cb.id;
+                                                const productId = product.id;
+                                                const isChecked = e.target.checked;
+                                                
+                                                setComboRows(prev => prev.map(row => {
+                                                  if (row.id === targetId) {
+                                                    const currentProducts = row.availableProducts || [];
+                                                    const updatedProducts = isChecked
+                                                      ? [...currentProducts, productId]
+                                                      : currentProducts.filter(id => id !== productId);
+                                                    return { ...row, availableProducts: updatedProducts };
+                                                  }
+                                                  return row;
+                                                }));
+                                              }}
+                                              className="rounded border-gray-300"
+                                            />
+                                            <div className="flex-1 min-w-0">
+                                              <div className="text-sm font-medium text-gray-900 truncate">
+                                                {product.name}
+                                              </div>
+                                              <div className="text-xs text-gray-500">
+                                                ₹{product.price.toFixed(2)}
+                                              </div>
+                                            </div>
+                                          </label>
+                                        ))
+                                      )}
+                                    </div>
+                                    
+                                    <div className="flex items-center space-x-4 text-xs">
+                                      <label className="flex items-center space-x-1">
+                                        <input
+                                          type="checkbox"
+                                          checked={cb.allowDuplicates !== false}
+                                          onChange={(e) => {
+                                            const targetId = cb.id;
+                                            setComboRows(prev => prev.map(row => 
+                                              row.id === targetId ? { ...row, allowDuplicates: e.target.checked } : row
+                                            ));
+                                          }}
+                                          className="rounded border-gray-300"
+                                        />
+                                        <span className="text-blue-700">Allow duplicate selections</span>
+                                      </label>
+                                      
+                                      <div className="text-blue-600">
+                                        Selected: {(cb.availableProducts || []).length} products
+                                      </div>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1449,99 +1684,115 @@ export function CreateProductDialog({
                   />
                 </TabsContent>
 
-                <TabsContent value="attributes" className="space-y-4 mt-0">
-                  {/* This tab will be for future attributes */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Product Attributes</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-muted-foreground">Additional product attributes will be added here in the future.</p>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
+                <TabsContent value="advanced" className="space-y-4 mt-0">
+                  <Accordion type="multiple" className="w-full space-y-2">
+                    <AccordionItem value="attributes">
+                      <AccordionTrigger>Product Attributes</AccordionTrigger>
+                      <AccordionContent>
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Product Attributes</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <p className="text-muted-foreground">
+                              Additional product attributes will be added here in the future.
+                            </p>
+                          </CardContent>
+                        </Card>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                <TabsContent value="care" className="space-y-4 mt-0">
-                  <FormField
-                    control={form.control}
-                    name="care"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Care Instructions</FormLabel>
-                        <Textarea
-                          {...field}
-                          placeholder='Enter care instructions separated by commas or as JSON array'
-                          onBlur={(e) => handleJsonFieldBlur(e, true)}
-                        />
-                        <FormDescription>
-                          Enter care instructions as comma-separated values or a JSON array of strings
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                    <AccordionItem value="care">
+                      <AccordionTrigger>Care & Usage</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4">
+                          <FormField
+                            control={form.control}
+                            name="care"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Care Instructions</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  placeholder='Enter care instructions separated by commas or as JSON array'
+                                  onBlur={(e) => handleJsonFieldBlur(e, true)}
+                                />
+                                <FormDescription>
+                                  Enter care instructions as comma-separated values or a JSON array of strings
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-                  <FormField
-                    control={form.control}
-                    name="care_instructions"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Detailed Care Instructions</FormLabel>
-                        <Textarea
-                          {...field}
-                          className="min-h-[150px]"
-                          placeholder='Enter as JSON object or use the format described below'
-                          onBlur={(e) => handleJsonFieldBlur(e, false)}
-                        />
-                        <FormDescription>
-                          Enter as JSON object with "cleaning" and "storage" arrays or use the proper JSON format
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                          <FormField
+                            control={form.control}
+                            name="care_instructions"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Detailed Care Instructions</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  className="min-h-[150px]"
+                                  placeholder='Enter as JSON object or use the format described below'
+                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
+                                />
+                                <FormDescription>
+                                  Enter as JSON object with "cleaning" and "storage" arrays or use the proper JSON format
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-                  <FormField
-                    control={form.control}
-                    name="usage_guidelines"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Usage Guidelines</FormLabel>
-                        <Textarea
-                          {...field}
-                          className="min-h-[150px]"
-                          placeholder='Enter as JSON object or use the format described below'
-                          onBlur={(e) => handleJsonFieldBlur(e, false)}
-                        />
-                        <FormDescription>
-                          Enter as JSON object with "recommended_use" and "pro_tips" arrays or use the proper JSON format
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
+                          <FormField
+                            control={form.control}
+                            name="usage_guidelines"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Usage Guidelines</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  className="min-h-[150px]"
+                                  placeholder='Enter as JSON object or use the format described below'
+                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
+                                />
+                                <FormDescription>
+                                  Enter as JSON object with "recommended_use" and "pro_tips" arrays or use the proper JSON format
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
 
-                <TabsContent value="specs" className="space-y-4 mt-0">
-                  <FormField
-                    control={form.control}
-                    name="specifications"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Product Specifications</FormLabel>
-                        <Textarea
-                          {...field}
-                          className="min-h-[200px]"
-                          placeholder='Enter as JSON object or use the format described below'
-                          onBlur={(e) => handleJsonFieldBlur(e, false)}
+                    <AccordionItem value="specs">
+                      <AccordionTrigger>Specifications</AccordionTrigger>
+                      <AccordionContent>
+                        <FormField
+                          control={form.control}
+                          name="specifications"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Product Specifications</FormLabel>
+                              <Textarea
+                                {...field}
+                                className="min-h-[200px]"
+                                placeholder='Enter as JSON object or use the format described below'
+                                onBlur={(e) => handleJsonFieldBlur(e, false)}
+                              />
+                              <FormDescription>
+                                Enter product specifications as a JSON object with key-value pairs
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                        <FormDescription>
-                          Enter product specifications as a JSON object with key-value pairs
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
                 </TabsContent>
               </div>
             </Tabs>

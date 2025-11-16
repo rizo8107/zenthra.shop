@@ -117,17 +117,50 @@ export default function Cart() {
                               </Link>
                             </h3>
                             {(item.color || item.options) && (
-                              <div className="flex gap-2 mt-1">
+                              <div className="flex flex-wrap gap-2 mt-1">
                                 {item.color && (
                                   <Badge variant="outline" className="text-xs">
                                     Color: {item.color}
                                   </Badge>
                                 )}
-                                {item.options && Object.entries(item.options).map(([key, value]) => (
-                                  <Badge key={key} variant="outline" className="text-xs">
-                                    {key}: {value}
-                                  </Badge>
-                                ))}
+                                {item.options && Object.entries(item.options).map(([key, value]) => {
+                                  // Special handling for Buy Any X combo variants
+                                  if (key === 'variants' && item.options?.comboType === 'buy_any_x') {
+                                    try {
+                                      const variants = JSON.parse(value);
+                                      return (
+                                        <div key={key} className="flex flex-wrap gap-1">
+                                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                                            {item.options?.combo || 'Bundle'}
+                                          </Badge>
+                                          {variants.map((variant: string, idx: number) => {
+                                            const [type, val] = variant.split('-');
+                                            return (
+                                              <Badge key={idx} variant="outline" className="text-xs">
+                                                {type === 'size' ? 'Size' : 'Color'}: {val}
+                                              </Badge>
+                                            );
+                                          })}
+                                        </div>
+                                      );
+                                    } catch {
+                                      return (
+                                        <Badge key={key} variant="outline" className="text-xs">
+                                          {key}: {value}
+                                        </Badge>
+                                      );
+                                    }
+                                  }
+                                  // Skip internal combo metadata
+                                  if (['comboType', 'discountType', 'discountValue', 'variants'].includes(key)) {
+                                    return null;
+                                  }
+                                  return (
+                                    <Badge key={key} variant="outline" className="text-xs">
+                                      {key}: {value}
+                                    </Badge>
+                                  );
+                                })}
                               </div>
                             )}
                           </div>
@@ -147,6 +180,11 @@ export default function Cart() {
                             <span className="font-semibold text-lg">
                               ₹{(item.unitPrice || item.product.price).toFixed(2)}
                             </span>
+                            {item.options?.comboType === 'buy_any_x' && (
+                              <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                                Bundle Price
+                              </Badge>
+                            )}
                             {item.product.original_price && item.product.original_price > (item.unitPrice || item.product.price) && (
                               <span className="text-sm text-gray-500 line-through">
                                 ₹{item.product.original_price.toFixed(2)}

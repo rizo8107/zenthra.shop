@@ -86,6 +86,9 @@ const ProductDetail = () => {
   } | null>(null);
   const [lastVariantPick, setLastVariantPick] =
     useState<'size' | 'combo' | null>(null);
+  
+  // State for managing selected products in "Buy Any X" combos
+  const [selectedBuyAnyXProducts, setSelectedBuyAnyXProducts] = useState<Record<string, string[]>>({});
 
   const { toast } = useToast();
   const relatedLoaded = useRef(false);
@@ -757,16 +760,49 @@ const ProductDetail = () => {
   const handleAddToCart = () => {
     if (!product) return;
 
-    addItem(
-      product,
-      quantity,
-      selectedColor?.value || '',
-      {
-        ...(selectedSize ? { size: String(selectedSize.value) } : {}),
-        ...(selectedCombo ? { combo: String(selectedCombo.value) } : {}),
-      },
-      effectivePrice,
-    );
+    // Handle Buy Any X combo selections
+    if (selectedCombo && selectedBuyAnyXProducts[selectedCombo.value] && selectedBuyAnyXProducts[selectedCombo.value].length > 0) {
+      const selectedVariants = selectedBuyAnyXProducts[selectedCombo.value];
+      const requiredQuantity = selectedCombo.items || 2;
+      
+      if (selectedVariants.length !== requiredQuantity) {
+        toast({
+          title: "Incomplete Selection",
+          description: `Please select ${requiredQuantity} variants to complete your ${selectedCombo.name} bundle.`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Add combo as a single cart item with variant details
+      const comboOptions: Record<string, string> = {
+        combo: selectedCombo.name,
+        comboType: 'buy_any_x',
+        variants: JSON.stringify(selectedVariants),
+        discountType: selectedCombo.discountType || 'percent',
+        discountValue: String(selectedCombo.discountValue || 0)
+      };
+
+      addItem(
+        product,
+        quantity,
+        selectedColor?.value || '',
+        comboOptions,
+        effectivePrice,
+      );
+    } else {
+      // Regular single item or regular combo
+      addItem(
+        product,
+        quantity,
+        selectedColor?.value || '',
+        {
+          ...(selectedSize ? { size: String(selectedSize.value) } : {}),
+          ...(selectedCombo ? { combo: String(selectedCombo.value) } : {}),
+        },
+        effectivePrice,
+      );
+    }
 
     const now = Date.now();
     const THROTTLE_MS = 2000;
@@ -1364,59 +1400,381 @@ const ProductDetail = () => {
                   </div>
                 </div>
               )}
+
+              {/* Buy Any X Combos - Always show, but with different behavior based on variants */}
+              {true && (
+                <div className="space-y-4">
+                  <div className="text-sm font-medium text-foreground mb-3">
+                    Bundle Options <span className="text-xs font-normal text-muted-foreground">(Mix & Match)</span>
+                  </div>
+                  
+                  {/* Quick Bundle Buttons */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+                    {[
+                      { name: 'Buy Any 2', value: 'buy-any-2', requiredQuantity: 2, discount: '10% off' },
+                      { name: 'Buy Any 3', value: 'buy-any-3', requiredQuantity: 3, discount: '15% off' },
+                      { name: 'Buy Any 4', value: 'buy-any-4', requiredQuantity: 4, discount: '20% off' }
+                    ].map((bundle) => (
+                      <button
+                        key={bundle.value}
+                        type="button"
+                        onClick={() => {
+                          // Create a synthetic combo for this bundle
+                          const syntheticCombo = {
+                            name: bundle.name,
+                            value: bundle.value,
+                            items: bundle.requiredQuantity,
+                            type: 'custom' as const,
+                            discountType: 'percent' as const,
+                            discountValue: parseInt(bundle.discount.replace(/[^0-9]/g, ''))
+                          };
+                          
+                          if (selectedCombo?.value === bundle.value) {
+                            setSelectedCombo(null);
+                            // Clear selections for this combo
+                            setSelectedBuyAnyXProducts(prev => ({
+                              ...prev,
+                              [bundle.value]: []
+                            }));
+                          } else {
+                            setSelectedCombo(syntheticCombo);
+                            // Initialize empty selection for this combo
+                            setSelectedBuyAnyXProducts(prev => ({
+                              ...prev,
+                              [bundle.value]: []
+                            }));
+                          }
+                          setLastVariantPick('combo');
+                        }}
+                        className={cn(
+                          'p-3 text-left rounded-lg border transition-all',
+                          selectedCombo?.value === bundle.value
+                            ? 'border-blue-600 bg-blue-50 text-blue-700'
+                            : 'border-border bg-white text-foreground hover:border-blue-400 hover:bg-blue-50/50'
+                        )}
+                      >
+                        <div className="font-medium text-sm">{bundle.name}</div>
+                        <div className="text-xs text-muted-foreground">{bundle.discount}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Show variant selection when a combo is selected */}
+                  {selectedCombo && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium text-foreground">
+                          {selectedCombo.name || 'Bundle Selection'} 
+                          <span className="text-xs font-normal text-muted-foreground ml-1">
+                            (Select {selectedCombo.items || 2} variants)
+                          </span>
+                        </span>
+                        <div className="text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
+                          {(selectedBuyAnyXProducts[selectedCombo.value] || []).length} / {selectedCombo.items || 2} selected
+                        </div>
+                      </div>
+                      
+                      <div className="p-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg border-2 border-blue-300 shadow-sm">
+                        <div className="text-sm font-medium text-blue-900 mb-4 flex items-center gap-2">
+                          <span className="w-2 h-2 bg-blue-600 rounded-full animate-pulse"></span>
+                          Choose {selectedCombo.items || 2} variants to complete your bundle:
+                        </div>
+                        
+                        {(selectedBuyAnyXProducts[selectedCombo.value] || []).length === 0 && (
+                          <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div className="text-xs text-yellow-800 font-medium mb-1">
+                              👆 Getting Started:
+                            </div>
+                            <div className="text-xs text-yellow-700">
+                              Select {selectedCombo.items || 2} different variants below to create your personalized bundle!
+                            </div>
+                          </div>
+                        )}
+                            
+                            <div className="space-y-4">
+                              {/* Size Variants */}
+                              {sizeOptions.length > 0 && (
+                                <div className="space-y-3">
+                                  <h4 className="text-sm font-medium text-gray-900">Available Sizes</h4>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {sizeOptions.map((size: any) => {
+                                      const variantKey = `size-${size.value}`;
+                                      const isSelected = (selectedBuyAnyXProducts[selectedCombo.value] || []).includes(variantKey);
+                                      return (
+                                        <div key={variantKey} className={cn(
+                                          "flex items-center space-x-2 p-3 rounded-lg border transition-all cursor-pointer",
+                                          isSelected 
+                                            ? "bg-white border-blue-300 shadow-sm" 
+                                            : "bg-white/70 border-gray-200 hover:border-blue-200 hover:bg-white"
+                                        )}>
+                                          <input
+                                            type="checkbox"
+                                            id={`variant-${variantKey}`}
+                                            checked={isSelected}
+                                            onChange={(e) => {
+                                              const comboValue = selectedCombo.value;
+                                              const isChecked = e.target.checked;
+                                              const requiredQty = selectedCombo.items || 2;
+                                              
+                                              setSelectedBuyAnyXProducts(prev => {
+                                                const currentSelected = prev[comboValue] || [];
+                                                
+                                                if (isChecked) {
+                                                  if (currentSelected.length < requiredQty) {
+                                                    return {
+                                                      ...prev,
+                                                      [comboValue]: [...currentSelected, variantKey]
+                                                    };
+                                                  } else {
+                                                    toast({
+                                                      title: "Selection limit reached",
+                                                      description: `You can only select ${requiredQty} items for this combo`,
+                                                      variant: "destructive"
+                                                    });
+                                                    return prev;
+                                                  }
+                                                } else {
+                                                  return {
+                                                    ...prev,
+                                                    [comboValue]: currentSelected.filter(id => id !== variantKey)
+                                                  };
+                                                }
+                                              });
+                                            }}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                          />
+                                          <label htmlFor={`variant-${variantKey}`} className="flex-1 cursor-pointer">
+                                            <div className="text-sm font-medium text-gray-900">
+                                              {size.name || size.value} {size.unit || ''}
+                                            </div>
+                                            <div className="text-xs text-gray-500">
+                                              {size.priceOverride ? `₹${size.priceOverride}` : `₹${product.price}`}
+                                            </div>
+                                          </label>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Color Variants */}
+                              {colorOptions.length > 0 && (
+                                <div className="space-y-3">
+                                  <h4 className="text-sm font-medium text-gray-900">Available Colors</h4>
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {colorOptions.map((color: any) => {
+                                      const variantKey = `color-${color.value}`;
+                                      const isSelected = (selectedBuyAnyXProducts[selectedCombo.value] || []).includes(variantKey);
+                                      return (
+                                        <div key={variantKey} className={cn(
+                                          "flex items-center space-x-2 p-3 rounded-lg border transition-all cursor-pointer",
+                                          isSelected 
+                                            ? "bg-white border-blue-300 shadow-sm" 
+                                            : "bg-white/70 border-gray-200 hover:border-blue-200 hover:bg-white"
+                                        )}>
+                                          <input
+                                            type="checkbox"
+                                            id={`variant-${variantKey}`}
+                                            checked={isSelected}
+                                            onChange={(e) => {
+                                              const comboValue = selectedCombo.value;
+                                              const isChecked = e.target.checked;
+                                              const requiredQty = selectedCombo.items || 2;
+                                              
+                                              setSelectedBuyAnyXProducts(prev => {
+                                                const currentSelected = prev[comboValue] || [];
+                                                
+                                                if (isChecked) {
+                                                  if (currentSelected.length < requiredQty) {
+                                                    return {
+                                                      ...prev,
+                                                      [comboValue]: [...currentSelected, variantKey]
+                                                    };
+                                                  } else {
+                                                    toast({
+                                                      title: "Selection limit reached",
+                                                      description: `You can only select ${requiredQty} items for this combo`,
+                                                      variant: "destructive"
+                                                    });
+                                                    return prev;
+                                                  }
+                                                } else {
+                                                  return {
+                                                    ...prev,
+                                                    [comboValue]: currentSelected.filter(id => id !== variantKey)
+                                                  };
+                                                }
+                                              });
+                                            }}
+                                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                                          />
+                                          <div className="flex items-center space-x-2 flex-1">
+                                            <div 
+                                              className="w-4 h-4 rounded-full border border-gray-300"
+                                              style={{ backgroundColor: color.hex || color.value }}
+                                            />
+                                            <label htmlFor={`variant-${variantKey}`} className="cursor-pointer">
+                                              <div className="text-sm font-medium text-gray-900">
+                                                {color.name || color.value}
+                                              </div>
+                                            </label>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* If no variants available, show message */}
+                              {sizeOptions.length === 0 && colorOptions.length === 0 && (
+                                <div className="text-center py-8 text-gray-500 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                                  <div className="text-4xl mb-3">🎯</div>
+                                  <p className="text-sm font-medium text-gray-700">No variants available for this product</p>
+                                  <p className="text-xs mt-2 text-gray-500">This product doesn't have different sizes or colors to mix and match.</p>
+                                  <p className="text-xs mt-1 text-gray-500">Bundle options work best with products that have multiple variants.</p>
+                                </div>
+                              )}
+                            </div>
+                            
+                        <div className="mt-4 p-3 bg-blue-100/50 rounded-lg">
+                          <div className="text-xs text-blue-800 font-medium mb-1">
+                            Bundle Benefits:
+                          </div>
+                          <div className="text-xs text-blue-700">
+                            • Mix & match different sizes and colors
+                            • {selectedCombo.discountType === 'percent' ? `${selectedCombo.discountValue}% off` : selectedCombo.discountType === 'amount' ? `₹${selectedCombo.discountValue} off` : 'Special bundle pricing'}
+                            • Free shipping on bundles
+                            • Perfect for gifts or personal variety
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
-            {/* qty + add to cart (desktop & tablet only; mobile uses sticky bar) */}
-            <Card className="hidden md:flex items-center justify-between gap-4 rounded-xl border bg-white p-4 shadow-sm">
-              <div className="flex items-center gap-3">
-                <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Qty
-                </span>
-                <div className="flex items-center overflow-hidden rounded-full border bg-white">
-                  <button
-                    type="button"
-                    onClick={decreaseQuantity}
-                    disabled={quantity <= 1}
-                    className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                    aria-label="Decrease quantity"
-                  >
-                    <Minus className="h-3.5 w-3.5" />
-                  </button>
-                  <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
-                    {quantity}
+            {/* Enhanced qty + add to cart (desktop & tablet only; mobile uses sticky bar) */}
+            <Card className="hidden md:flex flex-col gap-4 rounded-xl border bg-white p-4 shadow-sm">
+              {/* Selection Summary */}
+              {(selectedSize || selectedCombo) && (
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Selected:</span>
+                  {selectedSize && (
+                    <Badge variant="outline" className="text-xs">
+                      {selectedSize.name || `${selectedSize.value} ${selectedSize.unit || ''}`.trim()}
+                    </Badge>
+                  )}
+                  {selectedCombo && (
+                    <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200">
+                      {selectedCombo.name}
+                    </Badge>
+                  )}
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Qty
                   </span>
-                  <button
-                    type="button"
-                    onClick={increaseQuantity}
-                    className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
-                    aria-label="Increase quantity"
+                  <div className="flex items-center overflow-hidden rounded-full border bg-white">
+                    <button
+                      type="button"
+                      onClick={decreaseQuantity}
+                      disabled={quantity <= 1}
+                      className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                      aria-label="Decrease quantity"
+                    >
+                      <Minus className="h-3.5 w-3.5" />
+                    </button>
+                    <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
+                      {quantity}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={increaseQuantity}
+                      className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
+                      aria-label="Increase quantity"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-1 items-center justify-end gap-3">
+                  <div className="text-right text-sm">
+                    <p className="text-xs text-muted-foreground">Total</p>
+                    <p className="text-lg font-semibold">
+                      ₹{selectedTotal.toFixed(2)}
+                    </p>
+                    {selectedCombo && (
+                      <p className="text-xs text-green-600">Bundle savings applied!</p>
+                    )}
+                  </div>
+                  <Button
+                    className="flex-1 max-w-[180px]"
+                    onClick={handleAddToCart}
+                    disabled={!product.inStock}
+                    size="lg"
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                  </button>
+                    <ShoppingCart className="mr-2 h-4 w-4" />
+                    {product.inStock ? 'Add to Cart' : 'Notify Me'}
+                  </Button>
                 </div>
-              </div>
-              <div className="flex flex-1 items-center justify-end gap-3">
-                <div className="text-right text-sm">
-                  <p className="text-xs text-muted-foreground">Total</p>
-                  <p className="text-lg font-semibold">
-                    ₹{selectedTotal.toFixed(2)}
-                  </p>
-                </div>
-                <Button
-                  className="flex-1 max-w-[180px]"
-                  onClick={handleAddToCart}
-                  disabled={!product.inStock}
-                >
-                  <ShoppingCart className="mr-2 h-4 w-4" />
-                  {product.inStock ? 'Add to Cart' : 'Notify Me'}
-                </Button>
               </div>
             </Card>
           </div>
         </div>
 
+        {/* Mobile sticky checkout bar */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center overflow-hidden rounded-full border bg-white">
+                <button
+                  type="button"
+                  onClick={decreaseQuantity}
+                  disabled={quantity <= 1}
+                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                  aria-label="Decrease quantity"
+                >
+                  <Minus className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
+                  {quantity}
+                </span>
+                <button
+                  type="button"
+                  onClick={increaseQuantity}
+                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
+                  aria-label="Increase quantity"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+              <div className="text-sm">
+                <div className="font-semibold">₹{selectedTotal.toFixed(2)}</div>
+                {selectedCombo && (
+                  <div className="text-xs text-green-600">Bundle price</div>
+                )}
+              </div>
+            </div>
+            <Button
+              className="flex-1 max-w-[140px]"
+              onClick={handleAddToCart}
+              disabled={!product.inStock}
+              size="lg"
+            >
+              <ShoppingCart className="mr-2 h-4 w-4" />
+              {product.inStock ? 'Add to Cart' : 'Notify'}
+            </Button>
+          </div>
+        </div>
+
         {/* description / reviews tabs full width */}
-        <div className="mt-3 rounded-xl bg-white p-3 shadow-sm md:p-4">
+        <div className="mt-3 mb-20 md:mb-3 rounded-xl bg-white p-3 shadow-sm md:p-4">
           <Tabs defaultValue="description" className="w-full">
             <TabsList className="inline-flex h-10 w-full gap-1 rounded-full bg-muted/70 p-1 text-sm">
               <TabsTrigger

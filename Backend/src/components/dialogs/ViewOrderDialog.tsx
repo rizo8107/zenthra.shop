@@ -13,6 +13,7 @@ import type { Order } from "@/types/schema";
 import { formatDate } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Label } from "@/components/ui/label";
 import { AspectRatio } from "@/components/ui/aspect-ratio";
 import { Printer, PencilLine, Check, X, Trash2 } from "lucide-react";
@@ -364,258 +365,279 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
             </Card>
           </div>
 
-          {/* DETAILS */}
-          <div className="space-y-3 sm:space-y-4 pt-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-              <Card>
-                <CardHeader className="px-4 py-3 sm:px-5">
-                  <CardTitle className="text-base sm:text-lg">Customer</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 px-4 pb-4 sm:px-5">
-                  <div>
-                    <Label className="font-semibold">Name</Label>
-                    {isEditing ? (
-                      <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
-                    ) : (
-                      <p>{form.customer_name}</p>
-                    )}
+          {/* Collapsible detail sections */}
+          <Accordion type="multiple" className="mt-3 space-y-3 sm:space-y-4">
+            <AccordionItem value="customer">
+              <AccordionTrigger className="text-sm sm:text-base font-medium">
+                Customer & Shipping
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="space-y-3 sm:space-y-4 pt-1">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    <Card>
+                      <CardHeader className="px-4 py-3 sm:px-5">
+                        <CardTitle className="text-base sm:text-lg">Customer</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2 px-4 pb-4 sm:px-5">
+                        <div>
+                          <Label className="font-semibold">Name</Label>
+                          {isEditing ? (
+                            <Input value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })} />
+                          ) : (
+                            <p>{form.customer_name}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="font-semibold">Email</Label>
+                          {isEditing ? (
+                            <Input type="email" value={form.customer_email} onChange={(e) => setForm({ ...form, customer_email: e.target.value })} />
+                          ) : (
+                            <p className="break-words">{form.customer_email}</p>
+                          )}
+                        </div>
+                        <div>
+                          <Label className="font-semibold">Phone</Label>
+                          {isEditing ? (
+                            <Input value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} />
+                          ) : (
+                            <p className="break-words">{form.customer_phone || "Not provided"}</p>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 pt-1">
+                          <div>
+                            <Label className="font-semibold">Status</Label>
+                            {isEditing ? (
+                              <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="processing">Processing</SelectItem>
+                                  <SelectItem value="shipped">Shipped</SelectItem>
+                                  <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                  <SelectItem value="delivered">Delivered</SelectItem>
+                                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div>
+                                <Badge variant={orderStatusVariant[form.status] || "outline"}>{form.status.replace(/_/g, " ")}</Badge>
+                              </div>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="font-semibold">Payment</Label>
+                            {isEditing ? (
+                              <Select value={form.payment_status} onValueChange={(v) => setForm({ ...form, payment_status: v })}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                  <SelectItem value="paid">Paid</SelectItem>
+                                  <SelectItem value="failed">Failed</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div>
+                                <Badge variant={paymentStatusVariant[form.payment_status] || "outline"}>{form.payment_status}</Badge>
+                              </div>
+                            )}
+                          </div>
+                          <div className="col-span-2">
+                            <Label className="font-semibold">Tracking</Label>
+                            <div className="text-sm mt-1 space-x-2">
+                              <span>
+                                Code: {((order as any).tracking_code as string) || "—"}
+                              </span>
+                              {((order as any).tracking_url as string) ? (
+                                <a
+                                  href={(order as any).tracking_url as string}
+                                  target="_blank"
+                                  rel="noreferrer noopener"
+                                  className="text-blue-600 underline"
+                                >
+                                  View Tracking
+                                </a>
+                              ) : null}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="px-4 py-3 sm:px-5">
+                        <CardTitle className="text-base sm:text-lg">Shipping Address</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4 pb-4 sm:px-5">
+                        {isEditing ? (
+                          <Textarea rows={6} value={form.shipping_address_text} onChange={(e) => setForm({ ...form, shipping_address_text: e.target.value })} />
+                        ) : (
+                          <p className="whitespace-pre-line break-words">{formatShippingAddress()}</p>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    <Card className="md:col-span-2">
+                      <CardHeader className="px-4 py-3 sm:px-5">
+                        <CardTitle className="text-base sm:text-lg">Order Notes</CardTitle>
+                      </CardHeader>
+                      <CardContent className="px-4 pb-4 sm:px-5">
+                        {isEditing ? (
+                          <Textarea rows={4} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+                        ) : (
+                          <p className="whitespace-pre-line break-words">{form.notes || "No notes provided"}</p>
+                        )}
+                      </CardContent>
+                    </Card>
                   </div>
-                    <div>
-                      <Label className="font-semibold">Email</Label>
-                      {isEditing ? (
-                        <Input type="email" value={form.customer_email} onChange={(e) => setForm({ ...form, customer_email: e.target.value })} />
-                      ) : (
-                        <p className="break-words">{form.customer_email}</p>
-                      )}
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Phone</Label>
-                      {isEditing ? (
-                        <Input value={form.customer_phone} onChange={(e) => setForm({ ...form, customer_phone: e.target.value })} />
-                      ) : (
-                        <p className="break-words">{form.customer_phone || "Not provided"}</p>
-                      )}
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 pt-1">
-                      <div>
-                        <Label className="font-semibold">Status</Label>
-                        {isEditing ? (
-                          <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="processing">Processing</SelectItem>
-                              <SelectItem value="shipped">Shipped</SelectItem>
-                              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                              <SelectItem value="delivered">Delivered</SelectItem>
-                              <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div>
-                            <Badge variant={orderStatusVariant[form.status] || "outline"}>{form.status.replace(/_/g, " ")}</Badge>
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Payment</Label>
-                        {isEditing ? (
-                          <Select value={form.payment_status} onValueChange={(v) => setForm({ ...form, payment_status: v })}>
-                            <SelectTrigger><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="paid">Paid</SelectItem>
-                              <SelectItem value="failed">Failed</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        ) : (
-                          <div>
-                            <Badge variant={paymentStatusVariant[form.payment_status] || "outline"}>{form.payment_status}</Badge>
-                          </div>
-                        )}
-                      </div>
-                      <div className="col-span-2">
-                        <Label className="font-semibold">Tracking</Label>
-                        <div className="text-sm mt-1 space-x-2">
-                          <span>
-                            Code: {((order as any).tracking_code as string) || "—"}
-                          </span>
-                          {((order as any).tracking_url as string) ? (
-                            <a
-                              href={(order as any).tracking_url as string}
-                              target="_blank"
-                              rel="noreferrer noopener"
-                              className="text-blue-600 underline"
-                            >
-                              View Tracking
-                            </a>
-                          ) : null}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
 
-                <Card>
-                  <CardHeader className="px-4 py-3 sm:px-5">
-                    <CardTitle className="text-base sm:text-lg">Shipping Address</CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-4 pb-4 sm:px-5">
-                    {isEditing ? (
-                      <Textarea rows={6} value={form.shipping_address_text} onChange={(e) => setForm({ ...form, shipping_address_text: e.target.value })} />
-                    ) : (
-                      <p className="whitespace-pre-line break-words">{formatShippingAddress()}</p>
-                    )}
-                  </CardContent>
-                </Card>
-
-                <Card className="md:col-span-2">
-                  <CardHeader className="px-4 py-3 sm:px-5">
-                    <CardTitle className="text-base sm:text-lg">Order Notes</CardTitle>
-                  </CardHeader>
-                  <CardContent className="px-4 pb-4 sm:px-5">
-                    {isEditing ? (
-                      <Textarea rows={4} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-                    ) : (
-                      <p className="whitespace-pre-line break-words">{form.notes || "No notes provided"}</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
-
-            {/* PRODUCTS */}
-            <div className="pt-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base sm:text-lg">Product Details</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {products.length > 0 ? (
-                    <div className="space-y-6">
-                      {products.map((product, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b pb-4">
-                          <div className="md:col-span-1 block mb-3 md:mb-0">
-                            <div className="w-full max-w-[150px] mx-auto">
-                              <AspectRatio ratio={1 / 1} className="bg-muted rounded-md overflow-hidden">
-                                <img
-                                  src={productImageUrl(product.product, resolveProductImageFileName(product.product))}
-                                  alt={product.product?.name}
-                                  className="object-cover w-full h-full"
-                                  onError={(e) => {
-                                    (e.target as HTMLImageElement).src = "https://placehold.co/200x200/e2e8f0/64748b?text=No+Image";
-                                  }}
-                                />
-                              </AspectRatio>
-                            </div>
-                          </div>
-                          <div className="md:col-span-3 flex flex-col justify-between">
-                            <div>
-                              <h4 className="font-medium text-base">{product.product?.name || (product as any).name || "Unknown Product"}</h4>
-                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                                {(() => {
-                                  const comboText = (((product as any).comboLabel || (product as any).combo || '') as string);
-                                  const m = typeof comboText === 'string' ? comboText.match(/(\d+)\s*-\s*Pack/i) : null;
-                                  const pack = m ? parseInt(m[1], 10) : NaN;
-                                  const q = Number(product.quantity || 0);
-                                  const displayQty = Number.isFinite(pack) && pack > 1 ? Math.max(1, Math.round(q / pack)) : q;
-                                  return (
-                                    <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-600">Qty {displayQty}</Badge>
-                                  );
-                                })()}
-                                {product.color && product.color.trim().length > 0 && (
-                                  <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-600">{product.color}</Badge>
-                                )}
-                                {(product as any).sizeLabel && (
-                                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-600">{(product as any).sizeLabel}</Badge>
-                                )}
-                                {!((product as any).sizeLabel) && (product as any).size && (
-                                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-600">{(product as any).size}</Badge>
-                                )}
-                                {(product as any).comboLabel && (
-                                  <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-600">{(product as any).comboLabel}</Badge>
-                                )}
-                                {!((product as any).comboLabel) && (product as any).combo && (
-                                  <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-600">{(product as any).combo}</Badge>
-                                )}
+            <AccordionItem value="products">
+              <AccordionTrigger className="text-sm sm:text-base font-medium">
+                Products
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="pt-3">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Product Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {products.length > 0 ? (
+                        <div className="space-y-6">
+                          {products.map((product, index) => (
+                            <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-4 border-b pb-4">
+                              <div className="md:col-span-1 block mb-3 md:mb-0">
+                                <div className="w-full max-w-[150px] mx-auto">
+                                  <AspectRatio ratio={1 / 1} className="bg-muted rounded-md overflow-hidden">
+                                    <img
+                                      src={productImageUrl(product.product, resolveProductImageFileName(product.product))}
+                                      alt={product.product?.name}
+                                      className="object-cover w-full h-full"
+                                      onError={(e) => {
+                                        (e.target as HTMLImageElement).src = "https://placehold.co/200x200/e2e8f0/64748b?text=No+Image";
+                                      }}
+                                    />
+                                  </AspectRatio>
+                                </div>
                               </div>
-                              {product.product?.description && (
-                                <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{product.product.description}</p>
-                              )}
-                            </div>
-                            <div className="grid grid-cols-3 mt-2 text-sm">
-                              <div>
-                                <span className="text-muted-foreground">Price</span>
-                                <p className="font-medium">₹{((product.product?.price ?? (product as any).price ?? 0) as number).toFixed(2)}</p>
-                              </div>
-                              <div>
-                                <span className="text-muted-foreground">Subtotal</span>
-                                <p className="font-medium">₹{(((product.product?.price ?? (product as any).price ?? 0) as number) * (product.quantity || 0)).toFixed(2)}</p>
+                              <div className="md:col-span-3 flex flex-col justify-between">
+                                <div>
+                                  <h4 className="font-medium text-base">{product.product?.name || (product as any).name || "Unknown Product"}</h4>
+                                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
+                                    {(() => {
+                                      const comboText = (((product as any).comboLabel || (product as any).combo || '') as string);
+                                      const m = typeof comboText === 'string' ? comboText.match(/(\d+)\s*-\s*Pack/i) : null;
+                                      const pack = m ? parseInt(m[1], 10) : NaN;
+                                      const q = Number(product.quantity || 0);
+                                      const displayQty = Number.isFinite(pack) && pack > 1 ? Math.max(1, Math.round(q / pack)) : q;
+                                      return (
+                                        <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-600">Qty {displayQty}</Badge>
+                                      );
+                                    })()}
+                                    {product.color && product.color.trim().length > 0 && (
+                                      <Badge variant="outline" className="border-rose-200 bg-rose-50 text-rose-600">{product.color}</Badge>
+                                    )}
+                                    {(product as any).sizeLabel && (
+                                      <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-600">{(product as any).sizeLabel}</Badge>
+                                    )}
+                                    {!((product as any).sizeLabel) && (product as any).size && (
+                                      <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-600">{(product as any).size}</Badge>
+                                    )}
+                                    {(product as any).comboLabel && (
+                                      <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-600">{(product as any).comboLabel}</Badge>
+                                    )}
+                                    {!((product as any).comboLabel) && (product as any).combo && (
+                                      <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-600">{(product as any).combo}</Badge>
+                                    )}
+                                  </div>
+                                  {product.product?.description && (
+                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{product.product.description}</p>
+                                  )}
+                                </div>
+                                <div className="grid grid-cols-3 mt-2 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">Price</span>
+                                    <p className="font-medium">₹{((product.product?.price ?? (product as any).price ?? 0) as number).toFixed(2)}</p>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground">Subtotal</span>
+                                    <p className="font-medium">₹{(((product.product?.price ?? (product as any).price ?? 0) as number) * (product.quantity || 0)).toFixed(2)}</p>
+                                  </div>
+                                </div>
                               </div>
                             </div>
+                          ))}
+                          <div className="border-t pt-4 space-y-2">
+                            <div className="flex justify-between"><span className="font-medium">Subtotal:</span><span>₹{order.subtotal?.toFixed(2) || "0.00"}</span></div>
+                            <div className="flex justify-between"><span className="font-medium">Shipping:</span><span>₹{shippingFee.toFixed(2)}</span></div>
+                            {order.discount_amount && order.discount_amount > 0 && (
+                              <div className="flex justify-between text-green-600"><span className="font-medium">Discount:</span><span>-₹{order.discount_amount.toFixed(2)}</span></div>
+                            )}
+                            <div className="flex justify-between font-bold text-lg"><span>Total:</span><span>₹{order.total?.toFixed(2) || "0.00"}</span></div>
                           </div>
                         </div>
-                      ))}
-                      <div className="border-t pt-4 space-y-2">
-                        <div className="flex justify-between"><span className="font-medium">Subtotal:</span><span>₹{order.subtotal?.toFixed(2) || "0.00"}</span></div>
-                        <div className="flex justify-between"><span className="font-medium">Shipping:</span><span>₹{shippingFee.toFixed(2)}</span></div>
+                      ) : (
+                        <p>No product information available</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="payment">
+              <AccordionTrigger className="text-sm sm:text-base font-medium">
+                Payment & Totals
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="pt-3">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base sm:text-lg">Payment</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <Label className="font-semibold">Payment Status</Label>
+                          <div>
+                            <Badge variant={paymentStatusVariant[order.payment_status] || "outline"}>
+                              {order.payment_status.replace(/^(.)/, (c) => c.toUpperCase())}
+                            </Badge>
+                          </div>
+                        </div>
+                        {order.coupon_code && (
+                          <div>
+                            <Label className="font-semibold">Coupon</Label>
+                            <p>{order.coupon_code}</p>
+                          </div>
+                        )}
+                        <div>
+                          <Label className="font-semibold">Razorpay Order ID</Label>
+                          <p>{order.razorpay_order_id || "—"}</p>
+                        </div>
+                        <div>
+                          <Label className="font-semibold">Razorpay Payment ID</Label>
+                          <p>{order.razorpay_payment_id || "—"}</p>
+                        </div>
+                      </div>
+                      <Separator />
+                      <div className="space-y-2">
+                        <div className="flex justify-between"><span>Subtotal:</span><span>₹{order.subtotal?.toFixed(2) || "0.00"}</span></div>
+                        <div className="flex justify-between"><span>Shipping:</span><span>₹{shippingFee.toFixed(2)}</span></div>
                         {order.discount_amount && order.discount_amount > 0 && (
-                          <div className="flex justify-between text-green-600"><span className="font-medium">Discount:</span><span>-₹{order.discount_amount.toFixed(2)}</span></div>
+                          <div className="flex justify-between text-green-600"><span>Discount:</span><span>-₹{order.discount_amount.toFixed(2)}</span></div>
                         )}
-                        <div className="flex justify-between font-bold text-lg"><span>Total:</span><span>₹{order.total?.toFixed(2) || "0.00"}</span></div>
+                        <Separator />
+                        <div className="flex justify-between font-bold"><span>Total Amount:</span><span>₹{order.total?.toFixed(2) || "0.00"}</span></div>
                       </div>
-                    </div>
-                  ) : (
-                    <p>No product information available</p>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* PAYMENT */}
-            <div className="pt-3">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-base sm:text-lg">Payment</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <Label className="font-semibold">Payment Status</Label>
-                      <div>
-                        <Badge variant={paymentStatusVariant[order.payment_status] || "outline"}>
-                          {order.payment_status.replace(/^(.)/, (c) => c.toUpperCase())}
-                        </Badge>
-                      </div>
-                    </div>
-                    {order.coupon_code && (
-                      <div>
-                        <Label className="font-semibold">Coupon</Label>
-                        <p>{order.coupon_code}</p>
-                      </div>
-                    )}
-                    <div>
-                      <Label className="font-semibold">Razorpay Order ID</Label>
-                      <p>{order.razorpay_order_id || "—"}</p>
-                    </div>
-                    <div>
-                      <Label className="font-semibold">Razorpay Payment ID</Label>
-                      <p>{order.razorpay_payment_id || "—"}</p>
-                    </div>
-                  </div>
-                  <Separator />
-                  <div className="space-y-2">
-                    <div className="flex justify-between"><span>Subtotal:</span><span>₹{order.subtotal?.toFixed(2) || "0.00"}</span></div>
-                    <div className="flex justify-between"><span>Shipping:</span><span>₹{shippingFee.toFixed(2)}</span></div>
-                    {order.discount_amount && order.discount_amount > 0 && (
-                      <div className="flex justify-between text-green-600"><span>Discount:</span><span>-₹{order.discount_amount.toFixed(2)}</span></div>
-                    )}
-                    <Separator />
-                    <div className="flex justify-between font-bold"><span>Total Amount:</span><span>₹{order.total?.toFixed(2) || "0.00"}</span></div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </ScrollArea>
 
         {/* Sticky footer actions (mobile-friendly) */}

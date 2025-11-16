@@ -426,9 +426,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
           .sort()
           .map((k) => `${k}:${(opts as Record<string,string>)[k]}`)
           .join('|');
-      // Check if item already exists in cart with same color
+      // Check if item already exists in cart with same color and options
+      // For Buy Any X combos, we need to check the variants as well
       const existingItemIndex = currentItems.findIndex(
-        (item) => item.productId === product.id && item.color === color && optionsKey(item.options) === optionsKey(options) && (item.unitPrice ?? item.product.price) === (unitPrice ?? product.price)
+        (item) => {
+          const sameProduct = item.productId === product.id;
+          const sameColor = item.color === color;
+          const sameOptions = optionsKey(item.options) === optionsKey(options);
+          const samePrice = (item.unitPrice ?? item.product.price) === (unitPrice ?? product.price);
+          
+          // For Buy Any X combos, also check if variants are identical
+          if (options?.comboType === 'buy_any_x' && item.options?.comboType === 'buy_any_x') {
+            const sameVariants = item.options?.variants === options?.variants;
+            return sameProduct && sameColor && sameOptions && samePrice && sameVariants;
+          }
+          
+          return sameProduct && sameColor && sameOptions && samePrice;
+        }
       );
 
       let newItems;

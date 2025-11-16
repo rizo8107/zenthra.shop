@@ -32,6 +32,10 @@ import { useProducts } from '@/hooks/useProducts';
 import { Separator } from '@/components/ui/separator';
 import { X } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 const formSchema = z.object({
   customer_name: z.string().min(1, 'Customer name is required'),
@@ -435,10 +439,19 @@ export function CreateOrderDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>Create Orders</DialogTitle>
-          <DialogDescription>Single or bulk create orders.</DialogDescription>
+      <DialogContent className="w-full h-dvh max-w-full sm:max-w-6xl xl:max-w-7xl sm:h-[90vh] rounded-none sm:rounded-xl p-0 overflow-hidden flex flex-col">
+        <DialogHeader className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur px-4 py-3 sm:px-6">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <DialogTitle className="text-xl font-semibold">Create Orders</DialogTitle>
+              <DialogDescription className="mt-1">Single or bulk create orders with advanced options</DialogDescription>
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="px-2 py-1 text-xs">
+                New Order
+              </Badge>
+            </div>
+          </div>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'single' | 'bulk')}>
@@ -448,256 +461,310 @@ export function CreateOrderDialog({
           </TabsList>
 
           <TabsContent value="single">
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="customer_name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Customer Name</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="Enter customer name" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="customer_email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="customer@example.com" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="customer_phone"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Phone</FormLabel>
-                    <FormControl>
-                      <Input {...field} placeholder="Enter phone number" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Order Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="processing">Processing</SelectItem>
-                        <SelectItem value="shipped">Shipped</SelectItem>
-                        <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
-                        <SelectItem value="delivered">Delivered</SelectItem>
-                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="payment_status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Payment Status</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      defaultValue={field.value}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment status" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="paid">Paid</SelectItem>
-                        <SelectItem value="failed">Failed</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Product selection */}
-            <div className="space-y-2">
-              <FormLabel className="text-base">Products</FormLabel>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Search products..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <Select onValueChange={(id) => {
-                  const prod = products.find((p: Product) => p.id === id);
-                  if (prod) {
-                    setSelectedItems((prev) => {
-                      const exists = prev.find((x) => x.product.id === prod.id);
-                      if (exists) return prev; // avoid duplicates
-                      return [...prev, { product: prod, quantity: 1 }];
-                    });
-                  }
-                }}>
-                  <SelectTrigger className="w-[260px]" disabled={isLoading}>
-                    <SelectValue placeholder={isLoading ? 'Loading...' : 'Select product'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {products.map((p: Product) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name} — ₹{Number(p.price || 0).toFixed(2)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <ScrollArea className="sm:flex-1 px-3 sm:px-6 pb-24">
+              {/* KPI cards */}
+              <div className="grid gap-3 pt-3 sm:grid-cols-2 xl:grid-cols-3">
+                <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-green-500 via-emerald-500 to-teal-500 text-white shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-xs uppercase tracking-wide text-white/80">Order value</p>
+                    <p className="text-2xl font-semibold">₹{total.toFixed(2)}</p>
+                  </CardContent>
+                </Card>
+                <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-500 text-white shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-xs uppercase tracking-wide text-white/80">Items</p>
+                    <p className="text-2xl font-semibold">{selectedItems.reduce((sum, item) => sum + item.quantity, 0)}</p>
+                    <p className="text-xs text-white/80">{selectedItems.length} SKU(s)</p>
+                  </CardContent>
+                </Card>
+                <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-orange-500 via-red-500 to-pink-500 text-white shadow-sm">
+                  <CardContent className="p-4">
+                    <p className="text-xs uppercase tracking-wide text-white/80">Status</p>
+                    <p className="text-lg font-semibold capitalize">{form.watch('status')}</p>
+                    <p className="text-xs text-white/80">Payment {form.watch('payment_status')}</p>
+                  </CardContent>
+                </Card>
               </div>
 
-              {/* Selected items list */}
-              {selectedItems.length > 0 && (
-                <div className="border rounded-md divide-y">
-                  {selectedItems.map((it, idx) => (
-                    <div key={it.product.id} className="flex items-center gap-3 p-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">{it.product.name}</div>
-                        <div className="text-xs text-muted-foreground">₹{Number(it.product.price || 0).toFixed(2)}</div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          type="number"
-                          min={1}
-                          value={it.quantity}
-                          onChange={(e) => {
-                            const q = Math.max(1, Number(e.target.value) || 1);
-                            setSelectedItems((prev) => prev.map((row, i) => i === idx ? { ...row, quantity: q } : row));
-                          }}
-                          className="w-20"
-                        />
-                        <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedItems((prev) => prev.filter((row) => row.product.id !== it.product.id))}>
-                          <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="w-24 text-right font-medium">₹{(((Number(it.product.price) || 0) * it.quantity)).toFixed(2)}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4 mt-6">
+                  <Accordion type="multiple" className="w-full space-y-3">
+                    <AccordionItem value="customer">
+                      <AccordionTrigger className="text-sm sm:text-base font-medium">
+                        Customer & Order Details
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4 pt-2">
+                          <FormField
+                            control={form.control}
+                            name="customer_name"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Customer Name</FormLabel>
+                                <FormControl>
+                                  <Input {...field} placeholder="Enter customer name" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-            <Separator />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="customer_email"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Email</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="customer@example.com" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
-            {/* Shipping and totals */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <FormLabel>Shipping Cost</FormLabel>
-                <Input
-                  type="number"
-                  step="0.01"
-                  value={shippingAmount}
-                  onChange={(e) => setShippingAmount(Number(e.target.value) || 0)}
-                  placeholder="0.00"
-                />
-              </div>
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm"><span>Subtotal:</span><span>₹{subtotal.toFixed(2)}</span></div>
-                <div className="flex justify-between text-sm"><span>Shipping:</span><span>₹{Number(shippingAmount || 0).toFixed(2)}</span></div>
-                <div className="flex justify-between font-semibold"><span>Total:</span><span>₹{total.toFixed(2)}</span></div>
-              </div>
-            </div>
+                            <FormField
+                              control={form.control}
+                              name="customer_phone"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Phone</FormLabel>
+                                  <FormControl>
+                                    <Input {...field} placeholder="Enter phone number" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
 
-            <FormField
-              control={form.control}
-              name="shipping_address_text"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Shipping Address</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Enter shipping address"
-                      className="resize-none"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Order Status</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select status" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="processing">Processing</SelectItem>
+                                      <SelectItem value="shipped">Shipped</SelectItem>
+                                      <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                                      <SelectItem value="delivered">Delivered</SelectItem>
+                                      <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Notes</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      {...field}
-                      placeholder="Enter any additional notes"
-                      className="resize-none"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                            <FormField
+                              control={form.control}
+                              name="payment_status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Payment Status</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select payment status" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      <SelectItem value="pending">Pending</SelectItem>
+                                      <SelectItem value="paid">Paid</SelectItem>
+                                      <SelectItem value="failed">Failed</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
 
-            <FormField
-              control={form.control}
-              name="created_text"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Order Created At (optional)</FormLabel>
-                  <FormControl>
-                    <Input
-                      {...field}
-                      placeholder="2022-01-01 10:00:00.123Z"
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                          <FormField
+                            control={form.control}
+                            name="shipping_address_text"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Shipping Address</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    {...field}
+                                    placeholder="Enter shipping address"
+                                    className="resize-none"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
 
-                <div className="flex justify-end gap-2">
-                  <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                    Cancel
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? 'Creating...' : 'Create Order'}
-                  </Button>
-                </div>
-              </form>
-            </Form>
+                          <FormField
+                            control={form.control}
+                            name="notes"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Notes</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    {...field}
+                                    placeholder="Enter any additional notes"
+                                    className="resize-none"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="products">
+                      <AccordionTrigger className="text-sm sm:text-base font-medium">
+                        Products & Variants
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4 pt-2">
+                          <div className="space-y-2">
+                            <FormLabel className="text-base">Products</FormLabel>
+                            <div className="flex gap-2">
+                              <Input
+                                placeholder="Search products..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                              />
+                              <Select onValueChange={(id) => {
+                                const prod = products.find((p: Product) => p.id === id);
+                                if (prod) {
+                                  setSelectedItems((prev) => {
+                                    const exists = prev.find((x) => x.product.id === prod.id);
+                                    if (exists) return prev; // avoid duplicates
+                                    return [...prev, { product: prod, quantity: 1 }];
+                                  });
+                                }
+                              }}>
+                                <SelectTrigger className="w-[260px]" disabled={isLoading}>
+                                  <SelectValue placeholder={isLoading ? 'Loading...' : 'Select product'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {products.map((p: Product) => (
+                                    <SelectItem key={p.id} value={p.id}>
+                                      {p.name} — ₹{Number(p.price || 0).toFixed(2)}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Selected items list */}
+                            {selectedItems.length > 0 && (
+                              <div className="border rounded-md divide-y">
+                                {selectedItems.map((it, idx) => (
+                                  <div key={it.product.id} className="flex items-center gap-3 p-2">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="font-medium truncate">{it.product.name}</div>
+                                      <div className="text-xs text-muted-foreground">₹{Number(it.product.price || 0).toFixed(2)}</div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="number"
+                                        min={1}
+                                        value={it.quantity}
+                                        onChange={(e) => {
+                                          const q = Math.max(1, Number(e.target.value) || 1);
+                                          setSelectedItems((prev) => prev.map((row, i) => i === idx ? { ...row, quantity: q } : row));
+                                        }}
+                                        className="w-20"
+                                      />
+                                      <Button type="button" variant="ghost" size="icon" onClick={() => setSelectedItems((prev) => prev.filter((row) => row.product.id !== it.product.id))}>
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                    <div className="w-24 text-right font-medium">₹{(((Number(it.product.price) || 0) * it.quantity)).toFixed(2)}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          <Separator />
+
+                          {/* Shipping and totals */}
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <FormLabel>Shipping Cost</FormLabel>
+                              <Input
+                                type="number"
+                                step="0.01"
+                                value={shippingAmount}
+                                onChange={(e) => setShippingAmount(Number(e.target.value) || 0)}
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="flex justify-between text-sm"><span>Subtotal:</span><span>₹{subtotal.toFixed(2)}</span></div>
+                              <div className="flex justify-between text-sm"><span>Shipping:</span><span>₹{Number(shippingAmount || 0).toFixed(2)}</span></div>
+                              <div className="flex justify-between font-semibold"><span>Total:</span><span>₹{total.toFixed(2)}</span></div>
+                            </div>
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="advanced">
+                      <AccordionTrigger className="text-sm sm:text-base font-medium">
+                        Advanced Options
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="space-y-4 pt-2">
+                          <FormField
+                            control={form.control}
+                            name="created_text"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Order Created At (optional)</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    placeholder="2022-01-01 10:00:00.123Z"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
+                  <div className="flex justify-end gap-2 mt-6">
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? 'Creating...' : 'Create Order'}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </ScrollArea>
           </TabsContent>
 
           <TabsContent value="bulk">
