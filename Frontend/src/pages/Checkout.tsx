@@ -19,6 +19,7 @@ import {
   AlertTriangle,
   Tag,
   CreditCard,
+  Truck,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { OfferBanner } from "@/components/OfferBanner";
@@ -1123,6 +1124,15 @@ export default function CheckoutPage() {
         shippingCost = calculateShippingCost(formData.state);
         estimatedDelivery = getDeliveryTime(formData.state);
       }
+    }
+
+    // Check if all items have free shipping enabled
+    const allItemsHaveFreeShipping = items.length > 0 && items.every(item => item.product.free_shipping === true);
+    
+    // If all items have free shipping, override shipping cost to 0
+    if (allItemsHaveFreeShipping) {
+      shippingCost = 0;
+      console.log('All items have free shipping - shipping cost set to 0');
     }
 
     console.log(
@@ -2451,7 +2461,21 @@ export default function CheckoutPage() {
                     <span className="text-gray-600">Shipping</span>
                     <span className="font-medium text-gray-800">
                       {formData.state ? (
-                        `₹${calculateFinalTotal().shippingCost.toFixed(2)}`
+                        (() => {
+                          const totals = calculateFinalTotal();
+                          const allItemsHaveFreeShipping = items.length > 0 && items.every(item => item.product.free_shipping === true);
+                          
+                          if (totals.shippingCost === 0 && allItemsHaveFreeShipping) {
+                            return (
+                              <div className="flex items-center gap-1 text-green-600">
+                                <Truck className="h-4 w-4" />
+                                <span className="text-sm font-medium">Free</span>
+                              </div>
+                            );
+                          } else {
+                            return `₹${totals.shippingCost.toFixed(2)}`;
+                          }
+                        })()
                       ) : (
                         <span className="text-xs text-gray-500">
                           Enter address

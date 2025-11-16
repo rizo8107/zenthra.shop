@@ -125,6 +125,7 @@ export interface Product extends RecordModel {
     new: boolean;
     inStock: boolean;
     tn_shipping_enabled?: boolean;
+    free_shipping?: boolean;
     reviews?: number;
     createdAt?: string;
     updatedAt?: string;
@@ -381,6 +382,7 @@ export async function getProducts(filter?: ProductFilter, signal?: AbortSignal):
                 bestseller: Boolean(record.bestseller),
                 new: Boolean(record.new),
                 inStock: Boolean(record.inStock),
+                free_shipping: Boolean((record as any).free_shipping),
                 createdAt: record.created,
                 updatedAt: record.updated,
                 reviews: 0 // Default to 0 reviews initially
@@ -506,6 +508,7 @@ export async function getProduct(id: string) {
             bestseller: Boolean(record.bestseller),
             new: Boolean(record.new),
             inStock: Boolean(record.inStock),
+            free_shipping: Boolean((record as any).free_shipping),
             reviews: reviewCount.totalItems // Set the actual review count
         };
     } catch (error) {

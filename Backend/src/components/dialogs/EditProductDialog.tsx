@@ -90,6 +90,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [bestseller, setBestseller] = useState(product?.bestseller || false);
   const [isNew, setIsNew] = useState(product?.new || false);
   const [inStock, setInStock] = useState(product?.inStock !== undefined ? product.inStock : true);
+  const [tnShippingEnabled, setTnShippingEnabled] = useState(product?.tn_shipping_enabled !== undefined ? product.tn_shipping_enabled : true);
+  const [freeShipping, setFreeShipping] = useState(product?.free_shipping || false);
   
   // Image handling
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
@@ -159,6 +161,11 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
       setStock(product.stock ? String(product.stock) : '');
       setCategory(product.category || '');
       setStatus(product.status as 'active' | 'inactive' || 'active');
+      setBestseller(product.bestseller || false);
+      setIsNew(product.new || false);
+      setInStock(product.inStock !== undefined ? product.inStock : true);
+      setTnShippingEnabled(product.tn_shipping_enabled !== undefined ? product.tn_shipping_enabled : true);
+      setFreeShipping(product.free_shipping || false);
       
       // Set additional fields
       setMaterial(product.material || '');
@@ -446,6 +453,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         bestseller,
         new: isNew,
         inStock,
+        tn_shipping_enabled: tnShippingEnabled,
+        free_shipping: freeShipping,
       };
 
       // Handle images
@@ -692,6 +701,35 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                         id="bestseller"
                         checked={bestseller}
                         onCheckedChange={setBestseller}
+                      />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-sm">Shipping Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-2 gap-4">
+                    <div className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="tnShippingEnabled">Allow TN Shipping</Label>
+                      </div>
+                      <Switch
+                        id="tnShippingEnabled"
+                        checked={tnShippingEnabled}
+                        onCheckedChange={setTnShippingEnabled}
+                      />
+                    </div>
+                    
+                    <div className="flex flex-row items-center justify-between rounded-lg border p-3">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="freeShipping">Free Shipping</Label>
+                      </div>
+                      <Switch
+                        id="freeShipping"
+                        checked={freeShipping}
+                        onCheckedChange={setFreeShipping}
                       />
                     </div>
                   </CardContent>
