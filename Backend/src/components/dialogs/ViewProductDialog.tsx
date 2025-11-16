@@ -1,10 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -17,83 +16,38 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { Trash2 } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
+import { 
+  Package, 
+  Info, 
+  Image as ImageIcon, 
+  Settings, 
+  Truck, 
+  Calendar,
+  DollarSign,
+  Package2,
+  Star,
+  Eye
+} from 'lucide-react';
 import { pb } from '@/lib/pocketbase';
 
 interface ViewProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
-  onDelete?: (productId: string) => void;
 }
 
-type ColorData = {
-  available?: string[];
-  primary?: string;
-};
-
-type CareInstructions = {
-  cleaning?: string[];
-  storage?: string[];
-};
-
-type UsageGuidelines = {
-  recommended_use?: string[];
-  pro_tips?: string[];
-};
-
-type Specifications = {
-  material?: string;
-  dimensions?: string;
-  weight?: string;
-  capacity?: string;
-  style?: string;
-  pattern?: string;
-  closure?: string;
-  waterResistant?: boolean;
-  [key: string]: unknown;
-};
-
-export function ViewProductDialog({ open, onOpenChange, product, onDelete }: ViewProductDialogProps) {
-  // Selected size for viewing variant images (keep hook unconditional)
-  const [selectedSize, setSelectedSize] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const handleDelete = async () => {
-    if (!product || !confirm('Are you sure you want to delete this product? This action cannot be undone.')) {
-      return;
-    }
-
-    setIsDeleting(true);
-    try {
-      await pb.collection('products').delete(product.id);
-      toast({
-        title: 'Product deleted',
-        description: 'The product has been successfully deleted.',
-      });
-      onDelete?.(product.id);
-      onOpenChange(false);
-    } catch (error) {
-      console.error('Error deleting product:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to delete product. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-  // If no product is selected, don't render the dialog content
+export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDialogProps) {
   if (!product) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Product Details</DialogTitle>
-            <DialogDescription>No product selected</DialogDescription>
           </DialogHeader>
+          <div className="py-6 text-center">
+            <Package className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-muted-foreground">No product selected</p>
+          </div>
           <DialogFooter>
             <Button onClick={() => onOpenChange(false)}>Close</Button>
           </DialogFooter>
@@ -124,443 +78,272 @@ export function ViewProductDialog({ open, onOpenChange, product, onDelete }: Vie
     return `${pocketbaseUrl}/api/files/${product.collectionId || 'products'}/${product.id}/${imagePath}`;
   };
 
-  // Safe access to product fields with fallbacks
-  const safeProduct = {
-    name: product?.name || 'Unnamed Product',
-    description: product?.description || '',
-    price: product?.price || 0,
-    stock: product?.stock || 0,
-    category: product?.category || 'Uncategorized',
-    status: product?.status || 'inactive',
-    created: product?.created || new Date().toISOString(),
-    updated: product?.updated || new Date().toISOString(),
-    inStock: product?.inStock || false,
-    bestseller: product?.bestseller || false,
-    new: product?.new || false,
-    material: product?.material || '',
-    dimensions: product?.dimensions || '',
-    review: product?.review || 0,
-    // Other fields with safe defaults
-    colors: { available: [], primary: '' } as ColorData,
-    specifications: {} as Specifications,
-    care_instructions: { cleaning: [], storage: [] } as CareInstructions,
-    usage_guidelines: { recommended_use: [], pro_tips: [] } as UsageGuidelines,
-    features: [] as string[],
-    tags: [] as string[],
-    images: [] as string[]
-  };
+  // Get product images (ensure it's an array)
+  const images = product.images ? 
+    (Array.isArray(product.images) ? product.images : [product.images]) : 
+    [];
 
-  // Parse JSON fields safely
-  const parseJsonField = <T,>(field: string | null | undefined | object, defaultValue: T): T => {
-    if (!field) return defaultValue;
-    
-    // If field is already an object, return it
-    if (typeof field === 'object') return field as unknown as T;
-    
-    try {
-      if (field === 'JSON' || field === '[object Object]') {
-        return defaultValue;
-      }
-      return JSON.parse(field as string);
-    } catch (e) {
-      console.error(`Failed to parse JSON field: ${field}`, e);
-      return defaultValue;
-    }
-  };
-
-  // Try to parse product fields, but use defaults if they fail
-  try {
-    // Parse product fields with safe defaults
-    const colors = parseJsonField<ColorData>(product.colors, { available: [], primary: '' });
-    const specifications = parseJsonField<Specifications>(product.specifications, {});
-    const careInstructions = parseJsonField<CareInstructions>(product.care_instructions, { cleaning: [], storage: [] });
-    const usageGuidelines = parseJsonField<UsageGuidelines>(product.usage_guidelines, { recommended_use: [], pro_tips: [] });
-    const features = parseJsonField<string[]>(product.features, []);
-    const tags = parseJsonField<string[]>(product.tags, []);
-    const care = parseJsonField<string[]>(product.care, []);
-
-    // Get product images (ensure it's an array)
-    const images = product.images ? 
-      (Array.isArray(product.images) ? product.images : [product.images]) : 
-      [];
-
-    // Parse variants for sizes (with optional images per size)
-    type VariantSize = { value: string; name?: string; images?: string[] };
-    const variants = parseJsonField<{ sizes?: VariantSize[] }>(product.variants as any, {} as { sizes?: VariantSize[] });
-    const sizeOptions: VariantSize[] = Array.isArray(variants?.sizes) ? variants!.sizes! : [];
-    const effectiveSize = selectedSize ?? (sizeOptions[0]?.value ?? null);
-    const selectedVariant = sizeOptions.find((s) => s.value === effectiveSize);
-    const variantImages: string[] = Array.isArray(selectedVariant?.images) ? selectedVariant!.images : [];
-    const displayImages: string[] = (variantImages.length > 0 ? variantImages : images) as string[];
-
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-full h-dvh max-w-full sm:max-w-5xl xl:max-w-7xl sm:h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <div className="flex justify-between items-center">
-              <div>
-                <DialogTitle className="text-xl flex items-center gap-2">
-                  {safeProduct.name}
-                  {product.new && <Badge variant="secondary">New</Badge>}
-                  {product.bestseller && <Badge variant="default">Bestseller</Badge>}
-                </DialogTitle>
-                <DialogDescription>
-                  Added on {formatDate(safeProduct.created)}
-                </DialogDescription>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant={product.inStock ? 'success' : 'destructive'}>
-                  {product.inStock ? 'In Stock' : 'Out of Stock'}
-                </Badge>
-                <span className="text-xl font-bold">&#8377;{safeProduct.price.toFixed(2)}</span>
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden">
+        <DialogHeader className="pb-4">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+              <Eye className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+                {product.name}
+                {product.new && <Badge variant="secondary" className="bg-blue-100 text-blue-800">New</Badge>}
+                {product.bestseller && <Badge variant="default" className="bg-yellow-100 text-yellow-800">Bestseller</Badge>}
+              </DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Created on {formatDate(product.created || new Date().toISOString())}
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <Badge variant={product.inStock ? 'default' : 'destructive'} className={product.inStock ? 'bg-green-100 text-green-800' : ''}>
+                {product.inStock ? 'In Stock' : 'Out of Stock'}
+              </Badge>
+              <div className="text-right">
+                <div className="text-xl font-bold text-green-600">₹{(product.price || 0).toFixed(2)}</div>
                 {product.review && (
-                  <span className="text-sm text-muted-foreground">
-                    Rating: {product.review}/5
-                  </span>
-                )}
-                {onDelete && (
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="ml-2"
-                  >
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    {isDeleting ? 'Deleting...' : 'Delete'}
-                  </Button>
+                  <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    {product.review}/5
+                  </div>
                 )}
               </div>
             </div>
-          </DialogHeader>
-
-          <Tabs defaultValue="details" className="flex-1 overflow-hidden flex flex-col">
-            <TabsList className="grid grid-cols-5 mb-4">
-              <TabsTrigger value="details">Details</TabsTrigger>
-              <TabsTrigger value="images">Images</TabsTrigger>
-              <TabsTrigger value="specifications">Specifications</TabsTrigger>
-              <TabsTrigger value="features">Features</TabsTrigger>
-              <TabsTrigger value="care">Care & Usage</TabsTrigger>
-            </TabsList>
-
-            <ScrollArea className="flex-1">
-              <TabsContent value="details" className="space-y-4 p-1">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Basic Information</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div>
-                        <Label className="font-semibold">Name</Label>
-                        <p>{safeProduct.name}</p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Category</Label>
-                        <p>{safeProduct.category || 'Uncategorized'}</p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Price</Label>
-                        <p>&#8377;{safeProduct.price.toFixed(2)}</p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Status</Label>
-                        <div className="flex gap-2 mt-1">
-                          {product.inStock && <Badge variant="outline">In Stock</Badge>}
-                          {product.new && <Badge variant="secondary">New</Badge>}
-                          {product.bestseller && <Badge variant="default">Bestseller</Badge>}
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Product Details</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                      <div>
-                        <Label className="font-semibold">Material</Label>
-                        <p>{product.material || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <Label className="font-semibold">Dimensions</Label>
-                        <p>{product.dimensions || 'Not specified'}</p>
-                      </div>
-                      {colors && colors.available && colors.available.length > 0 && (
-                        <div>
-                          <Label className="font-semibold">Colors</Label>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {colors.primary && (
-                              <Badge variant="outline" className="font-semibold">
-                                {colors.primary} (Primary)
-                              </Badge>
-                            )}
-                            {colors.available.map((color, i) => (
-                              <Badge key={i} variant="outline">
-                                {color}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-
-                  <Card className="md:col-span-2">
-                    <CardHeader>
-                      <CardTitle className="text-lg">Description</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="whitespace-pre-line">{safeProduct.description || 'No description provided'}</p>
-                    </CardContent>
-                  </Card>
-
-                  {tags && tags.length > 0 && (
-                    <Card className="md:col-span-2">
-                      <CardHeader>
-                        <CardTitle className="text-lg">Tags</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-wrap gap-1">
-                          {tags.map((tag, i) => (
-                            <Badge key={i} variant="secondary">
-                              {tag}
-                            </Badge>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="images" className="space-y-4 p-1">
-                {sizeOptions.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">Size</Label>
-                    <select
-                      aria-label="Select size"
-                      className="h-8 rounded-md border bg-background px-2 text-sm"
-                      value={effectiveSize ?? ''}
-                      onChange={(e) => setSelectedSize(e.target.value || null)}
-                    >
-                      {sizeOptions.map((s, i) => (
-                        <option key={i} value={s.value}>{s.name || `${s.value}`}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Product Images</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {displayImages && displayImages.length > 0 ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {displayImages.map((image: string, index: number) => (
-                          <div key={index} className="overflow-hidden rounded-md border">
-                            <AspectRatio ratio={1 / 1}>
-                              <img 
-                                src={getImageUrl(image)}
-                                alt={`${safeProduct.name} - Image ${index + 1}`}
-                                className="object-cover w-full h-full"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
-                                }}
-                              />
-                            </AspectRatio>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center p-8">
-                        <p className="text-muted-foreground">No images available for this product</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="specifications" className="space-y-4 p-1">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Product Specifications</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {specifications && Object.keys(specifications).length > 0 ? (
-                      <div className="space-y-2">
-                        {Object.entries(specifications).map(([key, value]) => (
-                          <div key={key} className="grid grid-cols-2 py-2 border-b border-muted">
-                            <div className="font-medium">{key.charAt(0).toUpperCase() + key.slice(1).replace(/([A-Z])/g, ' $1')}</div>
-                            <div>
-                              {typeof value === 'boolean' 
-                                ? (value ? 'Yes' : 'No')
-                                : String(value)}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center p-8">
-                        <p className="text-muted-foreground">No specifications available for this product</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="features" className="space-y-4 p-1">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Product Features</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {features && features.length > 0 ? (
-                      <ul className="list-disc pl-6 space-y-1">
-                        {features.map((feature, index) => (
-                          <li key={index}>{feature}</li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-muted-foreground">No features listed for this product</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="care" className="space-y-4 p-1">
-                {/* Simple care instructions if available */}
-                {care && care.length > 0 && (
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-lg">Care Instructions</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ul className="list-disc pl-6 space-y-1">
-                        {care.map((instruction, index) => (
-                          <li key={index}>{instruction}</li>
-                        ))}
-                      </ul>
-                    </CardContent>
-                  </Card>
-                )}
-
-                {/* Detailed care instructions if available */}
-                {careInstructions && (careInstructions.cleaning?.length > 0 || careInstructions.storage?.length > 0) && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {careInstructions.cleaning && careInstructions.cleaning.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Cleaning Instructions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="list-disc pl-6 space-y-1">
-                            {careInstructions.cleaning.map((instruction, index) => (
-                              <li key={index}>{instruction}</li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {careInstructions.storage && careInstructions.storage.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Storage Instructions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="list-disc pl-6 space-y-1">
-                            {careInstructions.storage.map((instruction, index) => (
-                              <li key={index}>{instruction}</li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                )}
-
-                {/* Usage guidelines if available */}
-                {usageGuidelines && (usageGuidelines.recommended_use?.length > 0 || usageGuidelines.pro_tips?.length > 0) && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {usageGuidelines.recommended_use && usageGuidelines.recommended_use.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Recommended Use</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="list-disc pl-6 space-y-1">
-                            {usageGuidelines.recommended_use.map((guideline, index) => (
-                              <li key={index}>{guideline}</li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
-
-                    {usageGuidelines.pro_tips && usageGuidelines.pro_tips.length > 0 && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-lg">Pro Tips</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <ul className="list-disc pl-6 space-y-1">
-                            {usageGuidelines.pro_tips.map((tip, index) => (
-                              <li key={index}>{tip}</li>
-                            ))}
-                          </ul>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                )}
-
-                {/* Fallback message if no care or usage info available */}
-                {(!care || care.length === 0) && 
-                 (!careInstructions || (!careInstructions.cleaning?.length && !careInstructions.storage?.length)) &&
-                 (!usageGuidelines || (!usageGuidelines.recommended_use?.length && !usageGuidelines.pro_tips?.length)) && (
-                  <Card>
-                    <CardContent className="text-center p-8">
-                      <p className="text-muted-foreground">No care or usage information available for this product</p>
-                    </CardContent>
-                  </Card>
-                )}
-              </TabsContent>
-            </ScrollArea>
-          </Tabs>
-
-          <DialogFooter className="mt-4">
-            <Button onClick={() => onOpenChange(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  } catch (error) {
-    // Fallback UI in case of any rendering errors
-    console.error('Error rendering product details:', error);
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Product Details</DialogTitle>
-            <DialogDescription>Error loading product details</DialogDescription>
-          </DialogHeader>
-          <div className="py-6">
-            <p className="text-destructive">There was an error displaying this product's details.</p>
-            <p className="text-muted-foreground mt-2">Basic Information:</p>
-            <ul className="mt-2 space-y-1">
-              <li><strong>Name:</strong> {safeProduct.name}</li>
-              <li><strong>Price:</strong> ₹{safeProduct.price.toFixed(2)}</li>
-              <li><strong>Category:</strong> {safeProduct.category}</li>
-              <li><strong>Material:</strong> {safeProduct.material}</li>
-            </ul>
           </div>
-          <DialogFooter>
-            <Button onClick={() => onOpenChange(false)}>Close</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    );
-  }
+        </DialogHeader>
+
+        <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
+          <TabsList className="grid grid-cols-4 mb-4">
+            <TabsTrigger value="overview" className="flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="details" className="flex items-center gap-2">
+              <Settings className="h-4 w-4" />
+              Details
+            </TabsTrigger>
+            <TabsTrigger value="images" className="flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Images
+            </TabsTrigger>
+            <TabsTrigger value="shipping" className="flex items-center gap-2">
+              <Truck className="h-4 w-4" />
+              Shipping
+            </TabsTrigger>
+          </TabsList>
+
+          <ScrollArea className="flex-1 px-1">
+            <TabsContent value="overview" className="space-y-6 mt-0">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      Basic Information
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Product Name</Label>
+                        <p className="text-sm font-medium">{product.name}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Category</Label>
+                        <p className="text-sm">{product.category || 'Uncategorized'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Price</Label>
+                        <p className="text-sm font-medium text-green-600">₹{(product.price || 0).toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Stock</Label>
+                        <p className="text-sm">{product.stock || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    
+                    <Separator />
+                    
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Status</Label>
+                      <div className="flex gap-2 mt-1">
+                        <Badge variant={product.status === 'active' ? 'default' : 'secondary'}>
+                          {product.status}
+                        </Badge>
+                        {product.inStock && <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">In Stock</Badge>}
+                        {product.new && <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">New</Badge>}
+                        {product.bestseller && <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">Bestseller</Badge>}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Timestamps
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Created</Label>
+                      <p className="text-sm">{formatDate(product.created || new Date().toISOString())}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Last Updated</Label>
+                      <p className="text-sm">{formatDate(product.updated || new Date().toISOString())}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Product ID</Label>
+                      <p className="text-xs font-mono bg-muted px-2 py-1 rounded">{product.id}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {product.description && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Description</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground whitespace-pre-line">
+                      {product.description}
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+
+            <TabsContent value="details" className="space-y-6 mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Product Specifications</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Material</Label>
+                        <p className="text-sm">{product.material || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Dimensions</Label>
+                        <p className="text-sm">{product.dimensions || 'Not specified'}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Review Rating</Label>
+                        <div className="flex items-center gap-2">
+                          {product.review ? (
+                            <>
+                              <div className="flex items-center gap-1">
+                                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                                <span className="text-sm font-medium">{product.review}/5</span>
+                              </div>
+                            </>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">No reviews yet</span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="images" className="space-y-6 mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <ImageIcon className="h-4 w-4" />
+                    Product Images
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {images && images.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {images.map((image: string, index: number) => (
+                        <div key={index} className="overflow-hidden rounded-lg border bg-muted">
+                          <AspectRatio ratio={1 / 1}>
+                            <img 
+                              src={getImageUrl(image)}
+                              alt={`${product.name} - Image ${index + 1}`}
+                              className="object-cover w-full h-full transition-transform hover:scale-105"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://placehold.co/400x400/e2e8f0/64748b?text=Image+Not+Found';
+                              }}
+                            />
+                          </AspectRatio>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+                      <p className="text-muted-foreground">No images available for this product</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            <TabsContent value="shipping" className="space-y-6 mt-0">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Truck className="h-4 w-4" />
+                    Shipping Configuration
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 rounded-lg border">
+                        <div>
+                          <Label className="text-sm font-medium">Tamil Nadu Shipping</Label>
+                          <p className="text-xs text-muted-foreground">Shipping to Tamil Nadu</p>
+                        </div>
+                        <Badge variant={product.tn_shipping_enabled ? 'default' : 'secondary'}>
+                          {product.tn_shipping_enabled ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between p-4 rounded-lg border">
+                        <div>
+                          <Label className="text-sm font-medium">Free Shipping</Label>
+                          <p className="text-xs text-muted-foreground">Free delivery option</p>
+                        </div>
+                        <Badge variant={product.free_shipping ? 'default' : 'secondary'} className={product.free_shipping ? 'bg-green-100 text-green-800' : ''}>
+                          {product.free_shipping ? 'Enabled' : 'Disabled'}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
+
+        <Separator className="my-4" />
+
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} className="px-6">
+            Close
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
