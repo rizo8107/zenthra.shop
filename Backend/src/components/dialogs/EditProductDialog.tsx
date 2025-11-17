@@ -20,11 +20,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Package, Info, Settings, Palette, Truck, Save, X, Upload, Image as ImageIcon } from 'lucide-react';
+import { Package, Info, Settings, Palette, Truck, Save, X, Upload, Image as ImageIcon, Trash } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { generateProductCopy } from '@/lib/gemini';
 import { pb } from '@/lib/pocketbase';
+import { useProducts } from '@/hooks/useProducts';
 
 interface EditProductDialogProps {
   open: boolean;
@@ -122,6 +123,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [variantFilenamesBySize, setVariantFilenamesBySize] = useState<Record<string, string[]>>({});
   const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
   const [aiKeywords, setAiKeywords] = useState('');
+
+  const { deleteProduct } = useProducts();
 
   // Helper functions
   const generateRowId = () => {
@@ -463,6 +466,24 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
     } catch (error) {
       console.error('Error updating product:', error);
       toast.error('Failed to update product');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!product?.id) return;
+
+    const confirmed = window.confirm('Are you sure you want to delete this product? This action cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      setIsSubmitting(true);
+      await deleteProduct.mutateAsync(product.id);
+      onOpenChange(false);
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      toast.error('Failed to delete product');
     } finally {
       setIsSubmitting(false);
     }
@@ -1227,6 +1248,18 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
           <Separator className="my-4" />
 
           <DialogFooter>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isSubmitting}
+              className="px-4 mr-auto"
+            >
+              <div className="flex items-center gap-2">
+                <Trash className="h-4 w-4" />
+                Delete
+              </div>
+            </Button>
             <Button
               type="button"
               variant="outline"
