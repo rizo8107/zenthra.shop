@@ -181,9 +181,10 @@ export function CreateProductDialog({
   const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
   const [showVariantPrompt, setShowVariantPrompt] = useState(false);
   const [variantRequest, setVariantRequest] = useState('');
-  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
-  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>('');
-  const [videoUploadMode, setVideoUploadMode] = useState<'url' | 'upload'>('url');
+  const [showMediaLibrary, setShowMediaLibrary] = useState(false);
+  const [existingVideos, setExistingVideos] = useState<Array<{id: string, videos: string}>>([]);
+  const [loadingVideos, setLoadingVideos] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
 
   const buildVariantsFromRows = () => {
     const variants: any = {};
@@ -776,6 +777,8 @@ Only return the JSON, no explanations.`;
       setComboPreviewsByKey({});
       setComboFilenamesByKey({});
       setSelectedVariantSizeId("");
+      // Clean up video state
+      setShowMediaLibrary(false);
       onOpenChange(false);
       toast.success('Product created successfully');
     } catch (error) {
@@ -786,8 +789,8 @@ Only return the JSON, no explanations.`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full h-[95vh] max-w-[96vw] sm:max-w-[96vw] xl:max-w-[96vw] overflow-hidden flex flex-col bg-gray-50">
-        <DialogHeader className="border-b pb-4 bg-white">
+      <DialogContent className="w-full h-[95vh] max-w-[96vw] sm:max-w-[96vw] xl:max-w-[96vw] overflow-hidden flex flex-col bg-background">
+        <DialogHeader className="border-b pb-4">
           <DialogTitle className="text-2xl font-semibold">Create Product</DialogTitle>
           <p className="text-sm text-muted-foreground mt-1">Add a new product to your store</p>
         </DialogHeader>
@@ -795,7 +798,7 @@ Only return the JSON, no explanations.`;
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 overflow-hidden flex flex-col">
             <Tabs defaultValue="basic" className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid grid-cols-2 mb-6 bg-white shadow-sm rounded-lg p-1">
+              <TabsList className="grid grid-cols-2 mb-6 bg-muted shadow-sm rounded-lg p-1">
                 <TabsTrigger value="basic" className="rounded-md data-[state=active]:bg-purple-600 data-[state=active]:text-white">Overview</TabsTrigger>
                 <TabsTrigger value="variants" className="rounded-md data-[state=active]:bg-green-600 data-[state=active]:text-white">Variants & Combos</TabsTrigger>
               </TabsList>
@@ -805,10 +808,10 @@ Only return the JSON, no explanations.`;
                   <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)] gap-8">
                     {/* Left column: General info + pricing + status */}
                     <div className="space-y-6">
-                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
-                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                          <CardTitle className="text-base font-semibold text-gray-900">General Information</CardTitle>
-                          <p className="text-xs text-gray-500 mt-1">Basic product details</p>
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="text-base font-semibold">General Information</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">Basic product details</p>
                         </CardHeader>
                         <CardContent className="space-y-5 p-6">
                           <FormField
@@ -900,10 +903,10 @@ Only return the JSON, no explanations.`;
                         </CardContent>
                       </Card>
 
-                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
-                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                          <CardTitle className="text-base font-semibold text-gray-900">Pricing & Stock</CardTitle>
-                          <p className="text-xs text-gray-500 mt-1">Set pricing and inventory</p>
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="text-base font-semibold">Pricing & Stock</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">Set pricing and inventory</p>
                         </CardHeader>
                         <CardContent className="space-y-5 p-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1022,10 +1025,10 @@ Only return the JSON, no explanations.`;
                         </CardContent>
                       </Card>
 
-                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
-                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                          <CardTitle className="text-base font-semibold text-gray-900">Product Status</CardTitle>
-                          <p className="text-xs text-gray-500 mt-1">Configure product visibility and badges</p>
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="text-base font-semibold">Product Status</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">Configure product visibility and badges</p>
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
                           <FormField
@@ -1114,10 +1117,10 @@ Only return the JSON, no explanations.`;
                       </Card>
 
                       {/* Advanced Fields - merged from Advanced tab */}
-                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
-                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                          <CardTitle className="text-base font-semibold text-gray-900">Product Details</CardTitle>
-                          <p className="text-xs text-gray-500 mt-1">Features, tags, specifications, and care instructions</p>
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="text-base font-semibold">Product Details</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">Features, tags, specifications, and care instructions</p>
                         </CardHeader>
                         <CardContent className="space-y-5 p-6">
                           <FormField
@@ -1225,9 +1228,9 @@ Only return the JSON, no explanations.`;
 
                     {/* Right column: Upload images, similar to reference UI */}
                     <div className="space-y-6">
-                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden sticky top-4">
-                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                          <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden sticky top-4">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="flex items-center gap-2 text-base font-semibold">
                             <ImageIcon className="h-5 w-5" />
                             Product Images
                           </CardTitle>
@@ -1560,10 +1563,10 @@ Only return the JSON, no explanations.`;
 
                   <div className="space-y-6">
                     {/* 🟩 Card 1 — Variants (Interactive) */}
-                    <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
-                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                        <CardTitle className="text-base font-semibold text-gray-900">Variants (Interactive)</CardTitle>
-                        <p className="text-xs text-gray-500 mt-1">Add sizes and variant-based combos for this product.</p>
+                    <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                        <CardTitle className="text-base font-semibold">Variants (Interactive)</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">Add sizes and variant-based combos for this product.</p>
                       </CardHeader>
                       <CardContent className="p-6 space-y-4">
                         <div className="space-y-3">
@@ -1954,10 +1957,10 @@ Only return the JSON, no explanations.`;
                     </Card>
 
                     {/* Card 3 — Tags & Available Sizes */}
-                    <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
-                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                        <CardTitle className="text-base font-semibold text-gray-900">Tags & Available Sizes</CardTitle>
-                        <p className="text-xs text-gray-500 mt-1">Product tags and size options</p>
+                    <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                        <CardTitle className="text-base font-semibold">Tags & Available Sizes</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">Product tags and size options</p>
                       </CardHeader>
                       <CardContent className="p-6 space-y-5">
                         <FormField
@@ -2022,125 +2025,57 @@ Only return the JSON, no explanations.`;
                       )}
                     />
 
-                    {/* Video Section with Upload/URL Options */}
-                    <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
-                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
-                        <CardTitle className="text-base font-semibold text-gray-900">Product Video</CardTitle>
-                        <p className="text-xs text-gray-500 mt-1">Add a video to showcase your product</p>
+                    {/* Video Section - Media Library */}
+                    <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                        <CardTitle className="text-base font-semibold">Product Video</CardTitle>
+                        <p className="text-xs text-muted-foreground mt-1">Select or upload a video from media library</p>
                       </CardHeader>
-                      <CardContent className="p-6 space-y-5">
-                        {/* Video Upload Mode Toggle */}
-                        <div className="flex gap-3 p-1 bg-gray-100 rounded-lg w-fit">
-                          <button
-                            type="button"
-                            onClick={() => setVideoUploadMode('url')}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                              videoUploadMode === 'url'
-                                ? 'bg-white shadow-sm text-gray-900'
-                                : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                          >
-                            Enter URL
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setVideoUploadMode('upload')}
-                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                              videoUploadMode === 'upload'
-                                ? 'bg-white shadow-sm text-gray-900'
-                                : 'text-gray-600 hover:text-gray-900'
-                            }`}
-                          >
-                            Upload Video
-                          </button>
-                        </div>
-
-                        {videoUploadMode === 'url' ? (
-                          <div className="grid grid-cols-2 gap-4">
-                            <FormField
-                              control={form.control}
-                              name="videoUrl"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Video URL</FormLabel>
-                                  <Input {...field} placeholder="https://..." />
-                                  <FormDescription className="text-xs text-gray-500">
-                                    YouTube, Vimeo, or direct video link
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-
-                            <FormField
-                              control={form.control}
-                              name="videoThumbnail"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Video Thumbnail URL</FormLabel>
-                                  <Input {...field} placeholder="https://..." />
-                                  <FormDescription className="text-xs text-gray-500">
-                                    Optional preview image
-                                  </FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        ) : (
-                          <div className="space-y-4">
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                              <input
-                                type="file"
-                                accept="video/*"
-                                id="video-upload"
-                                className="sr-only"
-                                onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    setUploadedVideo(file);
-                                    const url = URL.createObjectURL(file);
-                                    setVideoPreviewUrl(url);
-                                    form.setValue('videoUrl', url);
-                                  }
-                                }}
-                              />
-                              <label
-                                htmlFor="video-upload"
-                                className="cursor-pointer flex flex-col items-center gap-2"
-                              >
-                                <Upload className="h-10 w-10 text-gray-400" />
-                                <div className="text-sm font-medium text-gray-700">
-                                  {uploadedVideo ? uploadedVideo.name : 'Click to upload video'}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  MP4, WebM, or OGG (max 100MB)
-                                </div>
-                              </label>
-                            </div>
-
-                            {videoPreviewUrl && (
-                              <div className="rounded-lg overflow-hidden border">
-                                <video
-                                  src={videoPreviewUrl}
-                                  controls
-                                  className="w-full max-h-64 bg-black"
-                                />
-                                <button
+                      <CardContent className="p-6 space-y-4">
+                        {/* Current Video URL Display */}
+                        <FormField
+                          control={form.control}
+                          name="videoUrl"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Selected Video</FormLabel>
+                              <div className="flex gap-2">
+                                <Input {...field} placeholder="No video selected" readOnly className="flex-1" />
+                                <Button
                                   type="button"
-                                  onClick={() => {
-                                    setUploadedVideo(null);
-                                    setVideoPreviewUrl('');
-                                    form.setValue('videoUrl', '');
+                                  onClick={async () => {
+                                    setShowMediaLibrary(true);
+                                    if (existingVideos.length === 0) {
+                                      setLoadingVideos(true);
+                                      try {
+                                        const { pb } = await import('@/lib/pocketbase');
+                                        const records = await pb.collection('content').getFullList({
+                                          sort: '-created'
+                                        });
+                                        // Filter records that have Videos field (capitalized)
+                                        const videosOnly = records.filter((r: any) => r.Videos);
+                                        setExistingVideos(videosOnly.map((r: any) => ({id: r.id, videos: r.Videos})) as Array<{id: string, videos: string}>);
+                                      } catch (error) {
+                                        console.error('Error fetching videos:', error);
+                                      } finally {
+                                        setLoadingVideos(false);
+                                      }
+                                    }
                                   }}
-                                  className="w-full py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                  variant="outline"
+                                  className="shrink-0"
                                 >
-                                  Remove Video
-                                </button>
+                                  <Upload className="h-4 w-4 mr-2" />
+                                  Media Library
+                                </Button>
                               </div>
-                            )}
-                          </div>
-                        )}
+                              <FormDescription className="text-xs text-gray-500">
+                                Click "Media Library" to select or upload a video
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
 
                         <FormField
                           control={form.control}
@@ -2164,13 +2099,13 @@ Only return the JSON, no explanations.`;
                 </div>
               </Tabs>
 
-              <Alert className="mt-6 bg-blue-50 border-blue-200 rounded-lg">
-                <AlertDescription className="text-sm text-blue-900">
+              <Alert className="mt-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 rounded-lg">
+                <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
                   <strong>Tip:</strong> For fields like Features, Colors, and Tags, you can enter simple comma-separated values and they will be automatically converted to the required JSON format.
                 </AlertDescription>
               </Alert>
 
-              <DialogFooter className="mt-6 pt-6 border-t bg-white sticky bottom-0 flex gap-3">
+              <DialogFooter className="mt-6 pt-6 border-t bg-background sticky bottom-0 flex gap-3">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="px-6">
                   Cancel
                 </Button>
@@ -2188,9 +2123,124 @@ Only return the JSON, no explanations.`;
                   )}
                 </Button>
               </DialogFooter>
-            </form>
-          </Form>
+          </form>
+        </Form>
+      </DialogContent>
+
+      {/* Media Library Modal */}
+      <Dialog open={showMediaLibrary} onOpenChange={setShowMediaLibrary}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Media Library - Videos</DialogTitle>
+            <p className="text-sm text-muted-foreground">Select an existing video or upload a new one</p>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            {loadingVideos ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 border-4 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+                  <p className="text-sm text-gray-600">Loading videos...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Upload New Video */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    id="media-library-upload"
+                    className="sr-only"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setUploadingVideo(true);
+                        try {
+                          const { pb } = await import('@/lib/pocketbase');
+                          const formData = new FormData();
+                          formData.append('Videos', file);
+                          const record = await pb.collection('content').create(formData);
+                          const videoUrl = `https://backend.karigaistore.in/api/files/content/${record.id}/${record.Videos}`;
+                          form.setValue('videoUrl', videoUrl);
+                          setShowMediaLibrary(false);
+                          toast.success('Video uploaded successfully');
+                          // Refresh the list
+                          const records = await pb.collection('content').getFullList({
+                            sort: '-created'
+                          });
+                          const videosOnly = records.filter((r: any) => r.Videos);
+                          setExistingVideos(videosOnly.map((r: any) => ({id: r.id, videos: r.Videos})) as Array<{id: string, videos: string}>);
+                        } catch (error) {
+                          console.error('Error uploading video:', error);
+                          toast.error('Failed to upload video');
+                        } finally {
+                          setUploadingVideo(false);
+                        }
+                      }
+                    }}
+                    disabled={uploadingVideo}
+                  />
+                  <label htmlFor="media-library-upload" className={`cursor-pointer flex flex-col items-center gap-3 ${uploadingVideo ? 'opacity-50' : ''}`}>
+                    {uploadingVideo ? (
+                      <>
+                        <div className="w-12 h-12 border-4 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+                        <p className="text-sm font-medium text-gray-700">Uploading...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-12 w-12 text-gray-400" />
+                        <div className="text-sm font-medium text-gray-700">Click to upload new video</div>
+                        <div className="text-xs text-gray-500">MP4, WebM, or OGG (max 100MB)</div>
+                      </>
+                    )}
+                  </label>
+                </div>
+
+                {/* Existing Videos Grid */}
+                {existingVideos.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3">Existing Videos</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      {existingVideos.map((content) => {
+                        const videoUrl = `https://backend.karigaistore.in/api/files/content/${content.id}/${content.videos}`;
+                        return (
+                          <button
+                            key={content.id}
+                            type="button"
+                            onClick={() => {
+                              form.setValue('videoUrl', videoUrl);
+                              setShowMediaLibrary(false);
+                              toast.success('Video selected');
+                            }}
+                            className="relative group rounded-lg border-2 border-gray-200 hover:border-purple-500 transition-colors overflow-hidden aspect-video bg-black"
+                          >
+                            <video
+                              src={videoUrl}
+                              className="w-full h-full object-cover"
+                              muted
+                            />
+                            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                              <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                                <svg className="w-6 h-6 text-purple-600 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                              <p className="text-xs text-white truncate font-medium">{content.videos}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
-    );
-  }
+    </Dialog>
+  );
+} 
