@@ -2,19 +2,20 @@
  * Utility for interacting with Google's Gemini API using direct API calls
  */
 
-const resolveEnv = (key: string): string | undefined => {
-  if (typeof process !== 'undefined' && process?.env?.[key]) {
-    return process.env[key];
+// Allow import.meta.env to be optional when compiling for Node environments
+declare global {
+  interface ImportMeta {
+    // Optional, because plain tsc (without Vite) doesn't inject env
+    env?: {
+      VITE_GEMINI_API_KEY?: string;
+    };
   }
-  try {
-    return (import.meta as unknown as { env?: Record<string, string> })?.env?.[key];
-  } catch {
-    return undefined;
-  }
-};
+}
 
 // The API key is loaded from environment variables (Node first, then Vite-style env)
-const GEMINI_API_KEY = resolveEnv('VITE_GEMINI_API_KEY') ?? '';
+const GEMINI_API_KEY =
+  (typeof process !== 'undefined' ? process.env?.VITE_GEMINI_API_KEY : undefined) ??
+  ((typeof import.meta !== 'undefined' ? import.meta.env?.VITE_GEMINI_API_KEY : undefined) ?? '');
 const API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent';
 
 export interface ProductCopyRequest {
