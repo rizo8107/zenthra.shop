@@ -378,58 +378,31 @@ Return ONLY valid JSON in this exact shape:
       };
     };
 
-    const maybeInjectProductDetailBlock = (blocks: PuckAiBlock[]): PuckAiBlock[] => {
-      if (!product) return blocks;
-      const hasProductBlock = blocks.some((b) =>
-        typeof b.type === 'string' && b.type.toLowerCase().includes('product'),
-      );
-      if (hasProductBlock) return blocks;
-      const alignRight = request.description?.toLowerCase().includes('right') ?? false;
-      const detailBlock: PuckAiBlock = {
-        type: 'SingleProductDetails',
-        props: {
-          productId: product.id,
-          showGallery: true,
-          showPrice: true,
-          showFeatures: true,
-          showCTA: true,
-          align: alignRight ? 'right' : 'left',
-          ribbonText: product.category ? `${product.category}` : 'Featured',
-          theme: 'brand',
-          ctaLabel: 'Add to Cart',
-        },
-      };
-      return [detailBlock, ...blocks];
-    };
-
     if (request.mode === 'page') {
       const page = parsed as Partial<PuckAiPageData>;
       const contentArr = Array.isArray(page.content) ? page.content : [];
       const normalised = contentArr
         .map(normaliseBlock)
         .filter((b): b is PuckAiBlock => Boolean(b));
-      const injected = maybeInjectProductDetailBlock(normalised);
       return {
         root:
           page.root && typeof page.root === 'object' && !Array.isArray(page.root)
             ? page.root
             : {},
-        content: injected,
+        content: normalised,
       };
     }
 
     // section mode
     if (Array.isArray(parsed)) {
-      const normalised = parsed
+      return parsed
         .map(normaliseBlock)
         .filter((b): b is PuckAiBlock => Boolean(b));
-      return maybeInjectProductDetailBlock(normalised);
     }
     if (parsed && Array.isArray((parsed as any).content)) {
-      const normalised = (parsed as any).content
+      return (parsed as any).content
         .map(normaliseBlock)
         .filter((b): b is PuckAiBlock => Boolean(b));
-      return maybeInjectProductDetailBlock(normalised);
     }
   } catch (err) {
     console.error('Failed to parse Gemini Puck content JSON, falling back to Text block', err, raw);

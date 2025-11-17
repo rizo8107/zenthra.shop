@@ -261,27 +261,15 @@ export default function PuckEditor() {
     try {
       setAiLoading(true);
 
-      const existingTypes = Array.isArray(data.content)
-        ? Array.from(
-            new Set(
-              data.content
-                .map((item: any) => item?.type)
-                .filter((type): type is string => typeof type === "string" && type.length > 0),
-            ),
-          )
-        : [];
-
       const payload: {
         mode: "page" | "section";
         description: string;
         tone: typeof aiTone;
-        existingTypes: string[];
         productId?: string;
       } = {
         mode: aiMode,
         description: aiDescription.trim(),
         tone: aiTone,
-        existingTypes,
       };
 
       if (aiUseProduct && aiProductId) {

@@ -6,7 +6,7 @@ import "@/styles/puck-editor-overrides.css";
 import { completePuckConfig as puckConfig } from "@/puck/config/complete";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { pocketbase, getProducts } from "@/lib/pocketbase";
+import { pocketbase } from "@/lib/pocketbase";
 import TemplateDialog from "@/components/TemplateDialog";
 import { Layout, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -225,14 +225,14 @@ export default function PuckEditor() {
   const ensureProductOptions = async () => {
     if (productOptions.length > 0) return;
     try {
-      const records = await getProducts();
-      const mapped = records
-        .slice(0, 50)
-        .map((p: any) => ({
-          id: p.id || p.$id,
-          name: p.name || p.title || p.id || p.$id,
-        }))
-        .filter((p) => p.id);
+      const records = await pocketbase.collection("products").getList(1, 50, {
+        sort: "-created",
+        $autoCancel: false,
+      });
+      const mapped = records.items.map((p: any) => ({
+        id: p.id,
+        name: p.name || p.title || p.id,
+      }));
       setProductOptions(mapped);
     } catch (error) {
       console.error("[PuckEditor] Failed to load products for AI selector", error);
@@ -261,27 +261,15 @@ export default function PuckEditor() {
     try {
       setAiLoading(true);
 
-      const existingTypes = Array.isArray(data.content)
-        ? Array.from(
-            new Set(
-              data.content
-                .map((item: any) => item?.type)
-                .filter((type): type is string => typeof type === "string" && type.length > 0),
-            ),
-          )
-        : [];
-
       const payload: {
         mode: "page" | "section";
         description: string;
         tone: typeof aiTone;
-        existingTypes: string[];
         productId?: string;
       } = {
         mode: aiMode,
         description: aiDescription.trim(),
         tone: aiTone,
-        existingTypes,
       };
 
       if (aiUseProduct && aiProductId) {

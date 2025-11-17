@@ -17,7 +17,6 @@ export async function getContentItems(): Promise<ContentItem[]> {
   try {
     const records = await pocketbase.collection('content').getFullList<ContentItem>({
       sort: '-created',
-      $autoCancel: false,
     });
     return records;
   } catch (error) {

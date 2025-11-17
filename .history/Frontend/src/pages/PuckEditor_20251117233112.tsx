@@ -6,7 +6,7 @@ import "@/styles/puck-editor-overrides.css";
 import { completePuckConfig as puckConfig } from "@/puck/config/complete";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { pocketbase, getProducts } from "@/lib/pocketbase";
+import { pocketbase } from "@/lib/pocketbase";
 import TemplateDialog from "@/components/TemplateDialog";
 import { Layout, Sparkles } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -30,19 +30,6 @@ interface AiPageData {
   root?: Record<string, any>;
   content: AiBlock[];
 }
-
-const SelectionBridge = ({
-  onChange,
-}: {
-  onChange: (id: string | null) => void;
-}) => {
-  const getPuckState = useGetPuck();
-  useEffect(() => {
-    const state = getPuckState();
-    onChange(state?.selectedItem?.props?.id ?? null);
-  });
-  return null;
-};
 
 // Helpers to improve snapshot quality/timing
 function delay(ms: number) { return new Promise<void>(res => setTimeout(res, ms)); }
@@ -219,20 +206,22 @@ export default function PuckEditor() {
   const [aiLoading, setAiLoading] = useState(false);
   const [productOptions, setProductOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [productSearch, setProductSearch] = useState("");
-  const [currentSelectionId, setCurrentSelectionId] = useState<string | null>(null);
+
+  // Accessor for current puck state when inserting generated sections
+  const getPuckState = useGetPuck();
 
   // --- AI helper functions ---
   const ensureProductOptions = async () => {
     if (productOptions.length > 0) return;
     try {
-      const records = await getProducts();
-      const mapped = records
-        .slice(0, 50)
-        .map((p: any) => ({
-          id: p.id || p.$id,
-          name: p.name || p.title || p.id || p.$id,
-        }))
-        .filter((p) => p.id);
+      const records = await pocketbase.collection("products").getList(1, 50, {
+        sort: "-created",
+        $autoCancel: false,
+      });
+      const mapped = records.items.map((p: any) => ({
+        id: p.id,
+        name: p.name || p.title || p.id,
+      }));
       setProductOptions(mapped);
     } catch (error) {
       console.error("[PuckEditor] Failed to load products for AI selector", error);
@@ -261,27 +250,15 @@ export default function PuckEditor() {
     try {
       setAiLoading(true);
 
-      const existingTypes = Array.isArray(data.content)
-        ? Array.from(
-            new Set(
-              data.content
-                .map((item: any) => item?.type)
-                .filter((type): type is string => typeof type === "string" && type.length > 0),
-            ),
-          )
-        : [];
-
       const payload: {
         mode: "page" | "section";
         description: string;
         tone: typeof aiTone;
-        existingTypes: string[];
         productId?: string;
       } = {
         mode: aiMode,
         description: aiDescription.trim(),
         tone: aiTone,
-        existingTypes,
       };
 
       if (aiUseProduct && aiProductId) {
@@ -343,12 +320,14 @@ export default function PuckEditor() {
           throw new Error("AI did not return any blocks to insert");
         }
 
+        const usePuckState = getPuckState();
+        const selected = (usePuckState?.selectedItem ?? null) as any | null;
         const currentContent = Array.isArray(data.content) ? data.content : [];
 
         let insertIndex = currentContent.length;
-        if (currentSelectionId) {
+        if (selected && selected.props && selected.props.id) {
           const idx = currentContent.findIndex(
-            (item: any) => item?.props?.id === currentSelectionId,
+            (item: any) => item?.props?.id === selected.props.id,
           );
           if (idx >= 0) insertIndex = idx + 1;
         }
@@ -744,14 +723,15 @@ export default function PuckEditor() {
                 <Sparkles size={16} />
                 AI Generate
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => window.open(`/page/${pageMeta.slug}`, "_blank", "noopener,noreferrer")}
-                disabled={!pageMeta.published || saving}
-              >
-                View Page
-              </Button>
-              <SelectionBridge onChange={setCurrentSelectionId} />
+              {pageMeta.slug ? (
+                <Button
+                  variant="secondary"
+                  onClick={() => window.open(`/page/${pageMeta.slug}`, "_blank", "noopener,noreferrer")}
+                  disabled={!pageMeta.published || saving}
+                >
+                  View Page
+                </Button>
+              ) : null}
               {children}
             </>
           ),
