@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useToast } from '@/hooks/use-toast';
-import { getDashboardMetrics, getMonthlyRevenueData, getOrders, getProductSalesSummary, updateOrderStatus } from '@/lib/pocketbase';
+import { getDashboardMetrics, getMonthlyRevenueData, getOrders, getProductSalesSummary, updateOrderStatus, type RevenueGroupBy } from '@/lib/pocketbase';
 import { mapPocketBaseOrderToOrder } from '@/lib/mapper';
 import { DateRangePicker } from '@/components/ui/date-range-picker';
 import type { DateRange } from 'react-day-picker';
@@ -19,7 +19,10 @@ import { Loader2, ShoppingBag, Clock, Check, DollarSign, TrendingUp, Calendar } 
 
 const DashboardPage: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [revenueData, setRevenueData] = useState<{ month: string; revenue: number }[]>([]);
+  const [revenueData, setRevenueData] = useState<{ label: string; revenue: number }[]>([]);
+  const [revenueRange, setRevenueRange] = useState<'day' | 'week' | 'month'>('month');
+  const [revenueDateRange, setRevenueDateRange] = useState<DateRange | undefined>(undefined);
+  const [isRevenueLoading, setIsRevenueLoading] = useState(false);
   const [orders, setOrders] = useState<Order[]>([]);
   const [productSales, setProductSales] = useState<ProductSalesSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +36,39 @@ const DashboardPage: React.FC = () => {
 
   // Fetch dashboard data
   useEffect(() => {
+    const fetchRevenue = async () => {
+      try {
+        setIsRevenueLoading(true);
+
+        const startDate = revenueDateRange?.from
+          ? new Date(revenueDateRange.from.setHours(0, 0, 0, 0)).toISOString()
+          : undefined;
+        const endDate = revenueDateRange?.to
+          ? new Date(revenueDateRange.to.setHours(23, 59, 59, 999)).toISOString()
+          : undefined;
+
+        const response = await getMonthlyRevenueData({
+          startDate,
+          endDate,
+          groupBy: revenueRange as RevenueGroupBy,
+        });
+        setRevenueData(response);
+      } catch (error) {
+        console.error('Error fetching revenue data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load revenue data. Please try again.',
+          variant: 'destructive',
+        });
+      } finally {
+        setIsRevenueLoading(false);
+      }
+    };
+
+    void fetchRevenue();
+  }, [revenueRange, revenueDateRange, toast]);
+
+  useEffect(() => {
     const fetchDashboardData = async () => {
       setIsLoading(true);
       try {
@@ -40,7 +76,7 @@ const DashboardPage: React.FC = () => {
         const metricsData = await getDashboardMetrics();
         setMetrics(metricsData);
 
-        // Fetch revenue data for chart
+        // Fetch revenue data for chart (default: current year, monthly)
         const revenueDataResponse = await getMonthlyRevenueData();
         setRevenueData(revenueDataResponse);
 
@@ -170,6 +206,11 @@ const DashboardPage: React.FC = () => {
     setProductTopN(15);
   };
 
+  const resetRevenueFilters = () => {
+    setRevenueRange('month');
+    setRevenueDateRange(undefined);
+  };
+
   return (
     <AdminLayout>
       <Tabs defaultValue="overview" className="space-y-6">
@@ -255,24 +296,73 @@ const DashboardPage: React.FC = () => {
           </div>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Revenue Overview</CardTitle>
-              <CardDescription>Monthly revenue for the current year</CardDescription>
+            <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <CardTitle>Revenue Overview</CardTitle>
+                <CardDescription>
+                  Revenue over time ({revenueRange === 'day' ? 'Daily' : revenueRange === 'week' ? 'Weekly' : 'Monthly'})
+                </CardDescription>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Range</Label>
+                  <div className="inline-flex rounded-md border bg-background p-0.5 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setRevenueRange('day')}
+                      className={`px-2 py-1 rounded-sm ${revenueRange === 'day' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                    >
+                      Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRevenueRange('week')}
+                      className={`px-2 py-1 rounded-sm ${revenueRange === 'week' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                    >
+                      Week
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRevenueRange('month')}
+                      className={`px-2 py-1 rounded-sm ${revenueRange === 'month' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}
+                    >
+                      Month
+                    </button>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-medium text-muted-foreground">Custom range</Label>
+                  <DateRangePicker value={revenueDateRange} onChange={setRevenueDateRange} />
+                  <Button variant="ghost" size="sm" onClick={resetRevenueFilters}>
+                    Reset
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart
-                    data={revenueData}
-                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`₹${value}`, 'Revenue']} />
-                    <Bar dataKey="revenue" fill="#0c8ee8" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                {isRevenueLoading ? (
+                  <div className="flex h-full items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : revenueData.length === 0 ? (
+                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                    No revenue data for the selected range.
+                  </div>
+                ) : (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={revenueData}
+                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                    >
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [`₹${value}`, 'Revenue']} />
+                      <Bar dataKey="revenue" fill="#0c8ee8" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                )}
               </div>
             </CardContent>
           </Card>

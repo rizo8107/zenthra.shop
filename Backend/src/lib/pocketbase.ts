@@ -697,44 +697,65 @@ export const getDashboardMetrics = async () => {
   }
 };
 
-// Get revenue data for chart (monthly revenue)
-export const getMonthlyRevenueData = async () => {
+export type RevenueGroupBy = 'day' | 'week' | 'month';
+
+// Get revenue data for chart, with optional date range and grouping
+export const getMonthlyRevenueData = async (params?: {
+  startDate?: string;
+  endDate?: string;
+  groupBy?: RevenueGroupBy;
+}) => {
   try {
     await ensureAdminAuth();
-    
-    // Get all orders
-    const ordersResult = await pb.collection('orders').getFullList(200, {
+
+    const { startDate, endDate, groupBy = 'month' } = params ?? {};
+
+    const filterParts: string[] = [];
+    if (startDate) {
+      filterParts.push(`created >= "${startDate}"`);
+    }
+    if (endDate) {
+      filterParts.push(`created <= "${endDate}"`);
+    }
+    const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
+
+    const ordersResult = await pb.collection('orders').getFullList(500, {
       sort: 'created',
       fields: 'total,created',
+      filter,
     });
-    
-    // Get current year
-    const currentYear = new Date().getFullYear();
-    
-    // Create an object to store monthly revenue
-    const monthlyRevenue = {
-      'Jan': 0, 'Feb': 0, 'Mar': 0, 'Apr': 0, 'May': 0, 'Jun': 0,
-      'Jul': 0, 'Aug': 0, 'Sep': 0, 'Oct': 0, 'Nov': 0, 'Dec': 0
-    };
-    
-    // Calculate revenue for each month
-    ordersResult.forEach(order => {
-      const orderDate = new Date(order.created);
-      
-      // Only include orders from current year
-      if (orderDate.getFullYear() === currentYear) {
-        const month = orderDate.toLocaleString('default', { month: 'short' });
-        monthlyRevenue[month] += (order.total || 0);
+
+    const buckets = new Map<string, number>();
+
+    ordersResult.forEach((order) => {
+      const created = new Date(order.created);
+      const total = Number(order.total || 0);
+
+      let key: string;
+      if (groupBy === 'day') {
+        key = created.toISOString().slice(0, 10); // YYYY-MM-DD
+      } else if (groupBy === 'week') {
+        const d = new Date(Date.UTC(created.getFullYear(), created.getMonth(), created.getDate()));
+        const dayNum = d.getUTCDay() || 7;
+        d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+        const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+        const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+        key = `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+      } else {
+        key = created.toLocaleString('default', { month: 'short', year: 'numeric' });
       }
+
+      buckets.set(key, (buckets.get(key) || 0) + total);
     });
-    
-    // Convert to array format expected by chart
-    return Object.entries(monthlyRevenue).map(([month, revenue]) => ({
-      month,
-      revenue
+
+    const entries = Array.from(buckets.entries()).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+
+    return entries.map(([label, revenue]) => ({
+      label,
+      revenue,
     }));
   } catch (error) {
-    console.error('Error fetching monthly revenue data:', error);
+    console.error('Error fetching revenue data:', error);
     throw error;
   }
 };
