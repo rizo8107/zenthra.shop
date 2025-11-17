@@ -244,9 +244,11 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
     if (!fileName) return placeholder;
     // If already a full URL, use as-is
     if (typeof fileName === "string" && /^https?:\/\//i.test(fileName)) return fileName;
+
     // PocketBase accepts collection id or name in the files URL
     const cid = record?.collectionId || record?.collectionName || record?.collection || "products";
     const rid = record?.id || record?.productId;
+
     if (cid && rid) {
       let fname = String(fileName);
       // Normalize values like "<recordId>/<filename>" to just "<filename>"
@@ -255,6 +257,7 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
       }
       return pbGetImageUrl(String(cid), String(rid), fname);
     }
+
     // Fallback
     return placeholder;
   };
@@ -266,7 +269,52 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
       if (typeof p.images === "string" && p.images) return p.images as string;
       if (typeof (p as any).image === "string" && (p as any).image) return (p as any).image as string;
       return undefined;
-    } catch { return undefined; }
+    } catch {
+      return undefined;
+    }
+  };
+
+  type VariantSize = {
+    name?: string;
+    value?: string | number;
+    unit?: string;
+    inStock?: boolean;
+    images?: string[];
+  };
+
+  type VariantCombo = {
+    name?: string;
+    value?: string;
+    type?: string;
+    items?: number;
+    discountType?: string;
+    discountValue?: number;
+  };
+
+  const resolveVariants = (record: any): { sizes: VariantSize[]; combos: VariantCombo[] } => {
+    try {
+      const raw = record?.variants as unknown;
+      if (!raw) return { sizes: [], combos: [] };
+
+      let parsed: unknown = raw;
+      if (typeof raw === "string") {
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          return { sizes: [], combos: [] };
+        }
+      }
+
+      if (!parsed || typeof parsed !== "object") return { sizes: [], combos: [] };
+
+      const anyParsed = parsed as { sizes?: VariantSize[]; combos?: VariantCombo[] };
+      const sizes = Array.isArray(anyParsed.sizes) ? anyParsed.sizes : [];
+      const combos = Array.isArray(anyParsed.combos) ? anyParsed.combos : [];
+
+      return { sizes, combos };
+    } catch {
+      return { sizes: [], combos: [] };
+    }
   };
 
   // ===== Shipping fee (robust derivation) =====
@@ -527,8 +575,8 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                                   <h4 className="font-medium text-base">{product.product?.name || (product as any).name || "Unknown Product"}</h4>
                                   <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                                     {(() => {
-                                      const comboText = (((product as any).comboLabel || (product as any).combo || '') as string);
-                                      const m = typeof comboText === 'string' ? comboText.match(/(\d+)\s*-\s*Pack/i) : null;
+                                      const comboText = (((product as any).comboLabel || (product as any).combo || "") as string);
+                                      const m = typeof comboText === "string" ? comboText.match(/(\d+)\s*-\s*Pack/i) : null;
                                       const pack = m ? parseInt(m[1], 10) : NaN;
                                       const q = Number(product.quantity || 0);
                                       const displayQty = Number.isFinite(pack) && pack > 1 ? Math.max(1, Math.round(q / pack)) : q;
@@ -552,9 +600,57 @@ export function ViewOrderDialog({ open, onOpenChange, order }: ViewOrderDialogPr
                                       <Badge variant="outline" className="border-indigo-200 bg-indigo-50 text-indigo-600">{(product as any).combo}</Badge>
                                     )}
                                   </div>
-                                  {product.product?.description && (
-                                    <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{product.product.description}</p>
-                                  )}
+
+                                  {(() => {
+                                    const { sizes, combos } = resolveVariants(product.product);
+                                    const sizeLabel = ((product as any).sizeLabel || (product as any).size || "") as string;
+                                    const comboLabel = ((product as any).comboLabel || (product as any).combo || "") as string;
+
+                                    const matchedSize = sizes.find((s) => {
+                                      const name = (s.name || "").toString().toLowerCase();
+                                      const value = (s.value || "").toString().toLowerCase();
+                                      const label = sizeLabel.toLowerCase();
+                                      return !!label && (name === label || value === label || `${value} ${s.unit || ""}`.trim().toLowerCase() === label);
+                                    });
+
+                                    const matchedCombo = combos.find((c) => {
+                                      const name = (c.name || "").toString().toLowerCase();
+                                      const value = (c.value || "").toString().toLowerCase();
+                                      const label = comboLabel.toLowerCase();
+                                      return !!label && (name === label || value === label);
+                                    });
+
+                                    if (!matchedSize && !matchedCombo && !product.product?.description) return null;
+
+                                    return (
+                                      <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                                        {product.product?.description && (
+                                          <p className="text-sm text-muted-foreground line-clamp-2">{product.product.description}</p>
+                                        )}
+                                        {matchedSize && (
+                                          <div>
+                                            <span className="font-semibold">Variant:</span>{" "}
+                                            {matchedSize.name || sizeLabel}
+                                            {matchedSize.unit && ` • ${matchedSize.unit}`}
+                                          </div>
+                                        )}
+                                        {matchedCombo && (
+                                          <div>
+                                            <span className="font-semibold">Offer:</span>{" "}
+                                            {matchedCombo.name || comboLabel}
+                                            {matchedCombo.items && ` • Items: ${matchedCombo.items}`}
+                                            {matchedCombo.discountValue && (
+                                              <>
+                                                {" "}• Discount: {matchedCombo.discountValue}
+                                                {matchedCombo.discountType === "percent" ? "%" : ""}
+                                              </>
+                                            )}
+                                            {matchedCombo.type && ` • Type: ${matchedCombo.type.replace(/_/g, " ")}`}
+                                          </div>
+                                        )}
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                                 <div className="grid grid-cols-3 mt-2 text-sm">
                                   <div>
