@@ -21,7 +21,8 @@ import type {
   CustomScriptsConfig,
   CustomScript,
   WhatsappApiConfig,
-  EvolutionApiConfig
+  EvolutionApiConfig,
+  GeminiAiConfig,
 } from "@/plugins/types";
 import { getContentItems, uploadVideo, getContentVideoUrl, type ContentItem, getContentImageUrl, uploadImage } from "@/lib/content-service";
 import { pocketbase } from "@/lib/pocketbase";
@@ -59,6 +60,7 @@ export default function PluginsManager() {
   const [evoApiConfig, setEvoApiConfig] = useState<EvolutionApiConfig | null>(null);
   const [testing, setTesting] = useState<{ type: 'whatsapp' | 'evolution' | null }>({ type: null });
   const [testTargets, setTestTargets] = useState<{ whatsapp: string; evolution: string }>({ whatsapp: '', evolution: '' });
+  const [geminiConfig, setGeminiConfig] = useState<GeminiAiConfig | null>(null);
 
   useEffect(() => {
     if (!loading) {
@@ -71,6 +73,7 @@ export default function PluginsManager() {
       setClarityConfig(configs.microsoft_clarity as MicrosoftClarityConfig);
       setWaApiConfig((configs as any).whatsapp_api as WhatsappApiConfig || pluginRegistry.whatsapp_api.defaultConfig as unknown as WhatsappApiConfig);
       setEvoApiConfig((configs as any).evolution_api as EvolutionApiConfig || pluginRegistry.evolution_api.defaultConfig as unknown as EvolutionApiConfig);
+      setGeminiConfig((configs as any).gemini_ai as GeminiAiConfig || pluginRegistry.gemini_ai.defaultConfig as GeminiAiConfig);
       
       const customScripts = configs.custom_scripts as CustomScriptsConfig;
       console.log('[PluginsManager] Loading custom scripts config:', customScripts);
@@ -121,6 +124,9 @@ export default function PluginsManager() {
       if (key === "evolution_api" && evoApiConfig) {
         await savePluginConfig(key, evoApiConfig);
       }
+      if (key === "gemini_ai" && geminiConfig) {
+        await savePluginConfig(key, geminiConfig);
+      }
       await reload();
     } finally {
       setSaving(false);
@@ -138,6 +144,7 @@ export default function PluginsManager() {
     if (key === "custom_scripts") setCustomScriptsConfig(pluginRegistry.custom_scripts.defaultConfig);
     if (key === "whatsapp_api") setWaApiConfig(pluginRegistry.whatsapp_api.defaultConfig as unknown as WhatsappApiConfig);
     if (key === "evolution_api") setEvoApiConfig(pluginRegistry.evolution_api.defaultConfig as unknown as EvolutionApiConfig);
+    if (key === "gemini_ai") setGeminiConfig(pluginRegistry.gemini_ai.defaultConfig as GeminiAiConfig);
   };
 
   const origin = useMemo(() => (typeof window !== "undefined" ? window.location.origin : ""), []);
@@ -541,6 +548,15 @@ export default function PluginsManager() {
                 <span>Evolution API</span>
                 <Switch checked={enabled.evolution_api} onCheckedChange={(v) => onToggle('evolution_api', v)} />
               </button>
+              <button
+                type="button"
+                className={`w-full flex items-center justify-between rounded-md px-3 py-2 text-sm hover:bg-accent ${selected === 'gemini_ai' ? 'bg-accent' : ''}`}
+                onClick={() => setSelected('gemini_ai')}
+                title="Gemini AI"
+              >
+                <span>Gemini AI</span>
+                <Switch checked={enabled.gemini_ai} onCheckedChange={(v) => onToggle('gemini_ai', v)} />
+              </button>
             </nav>
           </div>
         </aside>
@@ -561,7 +577,7 @@ export default function PluginsManager() {
           </CardHeader>
           <CardContent className="space-y-4">
             {waConfig && (
-              <>
+              <div>
                 <div className="grid gap-2">
                   <Label htmlFor="wa-phone">Phone Number (without +)</Label>
                   <Input
@@ -815,10 +831,82 @@ export default function PluginsManager() {
                     Preview link
                   </a>
                 </div>
-              </>
+              </div>
             )}
           </CardContent>
         </Card>
+        )}
+
+        {selected === 'gemini_ai' && (
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle>Gemini AI</CardTitle>
+              <div className="flex items-center gap-2">
+                <Label className="text-sm">Enabled</Label>
+                <Switch
+                  checked={enabled.gemini_ai}
+                  onCheckedChange={(v) => onToggle('gemini_ai', v)}
+                />
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {geminiConfig && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="gemini-api-key">Gemini API Key</Label>
+                    <Input
+                      id="gemini-api-key"
+                      type="password"
+                      value={geminiConfig.apiKey || ''}
+                      onChange={(e) => setGeminiConfig({ ...geminiConfig, apiKey: e.target.value })}
+                      placeholder="Paste your VITE_GEMINI_API_KEY here"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Stored in the plugins collection. Make sure the admin backend also has the same
+                      VITE_GEMINI_API_KEY value in its environment.
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Default tone</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {(['playful','professional','minimal','luxury','casual'] as const).map((tone) => (
+                        <Button
+                          key={tone}
+                          type="button"
+                          variant={geminiConfig.defaultTone === tone ? 'default' : 'outline'}
+                          onClick={() => setGeminiConfig({ ...geminiConfig, defaultTone: tone })}
+                        >
+                          {tone.charAt(0).toUpperCase() + tone.slice(1)}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={geminiConfig.enableProductCopy !== false}
+                      onCheckedChange={(v) => setGeminiConfig({ ...geminiConfig, enableProductCopy: v })}
+                    />
+                    <Label>Enable for product content generation</Label>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <Button onClick={() => onSave('gemini_ai')} disabled={saving}>
+                      {saving ? 'Saving...' : 'Save'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => resetToDefault('gemini_ai')}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {selected === 'video_floating' && (

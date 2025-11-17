@@ -8,7 +8,8 @@ export type PluginKey =
   | "microsoft_clarity"
   | "custom_scripts"
   | "evolution_api"
-  | "whatsapp_api";
+  | "whatsapp_api"
+  | "gemini_ai";
 
 export interface BasePluginConfig {
   enabled: boolean;
@@ -189,6 +190,12 @@ export interface WhatsappApiConfig extends BasePluginConfig {
   defaultTemplate?: { name: string; lang: string };
 }
 
+export interface GeminiAiConfig extends BasePluginConfig {
+  apiKey?: string;
+  defaultTone?: "playful" | "professional" | "minimal" | "luxury" | "casual";
+  enableProductCopy?: boolean;
+}
+
 export type AnyPluginConfig =
   | { key: "whatsapp_floating"; config: WhatsAppPluginConfig }
   | { key: "video_floating"; config: VideoPluginConfig }
@@ -199,7 +206,8 @@ export type AnyPluginConfig =
   | { key: "microsoft_clarity"; config: MicrosoftClarityConfig }
   | { key: "custom_scripts"; config: CustomScriptsConfig }
   | { key: "evolution_api"; config: EvolutionApiConfig }
-  | { key: "whatsapp_api"; config: WhatsappApiConfig };
+  | { key: "whatsapp_api"; config: WhatsappApiConfig }
+  | { key: "gemini_ai"; config: GeminiAiConfig };
 
 export interface PluginDefinition<T extends BasePluginConfig> {
   key: PluginKey;

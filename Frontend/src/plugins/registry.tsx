@@ -15,6 +15,7 @@ import type {
   CustomScriptsConfig,
   EvolutionApiConfig,
   WhatsappApiConfig,
+  GeminiAiConfig,
 } from "./types";
 
 function cx(...classes: (string | false | undefined)[]) {
@@ -792,6 +793,18 @@ export const pluginRegistry = {
     } as WhatsappApiConfig,
     Component: () => null,
   } as PluginDefinition<WhatsappApiConfig>,
+  gemini_ai: {
+    key: 'gemini_ai',
+    name: 'Gemini AI',
+    description: 'Configure Gemini API for AI content generation in admin tools.',
+    defaultConfig: {
+      enabled: false,
+      apiKey: '',
+      defaultTone: 'playful',
+      enableProductCopy: true,
+    } as GeminiAiConfig,
+    Component: () => null,
+  } as PluginDefinition<GeminiAiConfig>,
 };
 
 export type PluginRegistry = typeof pluginRegistry;

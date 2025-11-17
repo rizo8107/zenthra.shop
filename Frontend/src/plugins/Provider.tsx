@@ -33,6 +33,7 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
     custom_scripts: false,
     evolution_api: false,
     whatsapp_api: false,
+    gemini_ai: false,
   });
   const [configs, setConfigs] = useState<Record<PluginKey, WhatsAppPluginConfig | VideoPluginConfig | PopupBannerConfig | CustomScriptsConfig>>({
     whatsapp_floating: pluginRegistry.whatsapp_floating.defaultConfig,
@@ -45,6 +46,7 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
     custom_scripts: pluginRegistry.custom_scripts.defaultConfig as CustomScriptsConfig,
     evolution_api: pluginRegistry.evolution_api.defaultConfig as any,
     whatsapp_api: pluginRegistry.whatsapp_api.defaultConfig as any,
+    gemini_ai: pluginRegistry.gemini_ai.defaultConfig as any,
   });
   const { pathname } = useLocation();
 
@@ -63,6 +65,7 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
         custom_scripts: false,
         evolution_api: false,
         whatsapp_api: false,
+        gemini_ai: false,
       };
       const nextConfigs: Record<PluginKey, WhatsAppPluginConfig | VideoPluginConfig | PopupBannerConfig | CustomScriptsConfig> = {
         whatsapp_floating: pluginRegistry.whatsapp_floating.defaultConfig,
@@ -75,6 +78,7 @@ export const PluginProvider: React.FC<{ children: React.ReactNode }>= ({ childre
         custom_scripts: pluginRegistry.custom_scripts.defaultConfig as CustomScriptsConfig,
         evolution_api: pluginRegistry.evolution_api.defaultConfig as any,
         whatsapp_api: pluginRegistry.whatsapp_api.defaultConfig as any,
+        gemini_ai: pluginRegistry.gemini_ai.defaultConfig as any,
       };
 
       (Object.keys(pluginRegistry) as PluginKey[]).forEach((key) => {
