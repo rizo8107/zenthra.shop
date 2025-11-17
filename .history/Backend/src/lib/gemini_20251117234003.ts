@@ -362,74 +362,32 @@ Return ONLY valid JSON in this exact shape:
   try {
     const parsed = JSON.parse(jsonText);
 
-    const normaliseBlock = (block: unknown, index: number): PuckAiBlock | null => {
-      if (!block || typeof block !== 'object') return null;
-      const candidate = block as { type?: unknown; props?: unknown };
-      const type = typeof candidate.type === 'string' && candidate.type.trim().length > 0
-        ? candidate.type.trim()
-        : null;
-      if (!type) return null;
-      const props = candidate.props && typeof candidate.props === 'object' && !Array.isArray(candidate.props)
-        ? candidate.props
-        : {};
-      return {
-        type,
-        props: { ...props, _generatedIndex: index },
-      };
-    };
-
-    const maybeInjectProductDetailBlock = (blocks: PuckAiBlock[]): PuckAiBlock[] => {
-      if (!product) return blocks;
-      const hasProductBlock = blocks.some((b) =>
-        typeof b.type === 'string' && b.type.toLowerCase().includes('product'),
-      );
-      if (hasProductBlock) return blocks;
-      const alignRight = request.description?.toLowerCase().includes('right') ?? false;
-      const detailBlock: PuckAiBlock = {
-        type: 'SingleProductDetails',
-        props: {
-          productId: product.id,
-          showGallery: true,
-          showPrice: true,
-          showFeatures: true,
-          showCTA: true,
-          align: alignRight ? 'right' : 'left',
-          ribbonText: product.category ? `${product.category}` : 'Featured',
-          theme: 'brand',
-          ctaLabel: 'Add to Cart',
-        },
-      };
-      return [detailBlock, ...blocks];
-    };
-
     if (request.mode === 'page') {
       const page = parsed as Partial<PuckAiPageData>;
       const contentArr = Array.isArray(page.content) ? page.content : [];
       const normalised = contentArr
-        .map(normaliseBlock)
-        .filter((b): b is PuckAiBlock => Boolean(b));
-      const injected = maybeInjectProductDetailBlock(normalised);
+        .filter((b) => b && typeof b.type === 'string')
+        .map((b, index) => ({
+          type: b.type,
+          props: {
+            ...b.props,
+          },
+        }));
       return {
         root:
           page.root && typeof page.root === 'object' && !Array.isArray(page.root)
             ? page.root
             : {},
-        content: injected,
+        content: normalised,
       };
     }
 
     // section mode
     if (Array.isArray(parsed)) {
-      const normalised = parsed
-        .map(normaliseBlock)
-        .filter((b): b is PuckAiBlock => Boolean(b));
-      return maybeInjectProductDetailBlock(normalised);
+      return parsed as PuckAiBlock[];
     }
     if (parsed && Array.isArray((parsed as any).content)) {
-      const normalised = (parsed as any).content
-        .map(normaliseBlock)
-        .filter((b): b is PuckAiBlock => Boolean(b));
-      return maybeInjectProductDetailBlock(normalised);
+      return (parsed as any).content as PuckAiBlock[];
     }
   } catch (err) {
     console.error('Failed to parse Gemini Puck content JSON, falling back to Text block', err, raw);
