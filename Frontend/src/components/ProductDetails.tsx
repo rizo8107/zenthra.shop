@@ -91,7 +91,7 @@ const extractPocketBaseFileInfo = (url: string | undefined): { recordId: string,
 };
 
 // Helper function to get the full PocketBase file URL
-const getPocketBaseFileUrl = (url: string | undefined): string => {
+const getPocketBaseFileUrl = (url: string | undefined, productId?: string): string => {
   if (!url) return '';
   
   // If it's already a full URL, return it
@@ -103,6 +103,16 @@ const getPocketBaseFileUrl = (url: string | undefined): string => {
   const baseUrl = pocketbase.baseUrl.endsWith('/') 
     ? pocketbase.baseUrl.slice(0, -1) 
     : pocketbase.baseUrl;
+  
+  // If URL contains a slash, it's already in format "recordId/filename"
+  if (url.includes('/')) {
+    return `${baseUrl}/api/files/${Collections.PRODUCTS}/${url}`;
+  }
+  
+  // Otherwise, we need the productId to construct the full path
+  if (productId) {
+    return `${baseUrl}/api/files/${Collections.PRODUCTS}/${productId}/${url}`;
+  }
     
   return `${baseUrl}/api/files/${Collections.PRODUCTS}/${url}`;
 };
@@ -349,7 +359,8 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
   const hasCare = orderConfig?.showCareInstructions !== false && (cleaningList.length > 0 || storageList.length > 0);
   const hasFeatures = orderConfig?.showFeaturesAndBenefits !== false && featureList.length > 0;
   const hasUsage = orderConfig?.showUsageGuidelines !== false && (usageRecommended.length > 0 || usageTips.length > 0);
-  const hasVideo = !!product.videoUrl;
+  // Don't show video if it's a blob URL (invalid/temporary URL)
+  const hasVideo = !!product.videoUrl && !product.videoUrl.startsWith('blob:');
 
   const recommendations = recommendedProducts.filter((item) => item.id !== product.id).slice(0, 4);
   const showRecommendations = recommendedLoading || recommendedError || recommendations.length > 0;
@@ -366,7 +377,7 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
               <p className="text-sm text-white/70">See the product in action before you buy.</p>
             </CardHeader>
             <CardContent>
-              <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black/30">
+              <div className="relative aspect-video overflow-hidden rounded-xl border border-white/10 bg-black">
                 {!isVideoPlaying ? (
                   <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/40 backdrop-blur">
                     {thumbnailLoading ? (
@@ -389,40 +400,64 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
                     )}
                     <button
                       onClick={() => setIsVideoPlaying(true)}
-                      className="group relative inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-blue-600 shadow-lg transition-all duration-300 hover:scale-105 hover:bg-white"
+                      className="group absolute inline-flex h-16 w-16 items-center justify-center rounded-full bg-white/95 text-blue-600 shadow-lg transition-all duration-300 hover:scale-105 hover:bg-white z-10"
                       aria-label="Play video"
                     >
-                      <Play size={28} className="ml-1" />
+                      <Play size={28} className="ml-1" fill="currentColor" />
                     </button>
                   </div>
                 ) : isYouTubeUrl(product.videoUrl) ? (
                   <iframe
-                    src={`${getYouTubeEmbedUrl(product.videoUrl)}${isVideoPlaying ? '?autoplay=1' : ''}`}
+                    src={`${getYouTubeEmbedUrl(product.videoUrl)}?autoplay=1&rel=0`}
                     title="YouTube video player"
-                    className="absolute inset-0 h-full w-full rounded-xl"
+                    className="absolute inset-0 h-full w-full"
                     frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowFullScreen
                   ></iframe>
                 ) : isPocketBaseFileUrl(product.videoUrl) || isVideoFileUrl(product.videoUrl) ? (
-                  <div className="relative z-[90] overflow-hidden rounded-xl">
-                    <VideoPlayer
-                      src={isPocketBaseFileUrl(product.videoUrl) ? getPocketBaseFileUrl(product.videoUrl) : videoUrl}
-                      onClose={() => setIsVideoPlaying(false)}
-                    />
+                  <div className="relative h-full w-full">
+                    <video
+                      key={isPocketBaseFileUrl(product.videoUrl) ? getPocketBaseFileUrl(product.videoUrl, product.id) : videoUrl}
+                      controls
+                      autoPlay
+                      playsInline
+                      muted
+                      className="absolute inset-0 h-full w-full object-contain bg-black"
+                      onEnded={() => setIsVideoPlaying(false)}
+                      onError={(e) => {
+                        const videoSrc = isPocketBaseFileUrl(product.videoUrl) ? getPocketBaseFileUrl(product.videoUrl, product.id) : videoUrl;
+                        console.error('Video playback error');
+                        console.error('Video URL:', videoSrc);
+                        console.error('Product videoUrl:', product.videoUrl);
+                        console.error('Product ID:', product.id);
+                        console.error('Is PocketBase URL:', isPocketBaseFileUrl(product.videoUrl));
+                        console.error('Error event:', e.nativeEvent);
+                      }}
+                      onLoadedData={() => {
+                        console.log('Video loaded successfully');
+                      }}
+                    >
+                      <source 
+                        src={isPocketBaseFileUrl(product.videoUrl) ? getPocketBaseFileUrl(product.videoUrl, product.id) : videoUrl}
+                        type="video/mp4"
+                      />
+                      <source 
+                        src={isPocketBaseFileUrl(product.videoUrl) ? getPocketBaseFileUrl(product.videoUrl, product.id) : videoUrl}
+                        type="video/webm"
+                      />
+                      Your browser does not support the video tag.
+                    </video>
                   </div>
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <iframe
-                      src={`${videoUrl}${videoUrl.includes('?') ? '&' : '?'}autoplay=1`}
-                      title="Product video"
-                      className="h-full w-full rounded-xl"
-                      frameBorder="0"
-                      style={{ aspectRatio: 'auto', maxHeight: 'calc(100% - 60px)' }}
-                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                      allowFullScreen
-                    ></iframe>
-                  </div>
+                  <iframe
+                    src={`${videoUrl}${videoUrl.includes('?') ? '&' : '?'}autoplay=1`}
+                    title="Product video"
+                    className="absolute inset-0 h-full w-full"
+                    frameBorder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                    allowFullScreen
+                  ></iframe>
                 )}
               </div>
             </CardContent>

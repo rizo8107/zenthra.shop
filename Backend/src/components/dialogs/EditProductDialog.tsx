@@ -60,9 +60,10 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [videoUrl, setVideoUrl] = useState(product?.videoUrl || '');
   const [videoThumbnail, setVideoThumbnail] = useState(product?.videoThumbnail || '');
   const [videoDescription, setVideoDescription] = useState(product?.videoDescription || '');
-  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
-  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>(product?.videoUrl || '');
-  const [videoUploadMode, setVideoUploadMode] = useState<'url' | 'upload'>('url');
+  const [showMediaLibrary, setShowMediaLibrary] = useState(false);
+  const [existingVideos, setExistingVideos] = useState<Array<{id: string, videos: string}>>([]);
+  const [loadingVideos, setLoadingVideos] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [review, setReview] = useState(product?.review !== undefined && product.review !== null ? String(product.review) : '');
   const [features, setFeatures] = useState(product?.features || '');
   const [tags, setTags] = useState(product?.tags || '');
@@ -1013,111 +1014,47 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                             />
                           </div>
 
-                          {/* Video Upload Mode Toggle */}
-                          <div className="flex gap-3 p-1 bg-gray-100 rounded-lg w-fit">
-                            <button
-                              type="button"
-                              onClick={() => setVideoUploadMode('url')}
-                              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                videoUploadMode === 'url'
-                                  ? 'bg-white shadow-sm text-gray-900'
-                                  : 'text-gray-600 hover:text-gray-900'
-                              }`}
-                            >
-                              Enter URL
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setVideoUploadMode('upload')}
-                              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                videoUploadMode === 'upload'
-                                  ? 'bg-white shadow-sm text-gray-900'
-                                  : 'text-gray-600 hover:text-gray-900'
-                              }`}
-                            >
-                              Upload Video
-                            </button>
-                          </div>
-
-                          {videoUploadMode === 'url' ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="video_url" className="text-sm font-medium">Video URL</Label>
-                                <Input
-                                  id="video_url"
-                                  value={videoUrl}
-                                  onChange={(e) => setVideoUrl(e.target.value)}
-                                  placeholder="https://..."
-                                  className="h-10"
-                                />
-                                <p className="text-xs text-gray-500">YouTube, Vimeo, or direct video link</p>
-                              </div>
-                              <div className="space-y-2">
-                                <Label htmlFor="video_thumbnail" className="text-sm font-medium">Video Thumbnail</Label>
-                                <Input
-                                  id="video_thumbnail"
-                                  value={videoThumbnail}
-                                  onChange={(e) => setVideoThumbnail(e.target.value)}
-                                  placeholder="https://..."
-                                  className="h-10"
-                                />
-                                <p className="text-xs text-gray-500">Optional preview image</p>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-4">
-                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
-                                <input
-                                  type="file"
-                                  accept="video/*"
-                                  id="video-upload-edit"
-                                  className="sr-only"
-                                  onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      setUploadedVideo(file);
-                                      const url = URL.createObjectURL(file);
-                                      setVideoPreviewUrl(url);
-                                      setVideoUrl(url);
+                          {/* Media Library Button */}
+                          <div className="space-y-2">
+                            <Label htmlFor="video_url" className="text-sm font-medium">Selected Video</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="video_url"
+                                value={videoUrl}
+                                onChange={(e) => setVideoUrl(e.target.value)}
+                                placeholder="No video selected"
+                                readOnly
+                                className="flex-1"
+                              />
+                              <Button
+                                type="button"
+                                onClick={async () => {
+                                  setShowMediaLibrary(true);
+                                  if (existingVideos.length === 0) {
+                                    setLoadingVideos(true);
+                                    try {
+                                      const { pb } = await import('@/lib/pocketbase');
+                                      const records = await pb.collection('content').getFullList({
+                                        sort: '-created'
+                                      });
+                                      const videosOnly = records.filter((r: any) => r.Videos);
+                                      setExistingVideos(videosOnly.map((r: any) => ({id: r.id, videos: r.Videos})) as Array<{id: string, videos: string}>);
+                                    } catch (error) {
+                                      console.error('Error fetching videos:', error);
+                                    } finally {
+                                      setLoadingVideos(false);
                                     }
-                                  }}
-                                />
-                                <label
-                                  htmlFor="video-upload-edit"
-                                  className="cursor-pointer flex flex-col items-center gap-2"
-                                >
-                                  <Upload className="h-10 w-10 text-gray-400" />
-                                  <div className="text-sm font-medium text-gray-700">
-                                    {uploadedVideo ? uploadedVideo.name : 'Click to upload video'}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    MP4, WebM, or OGG (max 100MB)
-                                  </div>
-                                </label>
-                              </div>
-
-                              {videoPreviewUrl && (
-                                <div className="rounded-lg overflow-hidden border">
-                                  <video
-                                    src={videoPreviewUrl}
-                                    controls
-                                    className="w-full max-h-64 bg-black"
-                                  />
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setUploadedVideo(null);
-                                      setVideoPreviewUrl('');
-                                      setVideoUrl('');
-                                    }}
-                                    className="w-full py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                                  >
-                                    Remove Video
-                                  </button>
-                                </div>
-                              )}
+                                  }
+                                }}
+                                variant="outline"
+                                className="shrink-0"
+                              >
+                                <Upload className="h-4 w-4 mr-2" />
+                                Media Library
+                              </Button>
                             </div>
-                          )}
+                            <p className="text-xs text-gray-500">Click "Media Library" to select or upload a video</p>
+                          </div>
 
                           <div className="space-y-2">
                             <Label htmlFor="video_description" className="text-sm font-medium">Video Description</Label>
@@ -1318,6 +1255,121 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
           </DialogFooter>
         </form>
       </DialogContent>
+
+      {/* Media Library Modal */}
+      <Dialog open={showMediaLibrary} onOpenChange={setShowMediaLibrary}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Media Library - Videos</DialogTitle>
+            <p className="text-sm text-muted-foreground">Select an existing video or upload a new one</p>
+          </DialogHeader>
+          
+          <div className="flex-1 overflow-y-auto p-4">
+            {loadingVideos ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 border-4 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+                  <p className="text-sm text-gray-600">Loading videos...</p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Upload New Video */}
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors">
+                  <input
+                    type="file"
+                    accept="video/*"
+                    id="media-library-upload-edit"
+                    className="sr-only"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        setUploadingVideo(true);
+                        try {
+                          const { pb } = await import('@/lib/pocketbase');
+                          const formData = new FormData();
+                          formData.append('Videos', file);
+                          const record = await pb.collection('content').create(formData);
+                          const videoUrl = `https://backend.karigaistore.in/api/files/content/${record.id}/${record.Videos}`;
+                          setVideoUrl(videoUrl);
+                          setShowMediaLibrary(false);
+                          toast.success('Video uploaded successfully');
+                          // Refresh the list
+                          const records = await pb.collection('content').getFullList({
+                            sort: '-created'
+                          });
+                          const videosOnly = records.filter((r: any) => r.Videos);
+                          setExistingVideos(videosOnly.map((r: any) => ({id: r.id, videos: r.Videos})) as Array<{id: string, videos: string}>);
+                        } catch (error) {
+                          console.error('Error uploading video:', error);
+                          toast.error('Failed to upload video');
+                        } finally {
+                          setUploadingVideo(false);
+                        }
+                      }
+                    }}
+                    disabled={uploadingVideo}
+                  />
+                  <label htmlFor="media-library-upload-edit" className={`cursor-pointer flex flex-col items-center gap-3 ${uploadingVideo ? 'opacity-50' : ''}`}>
+                    {uploadingVideo ? (
+                      <>
+                        <div className="w-12 h-12 border-4 border-gray-300 border-t-purple-600 rounded-full animate-spin" />
+                        <p className="text-sm font-medium text-gray-700">Uploading...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="h-12 w-12 text-gray-400" />
+                        <div className="text-sm font-medium text-gray-700">Click to upload new video</div>
+                        <div className="text-xs text-gray-500">MP4, WebM, or OGG (max 100MB)</div>
+                      </>
+                    )}
+                  </label>
+                </div>
+
+                {/* Existing Videos Grid */}
+                {existingVideos.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-3">Existing Videos</h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      {existingVideos.map((content) => {
+                        const videoUrl = `https://backend.karigaistore.in/api/files/content/${content.id}/${content.videos}`;
+                        return (
+                          <button
+                            key={content.id}
+                            type="button"
+                            onClick={() => {
+                              setVideoUrl(videoUrl);
+                              setShowMediaLibrary(false);
+                              toast.success('Video selected');
+                            }}
+                            className="relative group rounded-lg border-2 border-gray-200 hover:border-purple-500 transition-colors overflow-hidden aspect-video bg-black"
+                          >
+                            <video
+                              src={videoUrl}
+                              className="w-full h-full object-cover"
+                              muted
+                            />
+                            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                              <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center">
+                                <svg className="w-6 h-6 text-purple-600 ml-1" fill="currentColor" viewBox="0 0 24 24">
+                                  <path d="M8 5v14l11-7z" />
+                                </svg>
+                              </div>
+                            </div>
+                            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                              <p className="text-xs text-white truncate font-medium">{content.videos}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
