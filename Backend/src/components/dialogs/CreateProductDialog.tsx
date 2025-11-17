@@ -33,7 +33,7 @@ import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { pb } from '@/lib/pocketbase';
-
+import { generateProductCopy } from '@/lib/gemini';
 
 const generateRowId = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -174,6 +174,16 @@ export function CreateProductDialog({
   // State for managing available products for "Buy Any X" combos
   const [availableProducts, setAvailableProducts] = useState<Array<{id: string, name: string, price: number}>>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
+  const [aiKeywords, setAiKeywords] = useState('');
+  const [showAiPrompt, setShowAiPrompt] = useState(false);
+  const [highlightedFields, setHighlightedFields] = useState<Set<string>>(new Set());
+  const [isGeneratingVariants, setIsGeneratingVariants] = useState(false);
+  const [showVariantPrompt, setShowVariantPrompt] = useState(false);
+  const [variantRequest, setVariantRequest] = useState('');
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>('');
+  const [videoUploadMode, setVideoUploadMode] = useState<'url' | 'upload'>('url');
 
   const buildVariantsFromRows = () => {
     const variants: any = {};
@@ -203,6 +213,206 @@ export function CreateProductDialog({
     }));
     const json = JSON.stringify(variants);
     form.setValue('variants', json);
+  };
+
+  const handleGenerateVariants = async () => {
+    const values = form.getValues();
+    if (!values.name && !values.category) {
+      toast.error('Enter a product name or category before generating variants.');
+      return;
+    }
+
+    if (!variantRequest.trim()) {
+      toast.error('Please describe what variants you want to create.');
+      return;
+    }
+
+    try {
+      setIsGeneratingVariants(true);
+      setShowVariantPrompt(false);
+      
+      // Use the same Gemini API endpoint as the working product copy generation
+      const prompt = `You are a product variant expert. Based on this product: "${values.name || 'unnamed product'}" in category "${values.category || 'general'}".
+
+The user wants these variants: "${variantRequest}"
+
+Our variant schema:
+- SIZES: Product variants/types. Can be numeric (100ml, 250g) OR named types (mint charcoal, sandle charcoal, Small, Medium). These will use "pcs" as unit if no unit specified.
+- COLORS: Only use for actual color/visual variations with hex codes. Leave empty if not needed.
+- COMBOS: Bundle deals like "Buy 2 Get 1", "Family Pack", etc. with type (bogo, bundle, custom) and items count.
+
+CRITICAL RULES:
+1. If user mentions product types/variants (like "mint charcoal", "sandle charcoal", "vanilla") → put in SIZES array as strings
+2. If user mentions numeric quantities (100ml, 250g) → put in SIZES array as strings
+3. If user mentions deals or bundles → these are COMBOS
+4. COLORS should only be used for actual visual color variations, otherwise leave empty
+
+Provide your response in this exact JSON format:
+{
+  "sizes": ["mint charcoal", "sandle charcoal", "redwine charcoal"],
+  "colors": [],
+  "combos": [{"name": "Buy 2 Get 1 Free", "type": "bogo", "items": 3}]
+}
+
+IMPORTANT: 
+- Create ONLY the variants the user requested
+- Put product type names (mint charcoal, etc.) in the SIZES array
+- Match the user's request exactly
+- Return empty arrays for variant types not requested
+
+Only return the JSON, no explanations.`;
+
+      const apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY;
+      if (!apiKey) {
+        throw new Error('Gemini API key not configured. Please set VITE_GEMINI_API_KEY in your environment.');
+      }
+
+      // Use the same model as gemini.ts (gemini-2.0-flash)
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Gemini API error:', errorText);
+        throw new Error(`Gemini API returned ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      
+      // Extract JSON from response
+      const jsonMatch = text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('Invalid response format');
+      
+      const suggested = JSON.parse(jsonMatch[0]);
+      
+      // Populate size rows
+      if (suggested.sizes && Array.isArray(suggested.sizes)) {
+        const newSizes = suggested.sizes.map((sizeStr: string) => {
+          // Check if it's a numeric size (100ml, 250g, etc.)
+          const numericMatch = sizeStr.match(/(\d+)(\w+)/);
+          
+          if (numericMatch) {
+            // Numeric size with unit
+            return {
+              id: generateRowId(),
+              value: numericMatch[1],
+              unit: numericMatch[2],
+              useBasePrice: true,
+              inStock: true,
+            };
+          } else {
+            // Named variant (mint charcoal, sandle charcoal, etc.)
+            return {
+              id: generateRowId(),
+              value: sizeStr,
+              unit: 'pcs',
+              useBasePrice: true,
+              inStock: true,
+            };
+          }
+        });
+        setSizeRows(newSizes);
+      }
+      
+      // Populate color rows
+      if (suggested.colors && Array.isArray(suggested.colors)) {
+        const newColors = suggested.colors.map((color: any) => ({
+          name: color.name || color,
+          hex: color.hex || '#000000',
+          value: slugify(color.name || color),
+          inStock: true,
+        }));
+        setColorRows(newColors);
+      }
+      
+      // Populate combo rows
+      if (suggested.combos && Array.isArray(suggested.combos)) {
+        const newCombos = suggested.combos.map((combo: any) => ({
+          id: generateRowId(),
+          name: combo.name,
+          value: slugify(combo.name),
+          type: combo.type || 'bundle',
+          items: combo.items || 2,
+        }));
+        setComboRows(newCombos);
+      }
+      
+      toast.success('Generated variants with AI');
+    } catch (error) {
+      console.error('Error generating variants:', error);
+      toast.error('Failed to generate variants');
+    } finally {
+      setIsGeneratingVariants(false);
+    }
+  };
+
+  const handleGenerateAiContent = async () => {
+    const values = form.getValues();
+    if (!values.name && !aiKeywords && !values.category) {
+      toast.error('Enter a product name, category, or some keywords before generating.');
+      return;
+    }
+
+    try {
+      setIsGeneratingCopy(true);
+      const newHighlighted = new Set<string>();
+      
+      const result = await generateProductCopy({
+        name: values.name || undefined,
+        category: values.category,
+        keywords: aiKeywords || values.tags || undefined,
+        tone: 'playful',
+      });
+
+      if (!values.name && result.name) {
+        form.setValue('name', result.name, { shouldDirty: true });
+        newHighlighted.add('name');
+      }
+      if (result.description) {
+        form.setValue('description', result.description, { shouldDirty: true });
+        newHighlighted.add('description');
+      }
+      if (result.features) {
+        form.setValue('features', result.features, { shouldDirty: true });
+        newHighlighted.add('features');
+      }
+      if (result.specifications) {
+        form.setValue('specifications', result.specifications, { shouldDirty: true });
+        newHighlighted.add('specifications');
+      }
+      if (result.tags) {
+        form.setValue('tags', result.tags, { shouldDirty: true });
+        newHighlighted.add('tags');
+      }
+      if (result.care_instructions) {
+        form.setValue('care_instructions', result.care_instructions, { shouldDirty: true });
+        newHighlighted.add('care_instructions');
+      }
+      if (result.usage_guidelines) {
+        form.setValue('usage_guidelines', result.usage_guidelines, { shouldDirty: true });
+        newHighlighted.add('usage_guidelines');
+      }
+
+      setHighlightedFields(newHighlighted);
+      setTimeout(() => setHighlightedFields(new Set()), 3000);
+
+      toast.success('Generated product copy with Gemini');
+    } catch (error) {
+      console.error('Error generating product copy with Gemini:', error);
+      const message = error instanceof Error ? error.message : 'Failed to generate product copy';
+      toast.error(message);
+    } finally {
+      setIsGeneratingCopy(false);
+    }
   };
   
   // Initialize form
@@ -576,37 +786,42 @@ export function CreateProductDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full h-[95vh] max-w-[96vw] sm:max-w-[96vw] xl:max-w-[96vw] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <DialogTitle>Create Product</DialogTitle>
+      <DialogContent className="w-full h-[95vh] max-w-[96vw] sm:max-w-[96vw] xl:max-w-[96vw] overflow-hidden flex flex-col bg-gray-50">
+        <DialogHeader className="border-b pb-4 bg-white">
+          <DialogTitle className="text-2xl font-semibold">Create Product</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">Add a new product to your store</p>
         </DialogHeader>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 overflow-hidden flex flex-col">
             <Tabs defaultValue="basic" className="flex-1 overflow-hidden flex flex-col">
-              <TabsList className="grid grid-cols-3 mb-4">
-                <TabsTrigger value="basic">Overview</TabsTrigger>
-                <TabsTrigger value="variants">Variants & Combos</TabsTrigger>
-                <TabsTrigger value="advanced">Advanced</TabsTrigger>
+              <TabsList className="grid grid-cols-2 mb-6 bg-white shadow-sm rounded-lg p-1">
+                <TabsTrigger value="basic" className="rounded-md data-[state=active]:bg-purple-600 data-[state=active]:text-white">Overview</TabsTrigger>
+                <TabsTrigger value="variants" className="rounded-md data-[state=active]:bg-green-600 data-[state=active]:text-white">Variants & Combos</TabsTrigger>
               </TabsList>
 
-              <div className="flex-1 overflow-auto px-1">
+              <div className="flex-1 overflow-auto px-2 py-1">
                 <TabsContent value="basic" className="mt-0">
-                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)] gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)] gap-8">
                     {/* Left column: General info + pricing + status */}
-                    <div className="space-y-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-sm">General Information</CardTitle>
+                    <div className="space-y-6">
+                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                          <CardTitle className="text-base font-semibold text-gray-900">General Information</CardTitle>
+                          <p className="text-xs text-gray-500 mt-1">Basic product details</p>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-5 p-6">
                           <FormField
                             control={form.control}
                             name="name"
                             render={({ field }) => (
                               <FormItem>
                                 <FormLabel>Name</FormLabel>
-                                <Input {...field} placeholder="Product name" />
+                                <Input 
+                                  {...field} 
+                                  placeholder="Product name" 
+                                  className={highlightedFields.has('name') ? 'ring-2 ring-purple-500 animate-pulse' : ''}
+                                />
                                 <FormMessage />
                               </FormItem>
                             )}
@@ -621,20 +836,76 @@ export function CreateProductDialog({
                                 <Textarea
                                   {...field}
                                   placeholder="Product description"
-                                  className="resize-none"
+                                  className={`resize-none ${highlightedFields.has('description') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
                                 />
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
+
+                          <div className="space-y-3 p-4 bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 flex items-center justify-center">
+                                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                                  </svg>
+                                </div>
+                                <FormLabel className="text-base font-semibold text-purple-900">AI Assistant</FormLabel>
+                              </div>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={showAiPrompt ? "secondary" : "default"}
+                                onClick={() => setShowAiPrompt(!showAiPrompt)}
+                                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                              >
+                                {showAiPrompt ? 'Hide Prompt' : '✨ Open AI Prompt'}
+                              </Button>
+                            </div>
+                            
+                            {showAiPrompt && (
+                              <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                                <Input
+                                  placeholder="Enter keywords, mood, or product details (e.g., 'organic lavender soap, calming, luxury')"
+                                  value={aiKeywords}
+                                  onChange={(e) => setAiKeywords(e.target.value)}
+                                  className="border-purple-300 focus:border-purple-500 focus:ring-purple-500"
+                                  autoFocus
+                                />
+                                <Button
+                                  type="button"
+                                  onClick={handleGenerateAiContent}
+                                  disabled={isGeneratingCopy}
+                                  className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                                >
+                                  {isGeneratingCopy ? (
+                                    <>
+                                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                      </svg>
+                                      Generating…
+                                    </>
+                                  ) : (
+                                    '✨ Generate with AI'
+                                  )}
+                                </Button>
+                                <FormDescription className="text-purple-700">
+                                  AI will suggest name, description, features, specifications, tags, care instructions, and usage guidelines.
+                                </FormDescription>
+                              </div>
+                            )}
+                          </div>
                         </CardContent>
                       </Card>
 
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-sm">Pricing & Stock</CardTitle>
+                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                          <CardTitle className="text-base font-semibold text-gray-900">Pricing & Stock</CardTitle>
+                          <p className="text-xs text-gray-500 mt-1">Set pricing and inventory</p>
                         </CardHeader>
-                        <CardContent className="space-y-4">
+                        <CardContent className="space-y-5 p-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField
                               control={form.control}
@@ -751,11 +1022,12 @@ export function CreateProductDialog({
                         </CardContent>
                       </Card>
 
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="text-sm">Product Status</CardTitle>
+                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                          <CardTitle className="text-base font-semibold text-gray-900">Product Status</CardTitle>
+                          <p className="text-xs text-gray-500 mt-1">Configure product visibility and badges</p>
                         </CardHeader>
-                        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 p-6">
                           <FormField
                             control={form.control}
                             name="inStock"
@@ -840,18 +1112,128 @@ export function CreateProductDialog({
                           />
                         </CardContent>
                       </Card>
+
+                      {/* Advanced Fields - merged from Advanced tab */}
+                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                          <CardTitle className="text-base font-semibold text-gray-900">Product Details</CardTitle>
+                          <p className="text-xs text-gray-500 mt-1">Features, tags, specifications, and care instructions</p>
+                        </CardHeader>
+                        <CardContent className="space-y-5 p-6">
+                          <FormField
+                            control={form.control}
+                            name="features"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Features</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  placeholder='Enter features separated by commas or as JSON array'
+                                  onBlur={(e) => handleJsonFieldBlur(e, true)}
+                                  className={highlightedFields.has('features') ? 'ring-2 ring-purple-500 animate-pulse' : ''}
+                                />
+                                <FormDescription>
+                                  Enter features as comma-separated values or a JSON array of strings
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="tags"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Tags</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  placeholder='Enter tags separated by commas or as JSON array'
+                                  onBlur={(e) => handleJsonFieldBlur(e, true)}
+                                  className={highlightedFields.has('tags') ? 'ring-2 ring-purple-500 animate-pulse' : ''}
+                                />
+                                <FormDescription>
+                                  Enter tags as comma-separated values or a JSON array of strings
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="specifications"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Specifications</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  className={`min-h-[120px] ${highlightedFields.has('specifications') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
+                                  placeholder='Enter as JSON object or use the format described below'
+                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
+                                />
+                                <FormDescription>
+                                  Enter product specifications as a JSON object with key-value pairs
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="care_instructions"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Care Instructions</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  className={`min-h-[120px] ${highlightedFields.has('care_instructions') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
+                                  placeholder='Enter as JSON object or use the format described below'
+                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
+                                />
+                                <FormDescription>
+                                  Enter as JSON object with "cleaning" and "storage" arrays
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="usage_guidelines"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Usage Guidelines</FormLabel>
+                                <Textarea
+                                  {...field}
+                                  className={`min-h-[120px] ${highlightedFields.has('usage_guidelines') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
+                                  placeholder='Enter as JSON object or use the format described below'
+                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
+                                />
+                                <FormDescription>
+                                  Enter as JSON object with "recommended_use" and "pro_tips" arrays
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        </CardContent>
+                      </Card>
                     </div>
 
                     {/* Right column: Upload images, similar to reference UI */}
-                    <div className="space-y-4">
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-sm">
-                            <ImageIcon className="h-4 w-4" />
-                            Upload Images
+                    <div className="space-y-6">
+                      <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden sticky top-4">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                          <CardTitle className="flex items-center gap-2 text-base font-semibold text-gray-900">
+                            <ImageIcon className="h-5 w-5" />
+                            Product Images
                           </CardTitle>
+                          <p className="text-xs text-gray-500 mt-1">Upload product photos</p>
                         </CardHeader>
-                        <CardContent>
+                        <CardContent className="p-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {imagePreviewUrls.map((url, index) => (
                               <div key={index} className="relative group overflow-hidden rounded-md border">
@@ -900,6 +1282,67 @@ export function CreateProductDialog({
                 </TabsContent>
 
                 <TabsContent value="variants" className="space-y-4 mt-0">
+                  {/* AI Variant Generator */}
+                  <div className="p-4 bg-gradient-to-r from-green-50 to-teal-50 rounded-lg border-2 border-green-200 mb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-full bg-gradient-to-r from-green-500 to-teal-500 flex items-center justify-center">
+                          <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+                          </svg>
+                        </div>
+                        <div>
+                          <div className="text-base font-semibold text-green-900">AI Variant Generator</div>
+                          <div className="text-xs text-green-700">Tell AI what variants you need and it will create them</div>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={showVariantPrompt ? "secondary" : "default"}
+                        onClick={() => setShowVariantPrompt(!showVariantPrompt)}
+                        className="bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
+                      >
+                        {showVariantPrompt ? 'Hide Prompt' : '🎨 Open Variant Prompt'}
+                      </Button>
+                    </div>
+                    
+                    {showVariantPrompt && (
+                      <div className="space-y-2 mt-3 animate-in slide-in-from-top-2 duration-300">
+                        <Textarea
+                          placeholder="Describe what variants you want (e.g., 'Add 3 sizes: 100ml, 250ml, 500ml' or 'Create 5 color variants for lavender soap' or 'Add combo deals: Buy 2 Get 1, Family Pack')"
+                          value={variantRequest}
+                          onChange={(e) => setVariantRequest(e.target.value)}
+                          className="border-green-300 focus:border-green-500 focus:ring-green-500 min-h-[100px]"
+                          autoFocus
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            type="button"
+                            onClick={handleGenerateVariants}
+                            disabled={isGeneratingVariants || !variantRequest.trim()}
+                            className="flex-1 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700"
+                          >
+                            {isGeneratingVariants ? (
+                              <>
+                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Generating…
+                              </>
+                            ) : (
+                              '✨ Generate Variants'
+                            )}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-green-700">
+                          <strong>Examples:</strong> "3 sizes in ml", "5 pastel colors", "Buy 2 Get 1 and Family Pack combos", "Small, Medium, Large sizes"
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -1115,36 +1558,16 @@ export function CreateProductDialog({
                     )}
                   />
 
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <FormLabel>Variants (Interactive)</FormLabel>
-                      <div className="space-y-3">
-                        {false && (
-                          <div className="space-y-2">
-                            <FormLabel className="text-sm">Colors</FormLabel>
-                            <div className="space-y-2">
-                              {colorRows.map((c, i) => (
-                                <div key={i} className="grid grid-cols-12 gap-2 items-center">
-                                  <div className="col-span-4">
-                                    <Input value={c.name} onChange={(e)=>{ const v=[...colorRows]; v[i]={...v[i],name:e.target.value, value: v[i].value || slugify(e.target.value)}; setColorRows(v); }} placeholder="Red" />
-                                  </div>
-                                  <div className="col-span-3">
-                                    <Input type="color" value={c.hex || '#ffffff'} onChange={(e)=>{ const v=[...colorRows]; v[i]={...v[i],hex:e.target.value}; setColorRows(v); }} />
-                                  </div>
-                                  <div className="col-span-3 text-xs text-muted-foreground truncate">
-                                    slug: {c.value || slugify(c.name || '')}
-                                  </div>
-                                  <div className="col-span-2 flex gap-2 justify-end">
-                                    <Button type="button" variant="outline" onClick={()=>{ const v=[...colorRows]; v.splice(i,1); setColorRows(v); }}>Remove</Button>
-                                  </div>
-                                </div>
-                              ))}
-                              <Button type="button" variant="secondary" onClick={()=>setColorRows([...colorRows,{name:'',hex:'#ff0000',value:''}])}>Add Color</Button>
-                            </div>
-                          </div>
-                        )}
-                        <div className="space-y-2">
-                          <FormLabel className="text-sm">Sizes</FormLabel>
+                  <div className="space-y-6">
+                    {/* 🟩 Card 1 — Variants (Interactive) */}
+                    <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
+                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                        <CardTitle className="text-base font-semibold text-gray-900">Variants (Interactive)</CardTitle>
+                        <p className="text-xs text-gray-500 mt-1">Add sizes and variant-based combos for this product.</p>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-4">
+                        <div className="space-y-3">
+                          <FormLabel className="text-sm font-medium">Sizes</FormLabel>
                           <div className="space-y-2">
                             {sizeRows.map((s) => (
                               <div key={s.id} className="rounded-md border p-3 bg-card/40 grid grid-cols-12 gap-3 items-center relative">
@@ -1292,21 +1715,19 @@ export function CreateProductDialog({
                             >Add Size</Button>
                           </div>
                         </div>
-                        <div className="space-y-2">
-                          <FormLabel className="text-sm">Combos</FormLabel>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
-                            <Button type="button" variant="secondary" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'',value:'',type:'bundle'}])}>Add Custom</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 2', value:'buy-any-2', type:'buy_any_x', requiredQuantity: 2, allowDuplicates: true, availableProducts: []}])}>Buy Any 2</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 3', value:'buy-any-3', type:'buy_any_x', requiredQuantity: 3, allowDuplicates: true, availableProducts: []}])}>Buy Any 3</Button>
-                          </div>
-                          <div className="flex flex-wrap gap-2 mb-2">
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
-                            <Button type="button" variant="outline" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
+                        <div className="space-y-3">
+                          <FormLabel className="text-sm font-medium">Combos</FormLabel>
+                          <div className="grid grid-cols-3 gap-3">
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
+                            <Button type="button" variant="secondary" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'',value:'',type:'bundle'}])}>Add Custom</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 2', value:'buy-any-2', type:'buy_any_x', requiredQuantity: 2, allowDuplicates: true, availableProducts: []}])}>Buy Any 2</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 3', value:'buy-any-3', type:'buy_any_x', requiredQuantity: 3, allowDuplicates: true, availableProducts: []}])}>Buy Any 3</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
                           </div>
                           <div className="space-y-2">
                             {comboRows.map((cb) => (
@@ -1529,291 +1950,247 @@ export function CreateProductDialog({
                             ))}
                           </div>
                         </div>
-                      </div>
-                    </div>
+                      </CardContent>
+                    </Card>
 
-                    <FormField
-                      control={form.control}
-                      name="variants"
-                      render={({ field }) => (
-                        <FormItem className="hidden">
-                          <Textarea {...field} />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  {false && (
-                    <FormField
-                      control={form.control}
-                      name="colors"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Colors</FormLabel>
-                          <Textarea
-                            {...field}
-                            placeholder='Enter colors separated by commas or as JSON object'
-                            onBlur={(e) => handleJsonFieldBlur(e, false)}
-                          />
-                          <FormDescription>
-                            Enter colors as comma-separated values or a JSON object with "available" array and "primary" color
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  <FormField
-                    control={form.control}
-                    name="tags"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Tags</FormLabel>
-                        <Textarea
-                          {...field}
-                          placeholder='Enter tags separated by commas or as JSON array'
-                          onBlur={(e) => handleJsonFieldBlur(e, true)}
+                    {/* Card 3 — Tags & Available Sizes */}
+                    <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
+                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                        <CardTitle className="text-base font-semibold text-gray-900">Tags & Available Sizes</CardTitle>
+                        <p className="text-xs text-gray-500 mt-1">Product tags and size options</p>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-5">
+                        <FormField
+                          control={form.control}
+                          name="tags"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tags</FormLabel>
+                              <Textarea
+                                {...field}
+                                placeholder='Enter tags separated by commas or as JSON array'
+                                onBlur={(e) => handleJsonFieldBlur(e, true)}
+                              />
+                              <FormDescription className="text-gray-500">
+                                Enter tags as comma-separated values or a JSON array of strings
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
                         />
-                        <FormDescription>
-                          Enter tags as comma-separated values or a JSON array of strings
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
 
-                  <div className="grid grid-cols-2 gap-4">
-                    {false && (
-                      <FormField
-                        control={form.control}
-                        name="available_colors"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Available Colors</FormLabel>
-                            <Textarea
-                              {...field}
-                              placeholder='Enter colors separated by commas or as JSON array'
-                              onBlur={(e) => handleJsonFieldBlur(e, true)}
-                            />
-                            <FormDescription>
-                              Enter colors as comma-separated values or a JSON array of strings
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    )}
-
-                    <FormField
-                      control={form.control}
-                      name="available_sizes"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Available Sizes</FormLabel>
-                          <Textarea
-                            {...field}
-                            placeholder='Enter sizes separated by commas or as JSON array'
-                            onBlur={(e) => handleJsonFieldBlur(e, true)}
-                          />
-                          <FormDescription>
-                            Enter sizes as comma-separated values or a JSON array of strings
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="review"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Review Rating (0-5)</FormLabel>
-                        <Input
-                          {...field}
-                          type="number"
-                          min="0"
-                          max="5"
-                          step="0.1"
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                          placeholder="0"
-                        />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="videoUrl"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Video URL</FormLabel>
-                          <Input {...field} placeholder="https://..." />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="videoThumbnail"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Video Thumbnail URL</FormLabel>
-                          <Input {...field} placeholder="https://..." />
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="videoDescription"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Video Description</FormLabel>
-                        <Textarea {...field} className="min-h-[120px]" placeholder="Describe the video" />
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </TabsContent>
-
-                <TabsContent value="advanced" className="space-y-4 mt-0">
-                  <Accordion type="multiple" className="w-full space-y-2">
-                    <AccordionItem value="attributes">
-                      <AccordionTrigger>Product Attributes</AccordionTrigger>
-                      <AccordionContent>
-                        <Card>
-                          <CardHeader>
-                            <CardTitle>Product Attributes</CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <p className="text-muted-foreground">
-                              Additional product attributes will be added here in the future.
-                            </p>
-                          </CardContent>
-                        </Card>
-                      </AccordionContent>
-                    </AccordionItem>
-
-                    <AccordionItem value="care">
-                      <AccordionTrigger>Care & Usage</AccordionTrigger>
-                      <AccordionContent>
-                        <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
-                            name="care"
+                            name="available_sizes"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Care Instructions</FormLabel>
+                                <FormLabel>Available Sizes</FormLabel>
                                 <Textarea
                                   {...field}
-                                  placeholder='Enter care instructions separated by commas or as JSON array'
+                                  placeholder='Enter sizes separated by commas or as JSON array'
                                   onBlur={(e) => handleJsonFieldBlur(e, true)}
                                 />
-                                <FormDescription>
-                                  Enter care instructions as comma-separated values or a JSON array of strings
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="care_instructions"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Detailed Care Instructions</FormLabel>
-                                <Textarea
-                                  {...field}
-                                  className="min-h-[150px]"
-                                  placeholder='Enter as JSON object or use the format described below'
-                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
-                                />
-                                <FormDescription>
-                                  Enter as JSON object with "cleaning" and "storage" arrays or use the proper JSON format
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-
-                          <FormField
-                            control={form.control}
-                            name="usage_guidelines"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Usage Guidelines</FormLabel>
-                                <Textarea
-                                  {...field}
-                                  className="min-h-[150px]"
-                                  placeholder='Enter as JSON object or use the format described below'
-                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
-                                />
-                                <FormDescription>
-                                  Enter as JSON object with "recommended_use" and "pro_tips" arrays or use the proper JSON format
+                                <FormDescription className="text-gray-500">
+                                  Enter sizes as comma-separated values or a JSON array of strings
                                 </FormDescription>
                                 <FormMessage />
                               </FormItem>
                             )}
                           />
                         </div>
-                      </AccordionContent>
-                    </AccordionItem>
+                      </CardContent>
+                    </Card>
 
-                    <AccordionItem value="specs">
-                      <AccordionTrigger>Specifications</AccordionTrigger>
-                      <AccordionContent>
+                    <FormField
+                      control={form.control}
+                      name="review"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Review Rating (0-5)</FormLabel>
+                          <Input
+                            {...field}
+                            type="number"
+                            min="0"
+                            max="5"
+                            step="0.1"
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                            placeholder="0"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Video Section with Upload/URL Options */}
+                    <Card className="shadow-sm border-gray-200 rounded-xl overflow-hidden">
+                      <CardHeader className="bg-gradient-to-r from-gray-50 to-white border-b">
+                        <CardTitle className="text-base font-semibold text-gray-900">Product Video</CardTitle>
+                        <p className="text-xs text-gray-500 mt-1">Add a video to showcase your product</p>
+                      </CardHeader>
+                      <CardContent className="p-6 space-y-5">
+                        {/* Video Upload Mode Toggle */}
+                        <div className="flex gap-3 p-1 bg-gray-100 rounded-lg w-fit">
+                          <button
+                            type="button"
+                            onClick={() => setVideoUploadMode('url')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              videoUploadMode === 'url'
+                                ? 'bg-white shadow-sm text-gray-900'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            Enter URL
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setVideoUploadMode('upload')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                              videoUploadMode === 'upload'
+                                ? 'bg-white shadow-sm text-gray-900'
+                                : 'text-gray-600 hover:text-gray-900'
+                            }`}
+                          >
+                            Upload Video
+                          </button>
+                        </div>
+
+                        {videoUploadMode === 'url' ? (
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="videoUrl"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Video URL</FormLabel>
+                                  <Input {...field} placeholder="https://..." />
+                                  <FormDescription className="text-xs text-gray-500">
+                                    YouTube, Vimeo, or direct video link
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="videoThumbnail"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Video Thumbnail URL</FormLabel>
+                                  <Input {...field} placeholder="https://..." />
+                                  <FormDescription className="text-xs text-gray-500">
+                                    Optional preview image
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                              <input
+                                type="file"
+                                accept="video/*"
+                                id="video-upload"
+                                className="sr-only"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    setUploadedVideo(file);
+                                    const url = URL.createObjectURL(file);
+                                    setVideoPreviewUrl(url);
+                                    form.setValue('videoUrl', url);
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor="video-upload"
+                                className="cursor-pointer flex flex-col items-center gap-2"
+                              >
+                                <Upload className="h-10 w-10 text-gray-400" />
+                                <div className="text-sm font-medium text-gray-700">
+                                  {uploadedVideo ? uploadedVideo.name : 'Click to upload video'}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  MP4, WebM, or OGG (max 100MB)
+                                </div>
+                              </label>
+                            </div>
+
+                            {videoPreviewUrl && (
+                              <div className="rounded-lg overflow-hidden border">
+                                <video
+                                  src={videoPreviewUrl}
+                                  controls
+                                  className="w-full max-h-64 bg-black"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setUploadedVideo(null);
+                                    setVideoPreviewUrl('');
+                                    form.setValue('videoUrl', '');
+                                  }}
+                                  className="w-full py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                  Remove Video
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         <FormField
                           control={form.control}
-                          name="specifications"
+                          name="videoDescription"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Product Specifications</FormLabel>
-                              <Textarea
-                                {...field}
-                                className="min-h-[200px]"
-                                placeholder='Enter as JSON object or use the format described below'
-                                onBlur={(e) => handleJsonFieldBlur(e, false)}
-                              />
-                              <FormDescription>
-                                Enter product specifications as a JSON object with key-value pairs
+                              <FormLabel>Video Description</FormLabel>
+                              <Textarea {...field} className="min-h-[100px]" placeholder="Describe the video" />
+                              <FormDescription className="text-xs text-gray-500">
+                                Optional description for the video
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-                      </AccordionContent>
-                    </AccordionItem>
-                  </Accordion>
+                      </CardContent>
+                    </Card>
+                  </div>
                 </TabsContent>
-              </div>
-            </Tabs>
 
-            <Alert className="mt-6 bg-muted/50">
-              <AlertDescription>
-                For fields like Features, Colors, and Tags, you can enter simple comma-separated values and they will be automatically converted to the required JSON format.
-              </AlertDescription>
-            </Alert>
+                </div>
+              </Tabs>
 
-            <DialogFooter className="mt-6">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancel
-              </Button>
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting ? 'Creating...' : 'Create Product'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
-  );
-}
+              <Alert className="mt-6 bg-blue-50 border-blue-200 rounded-lg">
+                <AlertDescription className="text-sm text-blue-900">
+                  <strong>Tip:</strong> For fields like Features, Colors, and Tags, you can enter simple comma-separated values and they will be automatically converted to the required JSON format.
+                </AlertDescription>
+              </Alert>
+
+              <DialogFooter className="mt-6 pt-6 border-t bg-white sticky bottom-0 flex gap-3">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="px-6">
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={isSubmitting} className="px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+                  {isSubmitting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Creating...
+                    </>
+                  ) : (
+                    'Create Product'
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+    );
+  }

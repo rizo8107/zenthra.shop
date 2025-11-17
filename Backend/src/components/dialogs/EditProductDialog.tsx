@@ -23,6 +23,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Package, Info, Settings, Palette, Truck, Save, X, Upload, Image as ImageIcon } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { generateProductCopy } from '@/lib/gemini';
 import { pb } from '@/lib/pocketbase';
 
 interface EditProductDialogProps {
@@ -59,6 +60,9 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [videoUrl, setVideoUrl] = useState(product?.videoUrl || '');
   const [videoThumbnail, setVideoThumbnail] = useState(product?.videoThumbnail || '');
   const [videoDescription, setVideoDescription] = useState(product?.videoDescription || '');
+  const [uploadedVideo, setUploadedVideo] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string>(product?.videoUrl || '');
+  const [videoUploadMode, setVideoUploadMode] = useState<'url' | 'upload'>('url');
   const [review, setReview] = useState(product?.review !== undefined && product.review !== null ? String(product.review) : '');
   const [features, setFeatures] = useState(product?.features || '');
   const [tags, setTags] = useState(product?.tags || '');
@@ -115,6 +119,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [variantPreviewsBySize, setVariantPreviewsBySize] = useState<Record<string, string[]>>({});
   const [variantFilesBySize, setVariantFilesBySize] = useState<Record<string, File[]>>({});
   const [variantFilenamesBySize, setVariantFilenamesBySize] = useState<Record<string, string[]>>({});
+  const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
+  const [aiKeywords, setAiKeywords] = useState('');
 
   // Helper functions
   const generateRowId = () => {
@@ -152,7 +158,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   };
 
   const buildVariantsFromRows = () => {
-    const variantsObj: any = {};
+    const variantsObj: { sizes?: any[]; combos?: any[] } = {};
     if (sizeRows.length) {
       variantsObj.sizes = sizeRows.map(s => ({
         name: s.name || (s.unit ? `${s.value} ${s.unit}` : s.value),
@@ -173,7 +179,57 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         images: []
       }));
     }
-    setVariants(variantsObj);
+    setVariants({
+      sizes: variantsObj.sizes || [],
+      combos: variantsObj.combos || [],
+    });
+  };
+
+  const handleGenerateAiContent = async () => {
+    if (!name && !aiKeywords && !category) {
+      toast.error('Enter a product name, category, or some keywords before generating.');
+      return;
+    }
+
+    try {
+      setIsGeneratingCopy(true);
+      const result = await generateProductCopy({
+        name: name || undefined,
+        category: category || undefined,
+        keywords: aiKeywords || tags || undefined,
+        tone: 'playful',
+      });
+
+      if (!name && result.name) {
+        setName(result.name);
+      }
+      if (result.description) {
+        setDescription(result.description);
+      }
+      if (result.features) {
+        setFeatures(result.features);
+      }
+      if (result.specifications) {
+        setSpecifications(result.specifications);
+      }
+      if (result.tags) {
+        setTags(result.tags);
+      }
+      if (result.care_instructions) {
+        setCareInstructions(result.care_instructions);
+      }
+      if (result.usage_guidelines) {
+        setUsageGuidelines(result.usage_guidelines);
+      }
+
+      toast.success('Generated product copy with Gemini');
+    } catch (error) {
+      console.error('Error generating product copy with Gemini:', error);
+      const message = error instanceof Error ? error.message : 'Failed to generate product copy';
+      toast.error(message);
+    } finally {
+      setIsGeneratingCopy(false);
+    }
   };
 
   // Reset form when product changes
@@ -392,7 +448,11 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         care: care || undefined,
         care_instructions: careInstructions || undefined,
         usage_guidelines: usageGuidelines || undefined,
-        variants: variants.sizes.length > 0 || variants.combos.length > 0 ? JSON.stringify(variants) : undefined,
+        variants:
+          (variants?.sizes?.length || 0) > 0 || (variants?.combos?.length || 0) > 0 ? JSON.stringify({
+            sizes: variants?.sizes || [],
+            combos: variants?.combos || [],
+          }) : undefined,
       };
 
       await onSubmit({ id: product.id, data: updateData });
@@ -483,6 +543,29 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                         rows={3}
                         className="resize-none"
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">AI Assistant (Gemini)</Label>
+                      <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                          placeholder="Optional keywords or notes (e.g. ingredients, mood, audience)"
+                          value={aiKeywords}
+                          onChange={(e) => setAiKeywords(e.target.value)}
+                          className="sm:flex-1"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={handleGenerateAiContent}
+                          disabled={isGeneratingCopy}
+                        >
+                          {isGeneratingCopy ? 'Generating…' : 'Generate with AI'}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Uses Gemini to suggest description, features, specifications, tags, care and usage text.
+                      </p>
                     </div>
                     
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -930,28 +1013,111 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                             />
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label htmlFor="video_url" className="text-sm font-medium">Video URL</Label>
-                              <Input
-                                id="video_url"
-                                value={videoUrl}
-                                onChange={(e) => setVideoUrl(e.target.value)}
-                                placeholder="https://..."
-                                className="h-10"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="video_thumbnail" className="text-sm font-medium">Video Thumbnail</Label>
-                              <Input
-                                id="video_thumbnail"
-                                value={videoThumbnail}
-                                onChange={(e) => setVideoThumbnail(e.target.value)}
-                                placeholder="https://..."
-                                className="h-10"
-                              />
-                            </div>
+                          {/* Video Upload Mode Toggle */}
+                          <div className="flex gap-3 p-1 bg-gray-100 rounded-lg w-fit">
+                            <button
+                              type="button"
+                              onClick={() => setVideoUploadMode('url')}
+                              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                videoUploadMode === 'url'
+                                  ? 'bg-white shadow-sm text-gray-900'
+                                  : 'text-gray-600 hover:text-gray-900'
+                              }`}
+                            >
+                              Enter URL
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setVideoUploadMode('upload')}
+                              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                videoUploadMode === 'upload'
+                                  ? 'bg-white shadow-sm text-gray-900'
+                                  : 'text-gray-600 hover:text-gray-900'
+                              }`}
+                            >
+                              Upload Video
+                            </button>
                           </div>
+
+                          {videoUploadMode === 'url' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label htmlFor="video_url" className="text-sm font-medium">Video URL</Label>
+                                <Input
+                                  id="video_url"
+                                  value={videoUrl}
+                                  onChange={(e) => setVideoUrl(e.target.value)}
+                                  placeholder="https://..."
+                                  className="h-10"
+                                />
+                                <p className="text-xs text-gray-500">YouTube, Vimeo, or direct video link</p>
+                              </div>
+                              <div className="space-y-2">
+                                <Label htmlFor="video_thumbnail" className="text-sm font-medium">Video Thumbnail</Label>
+                                <Input
+                                  id="video_thumbnail"
+                                  value={videoThumbnail}
+                                  onChange={(e) => setVideoThumbnail(e.target.value)}
+                                  placeholder="https://..."
+                                  className="h-10"
+                                />
+                                <p className="text-xs text-gray-500">Optional preview image</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                                <input
+                                  type="file"
+                                  accept="video/*"
+                                  id="video-upload-edit"
+                                  className="sr-only"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      setUploadedVideo(file);
+                                      const url = URL.createObjectURL(file);
+                                      setVideoPreviewUrl(url);
+                                      setVideoUrl(url);
+                                    }
+                                  }}
+                                />
+                                <label
+                                  htmlFor="video-upload-edit"
+                                  className="cursor-pointer flex flex-col items-center gap-2"
+                                >
+                                  <Upload className="h-10 w-10 text-gray-400" />
+                                  <div className="text-sm font-medium text-gray-700">
+                                    {uploadedVideo ? uploadedVideo.name : 'Click to upload video'}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    MP4, WebM, or OGG (max 100MB)
+                                  </div>
+                                </label>
+                              </div>
+
+                              {videoPreviewUrl && (
+                                <div className="rounded-lg overflow-hidden border">
+                                  <video
+                                    src={videoPreviewUrl}
+                                    controls
+                                    className="w-full max-h-64 bg-black"
+                                  />
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setUploadedVideo(null);
+                                      setVideoPreviewUrl('');
+                                      setVideoUrl('');
+                                    }}
+                                    className="w-full py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                                  >
+                                    Remove Video
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                           <div className="space-y-2">
                             <Label htmlFor="video_description" className="text-sm font-medium">Video Description</Label>
@@ -960,8 +1126,9 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               value={videoDescription}
                               onChange={(e) => setVideoDescription(e.target.value)}
                               placeholder="Describe the video"
-                              className="resize-none"
+                              className="resize-none min-h-[100px]"
                             />
+                            <p className="text-xs text-gray-500">Optional description for the video</p>
                           </div>
 
                           <div className="space-y-2">
