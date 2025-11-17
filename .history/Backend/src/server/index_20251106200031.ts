@@ -6,7 +6,6 @@ import webpush from 'web-push';
 import evolutionRoutes from './evolutionService.js';
 import webhooksRouter from './webhooks.js';
 import messagingRouter from './messaging.js';
-import aiRouter from './ai.js';
 import customerJourneyRoutes from '../api/customerJourney.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -65,7 +64,6 @@ app.use('/evolution', evolutionRoutes);
 app.use('/api', customerJourneyRoutes);
 app.use('/api/webhooks', webhooksRouter);
 app.use('/api/messaging', messagingRouter);
-app.use('/api', aiRouter);
 
 // In-memory store for push subscriptions
 const subscriptions: webpush.PushSubscription[] = [];

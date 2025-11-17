@@ -210,7 +210,34 @@ export default function PuckEditor() {
   // usePuck hook for reading selection when AI inserts sections
   const usePuckInternal = createUsePuck();
 
-  // --- AI helper functions ---
+  useEffect(() => {
+    loadPageData();
+  }, [pageId]);
+
+  // UI Enhancements: sidebar collapse, search, and settings delete button
+  useEffect(() => {
+    // Defer to allow Puck to render DOM
+    const t = setTimeout(() => {
+      try {
+        // 1) Collapse component categories by default and make them accordion-style
+        const applyAccordion = (root: ParentNode) => {
+          const details = Array.from(root.querySelectorAll<HTMLElement>('details')) as HTMLDetailsElement[];
+          if (!details.length) return;
+          details.forEach((d) => {
+            // close by default
+            d.open = false;
+            // avoid multiple listeners
+            (d as any)._puckAccordionBound || d.addEventListener('toggle', () => {
+              if (d.open) {
+                details.forEach((other) => {
+                  if (other !== d) other.open = false;
+                });
+              }
+            });
+            (d as any)._puckAccordionBound = true;
+          });
+        };
+
   const ensureProductOptions = async () => {
     if (productOptions.length > 0) return;
     try {
@@ -218,17 +245,14 @@ export default function PuckEditor() {
         sort: "-created",
         $autoCancel: false,
       });
-      const mapped = records.items.map((p: any) => ({
-        id: p.id,
-        name: p.name || p.title || p.id,
-      }));
+      const mapped = records.items.map((p: any) => ({ id: p.id, name: p.name || p.title || p.id }));
       setProductOptions(mapped);
     } catch (error) {
       console.error("[PuckEditor] Failed to load products for AI selector", error);
     }
   };
 
-  const filteredProductOptions = productOptions.filter((p: { id: string; name: string }) => {
+  const filteredProductOptions = productOptions.filter((p) => {
     if (!productSearch.trim()) return true;
     const q = productSearch.toLowerCase();
     return (p.name || "").toLowerCase().includes(q) || p.id.toLowerCase().includes(q);
@@ -265,10 +289,8 @@ export default function PuckEditor() {
         payload.productId = aiProductId;
       }
 
-      // Use the same base host as webhooks/CMS API, then swap /webhooks -> /ai
-      const webhooksBase = (import.meta as any).env?.VITE_WEBHOOKS_API_BASE || "/api/webhooks";
-      const aiBase = webhooksBase.replace(/\/webhooks$/, "");
-      const url = `${aiBase}/ai/puck-content`;
+      const base = (import.meta as any).env?.VITE_CMS_BASE || "";
+      const url = `${base}/api/ai/puck-content`;
 
       const resp = await fetch(url, {
         method: "POST",
@@ -304,10 +326,7 @@ export default function PuckEditor() {
           }));
 
         setData((prev) => ({
-          root:
-            pageData.root && typeof pageData.root === "object"
-              ? { ...prev.root, ...pageData.root }
-              : prev.root,
+          root: pageData.root && typeof pageData.root === "object" ? { ...prev.root, ...pageData.root } : prev.root,
           content: normalised,
         }));
 
@@ -326,9 +345,7 @@ export default function PuckEditor() {
 
         let insertIndex = currentContent.length;
         if (selected && selected.props && selected.props.id) {
-          const idx = currentContent.findIndex(
-            (item: any) => item?.props?.id === selected.props.id,
-          );
+          const idx = currentContent.findIndex((item: any) => item?.props?.id === selected.props.id);
           if (idx >= 0) insertIndex = idx + 1;
         }
 
@@ -364,47 +381,13 @@ export default function PuckEditor() {
     }
   };
 
-  useEffect(() => {
-    loadPageData();
-  }, [pageId]);
-
-  // UI Enhancements: sidebar collapse, search, and settings delete button
-  useEffect(() => {
-    // Defer to allow Puck to render DOM
-    const t = setTimeout(() => {
-      try {
-        // 1) Collapse component categories by default and make them accordion-style
-        const applyAccordion = (root: ParentNode) => {
-          const details = Array.from(
-            root.querySelectorAll<HTMLElement>('details'),
-          ) as HTMLDetailsElement[];
-          if (!details.length) return;
-          details.forEach((d) => {
-            // close by default
-            d.open = false;
-            // avoid multiple listeners
-            (d as any)._puckAccordionBound ||
-              d.addEventListener('toggle', () => {
-                if (d.open) {
-                  details.forEach((other) => {
-                    if (other !== d) other.open = false;
-                  });
-                }
-              });
-            (d as any)._puckAccordionBound = true;
-          });
-        };
-
         // 2) Insert a component search box at top of the Components panel
         const componentsPanel = document.querySelector<HTMLElement>('aside');
         if (componentsPanel) {
           // Apply collapsed-by-default + accordion now and on future updates
           const forceClose = () => {
             // Click any header that is currently expanded
-            const expanded =
-              componentsPanel.querySelectorAll<HTMLElement>(
-                '[aria-expanded="true"], details[open]',
-              );
+            const expanded = componentsPanel.querySelectorAll<HTMLElement>('[aria-expanded="true"], details[open]');
             expanded.forEach((el) => {
               // try click the header/summary to toggle closed
               if (el.tagName.toLowerCase() === 'details') {
@@ -424,46 +407,40 @@ export default function PuckEditor() {
           mo.observe(componentsPanel, { childList: true, subtree: true });
 
           if (!componentsPanel.querySelector('#puck-component-search')) {
-            const searchWrap = document.createElement('div');
-            searchWrap.style.padding = '8px 12px';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.id = 'puck-component-search';
-            input.placeholder = 'Search components…';
-            input.style.width = '100%';
-            input.style.border = '1px solid #e5e7eb';
-            input.style.borderRadius = '6px';
-            input.style.padding = '6px 10px';
-            input.style.fontSize = '14px';
-            searchWrap.appendChild(input);
-            componentsPanel.insertBefore(searchWrap, componentsPanel.firstChild);
+          const searchWrap = document.createElement('div');
+          searchWrap.style.padding = '8px 12px';
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.id = 'puck-component-search';
+          input.placeholder = 'Search components…';
+          input.style.width = '100%';
+          input.style.border = '1px solid #e5e7eb';
+          input.style.borderRadius = '6px';
+          input.style.padding = '6px 10px';
+          input.style.fontSize = '14px';
+          searchWrap.appendChild(input);
+          componentsPanel.insertBefore(searchWrap, componentsPanel.firstChild);
 
-            const filterButtons = () => {
-              const q = input.value.toLowerCase().trim();
-              const buttons =
-                componentsPanel.querySelectorAll<HTMLButtonElement>('button');
-              buttons.forEach((btn) => {
-                const label = (btn.textContent || '').toLowerCase();
-                const isCategory =
-                  btn.getAttribute('aria-controls') ||
-                  btn.getAttribute('aria-expanded');
-                if (isCategory) return; // don't hide category headers
-                if (!q) {
-                  btn.style.display = '';
-                } else {
-                  btn.style.display = label.includes(q) ? '' : 'none';
-                }
-              });
-            };
-            input.addEventListener('input', filterButtons);
+          const filterButtons = () => {
+            const q = input.value.toLowerCase().trim();
+            const buttons = componentsPanel.querySelectorAll<HTMLButtonElement>('button');
+            buttons.forEach((btn) => {
+              const label = (btn.textContent || '').toLowerCase();
+              const isCategory = btn.getAttribute('aria-controls') || btn.getAttribute('aria-expanded');
+              if (isCategory) return; // don't hide category headers
+              if (!q) {
+                btn.style.display = '';
+              } else {
+                btn.style.display = label.includes(q) ? '' : 'none';
+              }
+            });
+          };
+          input.addEventListener('input', filterButtons);
           }
         }
 
         // 3) Add a Delete button in the settings panel to remove the selected block
-        const settingsPanel =
-          document.querySelector<HTMLElement>(
-            '[data-puck-settings-panel], aside ~ div',
-          );
+        const settingsPanel = document.querySelector<HTMLElement>('[data-puck-settings-panel], aside ~ div');
         if (settingsPanel && !settingsPanel.querySelector('#puck-delete-block')) {
           const btn = document.createElement('button');
           btn.id = 'puck-delete-block';
@@ -480,9 +457,7 @@ export default function PuckEditor() {
           } as CSSStyleDeclaration);
           btn.addEventListener('click', () => {
             // Try to click the built-in delete icon on the currently selected block toolbar
-            const toolbarDelete = document.querySelector<HTMLElement>(
-              '[aria-label="Delete"], [title="Delete"], .puck-toolbar button[aria-label="Delete"]',
-            );
+            const toolbarDelete = document.querySelector<HTMLElement>('[aria-label="Delete"], [title="Delete"], .puck-toolbar button[aria-label="Delete"]');
             if (toolbarDelete) {
               toolbarDelete.click();
             } else {

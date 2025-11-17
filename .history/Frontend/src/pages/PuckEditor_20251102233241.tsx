@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Puck, createUsePuck } from "@measured/puck";
+import { Puck } from "@measured/puck";
 import "@measured/puck/puck.css";
 import "@/styles/puck-block.css";
 import "@/styles/puck-editor-overrides.css";
@@ -8,27 +8,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { pocketbase } from "@/lib/pocketbase";
 import TemplateDialog from "@/components/TemplateDialog";
-import { Layout, Sparkles } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Layout } from "lucide-react";
 
 interface PageData {
   content: any;
   root: any;
-}
-
-// Lightweight types for AI integration
-interface AiBlock {
-  type: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  props: Record<string, any>;
-}
-
-interface AiPageData {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  root?: Record<string, any>;
-  content: AiBlock[];
 }
 
 // Helpers to improve snapshot quality/timing
@@ -197,172 +181,6 @@ export default function PuckEditor() {
   const [pageMeta, setPageMeta] = useState<{ slug?: string; published?: boolean }>({});
   const [showTemplateDialog, setShowTemplateDialog] = useState(false);
   const [puckKey, setPuckKey] = useState(0);
-  const [showAiDialog, setShowAiDialog] = useState(false);
-  const [aiMode, setAiMode] = useState<"page" | "section">("section");
-  const [aiDescription, setAiDescription] = useState("");
-  const [aiTone, setAiTone] = useState<"playful" | "professional" | "minimal" | "luxury" | "casual">("playful");
-  const [aiUseProduct, setAiUseProduct] = useState(false);
-  const [aiProductId, setAiProductId] = useState<string>("");
-  const [aiLoading, setAiLoading] = useState(false);
-  const [productOptions, setProductOptions] = useState<Array<{ id: string; name: string }>>([]);
-  const [productSearch, setProductSearch] = useState("");
-
-  // usePuck hook for reading selection when AI inserts sections
-  const usePuckInternal = createUsePuck();
-
-  // --- AI helper functions ---
-  const ensureProductOptions = async () => {
-    if (productOptions.length > 0) return;
-    try {
-      const records = await pocketbase.collection("products").getList(1, 50, {
-        sort: "-created",
-        $autoCancel: false,
-      });
-      const mapped = records.items.map((p: any) => ({
-        id: p.id,
-        name: p.name || p.title || p.id,
-      }));
-      setProductOptions(mapped);
-    } catch (error) {
-      console.error("[PuckEditor] Failed to load products for AI selector", error);
-    }
-  };
-
-  const filteredProductOptions = productOptions.filter((p: { id: string; name: string }) => {
-    if (!productSearch.trim()) return true;
-    const q = productSearch.toLowerCase();
-    return (p.name || "").toLowerCase().includes(q) || p.id.toLowerCase().includes(q);
-  });
-
-  const handleOpenAiDialog = async () => {
-    setShowAiDialog(true);
-    if (aiUseProduct) {
-      await ensureProductOptions();
-    }
-  };
-
-  const handleGenerateWithAi = async () => {
-    if (!aiDescription.trim()) {
-      alert("Please describe what you want AI to generate.");
-      return;
-    }
-
-    try {
-      setAiLoading(true);
-
-      const payload: {
-        mode: "page" | "section";
-        description: string;
-        tone: typeof aiTone;
-        productId?: string;
-      } = {
-        mode: aiMode,
-        description: aiDescription.trim(),
-        tone: aiTone,
-      };
-
-      if (aiUseProduct && aiProductId) {
-        payload.productId = aiProductId;
-      }
-
-      // Use the same base host as webhooks/CMS API, then swap /webhooks -> /ai
-      const webhooksBase = (import.meta as any).env?.VITE_WEBHOOKS_API_BASE || "/api/webhooks";
-      const aiBase = webhooksBase.replace(/\/webhooks$/, "");
-      const url = `${aiBase}/ai/puck-content`;
-
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err?.error || `Request failed with status ${resp.status}`);
-      }
-
-      const json = (await resp.json()) as { ok?: boolean; data?: unknown };
-      const result = json.data;
-
-      if (!result) {
-        throw new Error("AI response missing data");
-      }
-
-      if (aiMode === "page") {
-        const pageData = result as AiPageData;
-        const safeContent = Array.isArray(pageData.content) ? pageData.content : [];
-        const normalised = safeContent
-          .filter((b) => b && typeof b.type === "string")
-          .map((b, index) => ({
-            type: b.type,
-            props: {
-              ...(b.props || {}),
-              id: `${b.type}-${Date.now()}-${index}`,
-            },
-          }));
-
-        setData((prev) => ({
-          root:
-            pageData.root && typeof pageData.root === "object"
-              ? { ...prev.root, ...pageData.root }
-              : prev.root,
-          content: normalised,
-        }));
-
-        setTimeout(() => setPuckKey((prev) => prev + 1), 50);
-      } else {
-        // section mode: insert blocks below current selection when possible
-        const blocks = Array.isArray(result) ? (result as AiBlock[]) : [];
-        const filteredBlocks = blocks.filter((b) => b && typeof b.type === "string");
-        if (!filteredBlocks.length) {
-          throw new Error("AI did not return any blocks to insert");
-        }
-
-        const usePuckState = usePuckInternal((s) => s);
-        const selected = usePuckState.selectedItem as any | null;
-        const currentContent = Array.isArray(data.content) ? data.content : [];
-
-        let insertIndex = currentContent.length;
-        if (selected && selected.props && selected.props.id) {
-          const idx = currentContent.findIndex(
-            (item: any) => item?.props?.id === selected.props.id,
-          );
-          if (idx >= 0) insertIndex = idx + 1;
-        }
-
-        const newBlocks = filteredBlocks.map((b, idx) => ({
-          type: b.type,
-          props: {
-            ...(b.props || {}),
-            id: `${b.type}-${Date.now()}-${idx}`,
-          },
-        }));
-
-        setData((prev) => {
-          const prevContent = Array.isArray(prev.content) ? prev.content : [];
-          const before = prevContent.slice(0, insertIndex);
-          const after = prevContent.slice(insertIndex);
-          return {
-            ...prev,
-            content: [...before, ...newBlocks, ...after],
-          };
-        });
-
-        setTimeout(() => setPuckKey((prev) => prev + 1), 50);
-      }
-
-      setShowAiDialog(false);
-      setAiDescription("");
-    } catch (error) {
-      console.error("[PuckEditor] AI generation failed", error);
-      const msg = error instanceof Error ? error.message : "Unknown error";
-      alert(`AI generation failed: ${msg}`);
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
   useEffect(() => {
     loadPageData();
@@ -375,22 +193,19 @@ export default function PuckEditor() {
       try {
         // 1) Collapse component categories by default and make them accordion-style
         const applyAccordion = (root: ParentNode) => {
-          const details = Array.from(
-            root.querySelectorAll<HTMLElement>('details'),
-          ) as HTMLDetailsElement[];
+          const details = Array.from(root.querySelectorAll<HTMLElement>('details')) as HTMLDetailsElement[];
           if (!details.length) return;
           details.forEach((d) => {
             // close by default
             d.open = false;
             // avoid multiple listeners
-            (d as any)._puckAccordionBound ||
-              d.addEventListener('toggle', () => {
-                if (d.open) {
-                  details.forEach((other) => {
-                    if (other !== d) other.open = false;
-                  });
-                }
-              });
+            (d as any)._puckAccordionBound || d.addEventListener('toggle', () => {
+              if (d.open) {
+                details.forEach((other) => {
+                  if (other !== d) other.open = false;
+                });
+              }
+            });
             (d as any)._puckAccordionBound = true;
           });
         };
@@ -401,10 +216,7 @@ export default function PuckEditor() {
           // Apply collapsed-by-default + accordion now and on future updates
           const forceClose = () => {
             // Click any header that is currently expanded
-            const expanded =
-              componentsPanel.querySelectorAll<HTMLElement>(
-                '[aria-expanded="true"], details[open]',
-              );
+            const expanded = componentsPanel.querySelectorAll<HTMLElement>('[aria-expanded="true"], details[open]');
             expanded.forEach((el) => {
               // try click the header/summary to toggle closed
               if (el.tagName.toLowerCase() === 'details') {
@@ -424,46 +236,40 @@ export default function PuckEditor() {
           mo.observe(componentsPanel, { childList: true, subtree: true });
 
           if (!componentsPanel.querySelector('#puck-component-search')) {
-            const searchWrap = document.createElement('div');
-            searchWrap.style.padding = '8px 12px';
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.id = 'puck-component-search';
-            input.placeholder = 'Search components…';
-            input.style.width = '100%';
-            input.style.border = '1px solid #e5e7eb';
-            input.style.borderRadius = '6px';
-            input.style.padding = '6px 10px';
-            input.style.fontSize = '14px';
-            searchWrap.appendChild(input);
-            componentsPanel.insertBefore(searchWrap, componentsPanel.firstChild);
+          const searchWrap = document.createElement('div');
+          searchWrap.style.padding = '8px 12px';
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.id = 'puck-component-search';
+          input.placeholder = 'Search components…';
+          input.style.width = '100%';
+          input.style.border = '1px solid #e5e7eb';
+          input.style.borderRadius = '6px';
+          input.style.padding = '6px 10px';
+          input.style.fontSize = '14px';
+          searchWrap.appendChild(input);
+          componentsPanel.insertBefore(searchWrap, componentsPanel.firstChild);
 
-            const filterButtons = () => {
-              const q = input.value.toLowerCase().trim();
-              const buttons =
-                componentsPanel.querySelectorAll<HTMLButtonElement>('button');
-              buttons.forEach((btn) => {
-                const label = (btn.textContent || '').toLowerCase();
-                const isCategory =
-                  btn.getAttribute('aria-controls') ||
-                  btn.getAttribute('aria-expanded');
-                if (isCategory) return; // don't hide category headers
-                if (!q) {
-                  btn.style.display = '';
-                } else {
-                  btn.style.display = label.includes(q) ? '' : 'none';
-                }
-              });
-            };
-            input.addEventListener('input', filterButtons);
+          const filterButtons = () => {
+            const q = input.value.toLowerCase().trim();
+            const buttons = componentsPanel.querySelectorAll<HTMLButtonElement>('button');
+            buttons.forEach((btn) => {
+              const label = (btn.textContent || '').toLowerCase();
+              const isCategory = btn.getAttribute('aria-controls') || btn.getAttribute('aria-expanded');
+              if (isCategory) return; // don't hide category headers
+              if (!q) {
+                btn.style.display = '';
+              } else {
+                btn.style.display = label.includes(q) ? '' : 'none';
+              }
+            });
+          };
+          input.addEventListener('input', filterButtons);
           }
         }
 
         // 3) Add a Delete button in the settings panel to remove the selected block
-        const settingsPanel =
-          document.querySelector<HTMLElement>(
-            '[data-puck-settings-panel], aside ~ div',
-          );
+        const settingsPanel = document.querySelector<HTMLElement>('[data-puck-settings-panel], aside ~ div');
         if (settingsPanel && !settingsPanel.querySelector('#puck-delete-block')) {
           const btn = document.createElement('button');
           btn.id = 'puck-delete-block';
@@ -480,9 +286,7 @@ export default function PuckEditor() {
           } as CSSStyleDeclaration);
           btn.addEventListener('click', () => {
             // Try to click the built-in delete icon on the currently selected block toolbar
-            const toolbarDelete = document.querySelector<HTMLElement>(
-              '[aria-label="Delete"], [title="Delete"], .puck-toolbar button[aria-label="Delete"]',
-            );
+            const toolbarDelete = document.querySelector<HTMLElement>('[aria-label="Delete"], [title="Delete"], .puck-toolbar button[aria-label="Delete"]');
             if (toolbarDelete) {
               toolbarDelete.click();
             } else {
@@ -714,15 +518,6 @@ export default function PuckEditor() {
                 <Layout size={16} />
                 Templates
               </Button>
-              <Button
-                variant="outline"
-                onClick={handleOpenAiDialog}
-                disabled={saving}
-                className="flex items-center gap-2"
-              >
-                <Sparkles size={16} />
-                AI Generate
-              </Button>
               {pageMeta.slug ? (
                 <Button
                   variant="secondary"
@@ -743,152 +538,6 @@ export default function PuckEditor() {
           onClose={() => setShowTemplateDialog(false)}
           onSelect={handleTemplateSelect}
         />
-      )}
-      {showAiDialog && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-          onClick={() => !aiLoading && setShowAiDialog(false)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl max-w-xl w-full max-h-[90vh] overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between p-4 border-b">
-              <div>
-                <h2 className="text-lg font-semibold flex items-center gap-2">
-                  <Sparkles size={18} /> AI Generate Content
-                </h2>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Generate an entire page or a single section. For sections, AI will insert below the currently selected block when possible.
-                </p>
-              </div>
-            </div>
-            <div className="p-4 space-y-4">
-              <div className="flex gap-3 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setAiMode("section")}
-                  className={`flex-1 rounded-md border px-3 py-2 text-left ${
-                    aiMode === "section" ? "border-primary bg-primary/5" : "border-border"
-                  }`}
-                >
-                  <div className="font-medium">Single section</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Inserts blocks below the current selection.
-                  </div>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAiMode("page")}
-                  className={`flex-1 rounded-md border px-3 py-2 text-left ${
-                    aiMode === "page" ? "border-primary bg-primary/5" : "border-border"
-                  }`}
-                >
-                  <div className="font-medium">Entire page</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    Replaces current layout with an AI-generated page.
-                  </div>
-                </button>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-medium">Describe what you want</label>
-                <Textarea
-                  value={aiDescription}
-                  onChange={(e) => setAiDescription(e.target.value)}
-                  rows={4}
-                  placeholder="Example: Hero section for our best-selling tote bag with bold headline and CTA to Shop"
-                />
-              </div>
-              <div className="flex gap-3 items-center">
-                <div className="flex-1 space-y-1">
-                  <label className="text-xs font-medium">Tone</label>
-                  <Select
-                    value={aiTone}
-                    onValueChange={(v: any) => setAiTone(v)}
-                  >
-                    <SelectTrigger className="h-8 text-xs">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="text-xs">
-                      <SelectItem value="playful">Playful</SelectItem>
-                      <SelectItem value="professional">Professional</SelectItem>
-                      <SelectItem value="minimal">Minimal</SelectItem>
-                      <SelectItem value="luxury">Luxury</SelectItem>
-                      <SelectItem value="casual">Casual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="space-y-2 border-t pt-3">
-                <div className="flex items-center justify-between text-xs">
-                  <label className="font-medium">Use product context</label>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const next = !aiUseProduct;
-                      setAiUseProduct(next);
-                      if (next) await ensureProductOptions();
-                    }}
-                    className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] ${
-                      aiUseProduct ? "bg-primary text-primary-foreground border-primary" : "border-border text-muted-foreground"
-                    }`}
-                  >
-                    {aiUseProduct ? "Enabled" : "Disabled"}
-                  </button>
-                </div>
-                {aiUseProduct && (
-                  <div className="space-y-2 text-xs">
-                    <Input
-                      placeholder="Search products by name or ID"
-                      value={productSearch}
-                      onChange={(e) => setProductSearch(e.target.value)}
-                      className="h-8 text-xs"
-                    />
-                    <Select
-                      value={aiProductId}
-                      onValueChange={(v) => setAiProductId(v)}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select a product" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-56 text-xs">
-                        {filteredProductOptions.map((p) => (
-                          <SelectItem key={p.id} value={p.id}>
-                            {p.name} ({p.id})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-[11px] text-muted-foreground">
-                      When enabled, AI will tailor the hero/sections to the selected product.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center justify-end gap-2 p-4 border-t bg-muted/40">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={aiLoading}
-                onClick={() => !aiLoading && setShowAiDialog(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={handleGenerateWithAi}
-                disabled={aiLoading}
-                className="flex items-center gap-2"
-              >
-                {aiLoading && (
-                  <span className="h-3 w-3 rounded-full border-2 border-t-transparent border-current animate-spin" />
-                )}
-                Generate
-              </Button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   );
