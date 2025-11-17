@@ -136,11 +136,50 @@ export function Cart({ children }: CartProps) {
                           <Trash2 className="h-4 w-4" />
                         </Button>
                       </div>
-                      {(item.options && Object.keys(item.options).length > 0) && (
-                        <div className="text-xs text-muted-foreground mt-0.5 space-x-2">
-                          {Object.keys(item.options).sort().map(k => (
-                            <span key={k}>{`${k}: ${item.options![k]}`}</span>
-                          ))}
+                      {item.options && Object.keys(item.options).length > 0 && (
+                        <div className="mt-0.5 flex flex-wrap gap-1 text-[11px] text-muted-foreground">
+                          {/* Special handling for Buy Any X bundle */}
+                          {item.options.comboType === 'buy_any_x' && (
+                            <>
+                              {item.options.combo && (
+                                <Badge className="rounded-full bg-blue-50 text-blue-800 border-blue-200 px-2 py-0.5">
+                                  {item.options.combo}
+                                </Badge>
+                              )}
+                              {item.options.discountType && item.options.discountValue && (
+                                <Badge variant="outline" className="border-green-200 text-green-700 px-2 py-0.5">
+                                  {item.options.discountType === 'percent'
+                                    ? `${item.options.discountValue}% off`
+                                    : `₹${item.options.discountValue} off`}
+                                </Badge>
+                              )}
+                              {item.options.variants && (() => {
+                                try {
+                                  const parsed = JSON.parse(item.options!.variants as string) as string[];
+                                  return parsed.map((variant, idx) => {
+                                    const [type, val] = variant.split('-');
+                                    const label = type === 'size' ? 'Size' : 'Variant';
+                                    return (
+                                      <Badge key={idx} variant="outline" className="px-2 py-0.5">
+                                        {label}: {val}
+                                      </Badge>
+                                    );
+                                  });
+                                } catch {
+                                  return null;
+                                }
+                              })()}
+                            </>
+                          )}
+
+                          {/* Generic options (skip internal combo metadata) */}
+                          {Object.entries(item.options)
+                            .filter(([key]) => !['comboType', 'discountType', 'discountValue', 'variants', 'combo'].includes(key))
+                            .map(([key, value]) => (
+                              <Badge key={key} variant="outline" className="px-2 py-0.5">
+                                {key}: {String(value)}
+                              </Badge>
+                            ))}
                         </div>
                       )}
                       <div className="mt-2 flex items-center gap-2">

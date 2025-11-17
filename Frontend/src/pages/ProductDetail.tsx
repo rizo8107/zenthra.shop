@@ -1676,30 +1676,30 @@ const ProductDetail = () => {
               )}
               
               <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2.5">
                   <span className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Qty
                   </span>
-                  <div className="flex items-center overflow-hidden rounded-full border bg-white">
+                  <div className="flex items-center overflow-hidden rounded-full border bg-white text-[13px]">
                     <button
                       type="button"
                       onClick={decreaseQuantity}
                       disabled={quantity <= 1}
-                      className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                      className="grid h-6 w-6 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
                       aria-label="Decrease quantity"
                     >
-                      <Minus className="h-3.5 w-3.5" />
+                      <Minus className="h-3 w-3" />
                     </button>
-                    <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
+                    <span className="min-w-[22px] px-0.5 border-x border-border/60 bg-white text-center font-semibold">
                       {quantity}
                     </span>
                     <button
                       type="button"
                       onClick={increaseQuantity}
-                      className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
+                      className="grid h-6 w-6 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
                       aria-label="Increase quantity"
                     >
-                      <Plus className="h-3.5 w-3.5" />
+                      <Plus className="h-3 w-3" />
                     </button>
                   </div>
                 </div>
@@ -1725,51 +1725,6 @@ const ProductDetail = () => {
                 </div>
               </div>
             </Card>
-          </div>
-        </div>
-
-        {/* Mobile sticky checkout bar */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t shadow-lg p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center overflow-hidden rounded-full border bg-white">
-                <button
-                  type="button"
-                  onClick={decreaseQuantity}
-                  disabled={quantity <= 1}
-                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                  aria-label="Decrease quantity"
-                >
-                  <Minus className="h-3.5 w-3.5" />
-                </button>
-                <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
-                  {quantity}
-                </span>
-                <button
-                  type="button"
-                  onClick={increaseQuantity}
-                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
-                  aria-label="Increase quantity"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="text-sm">
-                <div className="font-semibold">₹{selectedTotal.toFixed(2)}</div>
-                {selectedCombo && (
-                  <div className="text-xs text-green-600">Bundle price</div>
-                )}
-              </div>
-            </div>
-            <Button
-              className="flex-1 max-w-[140px]"
-              onClick={handleAddToCart}
-              disabled={!product.inStock}
-              size="lg"
-            >
-              <ShoppingCart className="mr-2 h-4 w-4" />
-              {product.inStock ? 'Add to Cart' : 'Notify'}
-            </Button>
           </div>
         </div>
 
@@ -1960,27 +1915,26 @@ const ProductDetail = () => {
               <span className="inline-flex min-w-[96px] max-w-[40%] items-center truncate rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 {selectionLabel || 'Choose option'}
               </span>
-
-              <div className="flex flex-1 items-center justify-center overflow-hidden rounded-full border bg-white">
+              <div className="ml-auto flex items-center overflow-hidden rounded-full border bg-white text-[13px]">
                 <button
                   type="button"
                   onClick={decreaseQuantity}
                   disabled={quantity <= 1}
-                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                  className="grid h-7 w-7 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
                   aria-label="Decrease quantity"
                 >
-                  <Minus className="h-3.5 w-3.5" />
+                  <Minus className="h-3 w-3" />
                 </button>
-                <span className="min-w-[34px] border-x border-border/60 bg-white text-center text-sm font-semibold">
+                <span className="min-w-[24px] px-0.5 border-x border-border/60 bg-white text-center font-semibold">
                   {quantity}
                 </span>
                 <button
                   type="button"
                   onClick={increaseQuantity}
-                  className="grid h-8 w-8 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
+                  className="grid h-7 w-7 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
                   aria-label="Increase quantity"
                 >
-                  <Plus className="h-3.5 w-3.5" />
+                  <Plus className="h-3 w-3" />
                 </button>
               </div>
 

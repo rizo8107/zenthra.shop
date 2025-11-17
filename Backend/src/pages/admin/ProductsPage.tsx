@@ -6,9 +6,7 @@ import { useProducts } from '@/hooks/useProducts';
 import { Button } from '@/components/ui/button';
 import { PlusIcon, LayoutGrid, LayoutList } from 'lucide-react';
 import { useState } from 'react';
-import { CreateProductDialog } from '@/components/dialogs/CreateProductDialog';
-import { ViewProductDialog } from '@/components/dialogs/ViewProductDialog';
-import { EditProductDialog } from '@/components/dialogs/EditProductDialog';
+import { ProductCrudDialog, ProductCrudMode } from '@/components/dialogs/ProductCrudDialog';
 import { Product } from '@/types/schema';
 import { Input } from '@/components/ui/input';
 import { CustomPagination } from '@/components/ui/custom-pagination';
@@ -18,9 +16,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 type ViewMode = 'table' | 'card';
 
 const ProductsPage = () => {
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
-  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<ProductCrudMode>('create');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [page, setPage] = useState(1);
@@ -45,12 +42,14 @@ const ProductsPage = () => {
 
   const handleViewProduct = (product: Product) => {
     setSelectedProduct(product);
-    setIsViewDialogOpen(true);
+    setDialogMode('view');
+    setIsDialogOpen(true);
   };
 
   const handleEditProduct = (product: Product) => {
     setSelectedProduct(product);
-    setIsEditDialogOpen(true);
+    setDialogMode('edit');
+    setIsDialogOpen(true);
   };
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,7 +84,11 @@ const ProductsPage = () => {
         )}
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-bold tracking-tight">Products</h1>
-          <Button onClick={() => setIsCreateDialogOpen(true)}>
+          <Button onClick={() => {
+            setSelectedProduct(null);
+            setDialogMode('create');
+            setIsDialogOpen(true);
+          }}>
             <PlusIcon className="mr-2 h-4 w-4" />
             Add Product
           </Button>
@@ -133,29 +136,21 @@ const ProductsPage = () => {
           />
         )}
 
-        <CreateProductDialog
-          open={isCreateDialogOpen}
-          onOpenChange={setIsCreateDialogOpen}
-          onSubmit={async (data) => {
+        <ProductCrudDialog
+          mode={dialogMode}
+          open={isDialogOpen}
+          onOpenChange={setIsDialogOpen}
+          product={selectedProduct}
+          onCreate={async (data) => {
             await createProduct.mutateAsync(data);
           }}
-        />
-
-        <ViewProductDialog
-          open={isViewDialogOpen}
-          onOpenChange={setIsViewDialogOpen}
-          product={selectedProduct}
+          onUpdate={async ({ id, data }) => {
+            await updateProduct.mutateAsync({ id, data });
+          }}
           onDelete={async () => {
             await refetch();
             setSelectedProduct(null);
           }}
-        />
-
-        <EditProductDialog
-          open={isEditDialogOpen}
-          onOpenChange={setIsEditDialogOpen}
-          product={selectedProduct}
-          onSubmit={updateProduct.mutateAsync}
         />
       </div>
     </AdminLayout>

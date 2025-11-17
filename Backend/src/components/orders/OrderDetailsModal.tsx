@@ -31,7 +31,7 @@ import { useWhatsAppActivities } from '@/hooks/useWhatsAppActivities';
 import { WhatsAppActivities } from './WhatsAppActivities';
 import SendEvolutionMessage from './SendEvolutionMessage';
 import { pb } from '@/lib/pocketbase';
-import { ViewProductDialog } from '@/components/dialogs/ViewProductDialog';
+import { ProductCrudDialog } from '@/components/dialogs/ProductCrudDialog';
 
 interface OrderDetailsModalProps {
   order: Order | null;
@@ -569,7 +569,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         </DialogFooter>
       </DialogContent>
       {/* Product viewer */}
-      <ViewProductDialog
+      <ProductCrudDialog
+        mode="view"
         open={productDialog.open}
         onOpenChange={(open) => setProductDialog(prev => ({ open, product: open ? prev.product : null }))}
         product={productDialog.product}

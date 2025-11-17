@@ -16,17 +16,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
-import { 
-  Package, 
-  Info, 
-  Image as ImageIcon, 
-  Settings, 
-  Truck, 
+import {
+  Package,
+  Info,
+  Image as ImageIcon,
+  Settings,
+  Truck,
   Calendar,
   DollarSign,
   Package2,
   Star,
-  Eye
+  Eye,
+  Palette
 } from 'lucide-react';
 import { pb } from '@/lib/pocketbase';
 
@@ -34,9 +35,24 @@ interface ViewProductDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product: Product | null;
+  onDelete?: () => Promise<void>;
 }
 
-export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDialogProps) {
+export function ViewProductDialog({ open, onOpenChange, product, onDelete }: ViewProductDialogProps) {
+  // Helper function to safely render field values that might be objects or strings
+  const renderFieldValue = (value: unknown): string => {
+    if (!value) return 'Not specified';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return 'Invalid data format';
+      }
+    }
+    return String(value);
+  };
+
   if (!product) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -119,10 +135,14 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
         </DialogHeader>
 
         <Tabs defaultValue="overview" className="flex-1 overflow-hidden flex flex-col">
-          <TabsList className="grid grid-cols-4 mb-4">
+          <TabsList className="grid grid-cols-5 mb-4">
             <TabsTrigger value="overview" className="flex items-center gap-2">
               <Info className="h-4 w-4" />
               Overview
+            </TabsTrigger>
+            <TabsTrigger value="variants" className="flex items-center gap-2">
+              <Palette className="h-4 w-4" />
+              Variants
             </TabsTrigger>
             <TabsTrigger value="details" className="flex items-center gap-2">
               <Settings className="h-4 w-4" />
@@ -222,6 +242,102 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
               )}
             </TabsContent>
 
+            <TabsContent value="variants" className="space-y-6 mt-0">
+              {(() => {
+                // Parse variants data
+                let variants = { sizes: [], combos: [] };
+                if (product.variants) {
+                  try {
+                    if (typeof product.variants === 'string') {
+                      variants = JSON.parse(product.variants);
+                    } else if (typeof product.variants === 'object') {
+                      variants = product.variants as any;
+                    }
+                  } catch (error) {
+                    console.error('Error parsing variants:', error);
+                  }
+                }
+
+                return (
+                  <>
+                    {/* Sizes Section */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Palette className="h-4 w-4" />
+                          Available Sizes
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {variants.sizes && variants.sizes.length > 0 ? (
+                          <div className="space-y-3">
+                            {variants.sizes.map((size: any, index: number) => (
+                              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-medium">{size.name}</span>
+                                    <Badge variant={size.inStock ? "default" : "secondary"}>
+                                      {size.inStock ? "In Stock" : "Out of Stock"}
+                                    </Badge>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    Value: {size.value} | Unit: {size.unit}
+                                  </p>
+                                  {size.images && size.images.length > 0 && (
+                                    <p className="text-xs text-muted-foreground">
+                                      {size.images.length} image(s) attached
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 border-2 border-dashed border-muted rounded-lg">
+                            <p className="text-muted-foreground">No sizes configured</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Combos Section */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                          <Package2 className="h-4 w-4" />
+                          Combo Offers
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        {variants.combos && variants.combos.length > 0 ? (
+                          <div className="space-y-3">
+                            {variants.combos.map((combo: any, index: number) => (
+                              <div key={index} className="p-3 border rounded-lg">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="font-medium">{combo.name}</span>
+                                  <Badge variant="secondary">{combo.type}</Badge>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4 text-sm text-muted-foreground">
+                                  <div>Items: {combo.items}</div>
+                                  <div>Value: {combo.value}</div>
+                                  <div>Discount: {combo.discountValue} ({combo.discountType})</div>
+                                  <div>Images: {combo.images ? combo.images.length : 0}</div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-center py-6 border-2 border-dashed border-muted rounded-lg">
+                            <p className="text-muted-foreground">No combo offers configured</p>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  </>
+                );
+              })()}
+            </TabsContent>
+
             <TabsContent value="details" className="space-y-6 mt-0">
               <Card>
                 <CardHeader>
@@ -237,6 +353,10 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
                       <div>
                         <Label className="text-xs font-medium text-muted-foreground">Dimensions</Label>
                         <p className="text-sm">{product.dimensions || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Product Type</Label>
+                        <p className="text-sm">{product.product_type || 'Not specified'}</p>
                       </div>
                     </div>
                     <div className="space-y-4">
@@ -255,6 +375,78 @@ export function ViewProductDialog({ open, onOpenChange, product }: ViewProductDi
                           )}
                         </div>
                       </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">List Order</Label>
+                        <p className="text-sm">{product.list_order ?? 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Original Price</Label>
+                        <p className="text-sm">{product.original_price !== undefined && product.original_price !== null ? `₹${product.original_price.toFixed?.(2) ?? product.original_price}` : 'Not specified'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Additional Details</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Qikink SKU</Label>
+                        <p className="text-sm">{product.qikink_sku || 'Not specified'}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Available Sizes</Label>
+                        <p className="text-sm whitespace-pre-wrap break-words">{renderFieldValue(product.available_sizes)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Tags</Label>
+                        <p className="text-sm whitespace-pre-wrap break-words">{renderFieldValue(product.tags)}</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Features</Label>
+                        <p className="text-sm whitespace-pre-wrap break-words">{renderFieldValue(product.features)}</p>
+                      </div>
+                      <div>
+                        <Label className="text-xs font-medium text-muted-foreground">Specifications</Label>
+                        <p className="text-sm whitespace-pre-wrap break-words">{renderFieldValue(product.specifications)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Care</Label>
+                      <p className="text-sm whitespace-pre-wrap break-words">{renderFieldValue(product.care)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Detailed Care Instructions</Label>
+                      <p className="text-sm whitespace-pre-wrap break-words">{renderFieldValue(product.care_instructions)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Usage Guidelines</Label>
+                      <p className="text-sm whitespace-pre-wrap break-words">{renderFieldValue(product.usage_guidelines)}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Video URL</Label>
+                      <p className="text-sm break-all">{product.videoUrl || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Video Thumbnail</Label>
+                      <p className="text-sm break-all">{product.videoThumbnail || 'Not specified'}</p>
+                    </div>
+                    <div>
+                      <Label className="text-xs font-medium text-muted-foreground">Video Description</Label>
+                      <p className="text-sm whitespace-pre-wrap break-words">{product.videoDescription || 'Not specified'}</p>
                     </div>
                   </div>
                 </CardContent>
