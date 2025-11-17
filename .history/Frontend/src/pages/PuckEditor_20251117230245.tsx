@@ -265,10 +265,8 @@ export default function PuckEditor() {
         payload.productId = aiProductId;
       }
 
-      // Use the same base host as webhooks/CMS API, then swap /webhooks -> /ai
-      const webhooksBase = (import.meta as any).env?.VITE_WEBHOOKS_API_BASE || "/api/webhooks";
-      const aiBase = webhooksBase.replace(/\/webhooks$/, "");
-      const url = `${aiBase}/ai/puck-content`;
+      const base = (import.meta as any).env?.VITE_CMS_BASE || "";
+      const url = `${base}/api/ai/puck-content`;
 
       const resp = await fetch(url, {
         method: "POST",
