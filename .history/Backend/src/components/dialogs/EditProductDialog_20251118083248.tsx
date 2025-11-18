@@ -145,9 +145,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
     return Math.random().toString(36).slice(2);
   };
 
-  const renameFile = (file: File, newName: string) =>
-    new File([file], newName, { type: file.type, lastModified: Date.now() });
-
   const slugify = (text: string) => {
     return text
       .toLowerCase()
@@ -285,14 +282,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
       setCare(product.care || '');
       setCareInstructions(product.care_instructions || '');
       setUsageGuidelines(product.usage_guidelines || '');
-      const existing = Array.isArray(product.images)
-        ? product.images.filter((img): img is string => typeof img === 'string' && img.length > 0)
-        : typeof product.image === 'string' && product.image.length > 0
-          ? [product.image]
-          : [];
-      setExistingImages(existing);
-      setImagePreviewUrls([]);
-      setUploadedImages([]);
       
       // Initialize variants and variant builder rows
       if (product.variants && typeof product.variants === 'object' && product.variants !== null) {
@@ -388,83 +377,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   useEffect(() => {
     buildVariantsFromRows();
   }, [sizeRows, comboRows, variantFilenamesBySize, variantExistingBySize]);
-
-  const compressionOptions = useMemo<CompressImageOptions>(() => ({
-    quality: 0.8,
-    maxWidth: 1600,
-    maxHeight: 1600,
-  }), []);
-
-  const applyCompression = useCallback(
-    async (files: File[], key: string): Promise<File[]> => {
-      const compressed: File[] = [];
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index];
-        const progressKey = `${key}-${index}`;
-        try {
-          const next = await compressImageToWebp(file, {
-            ...compressionOptions,
-            onProgress: (value) => {
-              setUploadProgressByKey((prev) => ({ ...prev, [progressKey]: value }));
-            },
-          });
-          compressed.push(next);
-        } catch (error) {
-          console.warn('Compression failed, using original file', error);
-          compressed.push(file);
-        } finally {
-          setUploadProgressByKey((prev) => {
-            const next = { ...prev };
-            delete next[progressKey];
-            return next;
-          });
-        }
-      }
-      return compressed;
-    },
-    [compressionOptions],
-  );
-
-  const activeCompressionProgress = useMemo(() => {
-    const values = Object.values(uploadProgressByKey);
-    if (!values.length) return null;
-    const total = values.reduce((sum, value) => sum + value, 0);
-    return Math.max(0, Math.min(100, Math.round(total / values.length)));
-  }, [uploadProgressByKey]);
-
-  const handleMainImageUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!e.target.files || e.target.files.length === 0) return;
-      const rawFiles = Array.from(e.target.files);
-      setIsCompressing(true);
-      try {
-        const compressed = await applyCompression(rawFiles, 'main');
-        const renamed = compressed.map((file, index) =>
-          renameFile(file, `${product?.id || 'product'}-${Date.now()}-${index}.webp`),
-        );
-        const previews = renamed.map((file) => URL.createObjectURL(file));
-        setUploadedImages((prev) => [...prev, ...renamed]);
-        setImagePreviewUrls((prev) => [...prev, ...previews]);
-      } finally {
-        setIsCompressing(false);
-        e.target.value = '';
-      }
-    },
-    [applyCompression, product?.id],
-  );
-
-  const removeMainImage = useCallback((index: number) => {
-    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviewUrls((prev) => {
-      const url = prev[index];
-      if (url) URL.revokeObjectURL(url);
-      return prev.filter((_, i) => i !== index);
-    });
-  }, []);
-
-  const removeExistingImage = useCallback((index: number) => {
-    setExistingImages((prev) => prev.filter((_, i) => i !== index));
-  }, []);
 
   // Image handling functions
   const handleSizeRowImageUpload = (sizeId: string, e: React.ChangeEvent<HTMLInputElement>) => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,17 +20,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { Package, Info, Settings, Palette, Truck, Save, X, Upload, Image as ImageIcon, Trash, Loader2 } from 'lucide-react';
+import { Package, Info, Settings, Palette, Truck, Save, X, Upload, Image as ImageIcon, Trash } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { generateProductCopy } from '@/lib/gemini';
 import { pb } from '@/lib/pocketbase';
 import { useProducts } from '@/hooks/useProducts';
-import { Progress } from '@/components/ui/progress';
-import {
-  compressImageToWebp,
-  type CompressImageOptions,
-} from '@/lib/imageCompression';
 
 interface EditProductDialogProps {
   open: boolean;
@@ -126,12 +121,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [variantPreviewsBySize, setVariantPreviewsBySize] = useState<Record<string, string[]>>({});
   const [variantFilesBySize, setVariantFilesBySize] = useState<Record<string, File[]>>({});
   const [variantFilenamesBySize, setVariantFilenamesBySize] = useState<Record<string, string[]>>({});
-  const [variantExistingBySize, setVariantExistingBySize] = useState<Record<string, string[]>>({});
-  const [uploadedImages, setUploadedImages] = useState<File[]>([]);
-  const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
-  const [existingImages, setExistingImages] = useState<string[]>([]);
-  const [uploadProgressByKey, setUploadProgressByKey] = useState<Record<string, number>>({});
-  const [isCompressing, setIsCompressing] = useState(false);
   const [isGeneratingCopy, setIsGeneratingCopy] = useState(false);
   const [aiKeywords, setAiKeywords] = useState('');
 
@@ -144,9 +133,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
     }
     return Math.random().toString(36).slice(2);
   };
-
-  const renameFile = (file: File, newName: string) =>
-    new File([file], newName, { type: file.type, lastModified: Date.now() });
 
   const slugify = (text: string) => {
     return text
@@ -183,10 +169,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         value: String(s.value),
         unit: s.unit,
         inStock: s.inStock !== false,
-        images: [
-          ...((variantExistingBySize[s.id] || [])),
-          ...((variantFilenamesBySize[s.id] || [])),
-        ],
+        images: variantFilenamesBySize[s.id] || [],
       }));
     }
     if (comboRows.length) {
@@ -197,7 +180,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         items: cb.items,
         discountType: cb.discountType,
         discountValue: cb.discountValue,
-        images: [],
+        images: []
       }));
     }
     setVariants({
@@ -285,46 +268,24 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
       setCare(product.care || '');
       setCareInstructions(product.care_instructions || '');
       setUsageGuidelines(product.usage_guidelines || '');
-      const existing = Array.isArray(product.images)
-        ? product.images.filter((img): img is string => typeof img === 'string' && img.length > 0)
-        : typeof product.image === 'string' && product.image.length > 0
-          ? [product.image]
-          : [];
-      setExistingImages(existing);
-      setImagePreviewUrls([]);
-      setUploadedImages([]);
       
       // Initialize variants and variant builder rows
       if (product.variants && typeof product.variants === 'object' && product.variants !== null) {
         const variantData = product.variants as unknown as {
           sizes?: Array<{ name?: string; value?: string; unit?: string; inStock?: boolean; images?: string[] }>;
-          combos?: Array<{ name?: string; value?: string; type?: string; items?: number; discountType?: string; discountValue?: number; images?: string[] }>;
+          combos?: Array<{ name?: string; value?: string; type?: string; items?: number; discountType?: string; discountValue?: number }>;
         };
 
         setVariants({
-          sizes: (variantData.sizes || []).map((size) => ({
-            name: size.name || '',
-            value: size.value || '',
-            unit: size.unit || '',
-            inStock: size.inStock !== false,
-            images: Array.isArray(size.images) ? size.images : [],
-          })),
-          combos: (variantData.combos || []).map((combo) => ({
-            name: combo.name || '',
-            value: combo.value || '',
-            type: combo.type || 'bundle',
-            items: combo.items ?? 0,
-            discountType: combo.discountType || 'amount',
-            discountValue: combo.discountValue ?? 0,
-            images: Array.isArray(combo.images) ? combo.images : [],
-          })),
+          sizes: variantData.sizes || [],
+          combos: variantData.combos || [],
         });
 
         // Initialize size rows and existing images for editing
         if (variantData.sizes && variantData.sizes.length > 0) {
           const newSizeRows: SizeRow[] = [];
+          const initialFilenames: Record<string, string[]> = {};
           const initialPreviews: Record<string, string[]> = {};
-          const initialExisting: Record<string, string[]> = {};
 
           variantData.sizes.forEach((size) => {
             const id = generateRowId();
@@ -338,14 +299,13 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
             });
 
             if (Array.isArray(size.images) && size.images.length > 0) {
-              initialExisting[id] = size.images;
+              initialFilenames[id] = size.images;
               initialPreviews[id] = size.images.map((img) => getImageUrl(img));
             }
           });
 
           setSizeRows(newSizeRows);
-          setVariantExistingBySize(initialExisting);
-          setVariantFilenamesBySize({});
+          setVariantFilenamesBySize(initialFilenames);
           setVariantPreviewsBySize(initialPreviews);
 
           if (newSizeRows.length > 0) {
@@ -353,7 +313,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
           }
         } else {
           setSizeRows([]);
-          setVariantExistingBySize({});
           setVariantFilenamesBySize({});
           setVariantPreviewsBySize({});
         }
@@ -377,7 +336,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         setVariants({ sizes: [], combos: [] });
         setSizeRows([]);
         setComboRows([]);
-        setVariantExistingBySize({});
         setVariantFilenamesBySize({});
         setVariantPreviewsBySize({});
       }
@@ -387,84 +345,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   // Rebuild variants when rows change
   useEffect(() => {
     buildVariantsFromRows();
-  }, [sizeRows, comboRows, variantFilenamesBySize, variantExistingBySize]);
-
-  const compressionOptions = useMemo<CompressImageOptions>(() => ({
-    quality: 0.8,
-    maxWidth: 1600,
-    maxHeight: 1600,
-  }), []);
-
-  const applyCompression = useCallback(
-    async (files: File[], key: string): Promise<File[]> => {
-      const compressed: File[] = [];
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index];
-        const progressKey = `${key}-${index}`;
-        try {
-          const next = await compressImageToWebp(file, {
-            ...compressionOptions,
-            onProgress: (value) => {
-              setUploadProgressByKey((prev) => ({ ...prev, [progressKey]: value }));
-            },
-          });
-          compressed.push(next);
-        } catch (error) {
-          console.warn('Compression failed, using original file', error);
-          compressed.push(file);
-        } finally {
-          setUploadProgressByKey((prev) => {
-            const next = { ...prev };
-            delete next[progressKey];
-            return next;
-          });
-        }
-      }
-      return compressed;
-    },
-    [compressionOptions],
-  );
-
-  const activeCompressionProgress = useMemo(() => {
-    const values = Object.values(uploadProgressByKey);
-    if (!values.length) return null;
-    const total = values.reduce((sum, value) => sum + value, 0);
-    return Math.max(0, Math.min(100, Math.round(total / values.length)));
-  }, [uploadProgressByKey]);
-
-  const handleMainImageUpload = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (!e.target.files || e.target.files.length === 0) return;
-      const rawFiles = Array.from(e.target.files);
-      setIsCompressing(true);
-      try {
-        const compressed = await applyCompression(rawFiles, 'main');
-        const renamed = compressed.map((file, index) =>
-          renameFile(file, `${product?.id || 'product'}-${Date.now()}-${index}.webp`),
-        );
-        const previews = renamed.map((file) => URL.createObjectURL(file));
-        setUploadedImages((prev) => [...prev, ...renamed]);
-        setImagePreviewUrls((prev) => [...prev, ...previews]);
-      } finally {
-        setIsCompressing(false);
-        e.target.value = '';
-      }
-    },
-    [applyCompression, product?.id],
-  );
-
-  const removeMainImage = useCallback((index: number) => {
-    setUploadedImages((prev) => prev.filter((_, i) => i !== index));
-    setImagePreviewUrls((prev) => {
-      const url = prev[index];
-      if (url) URL.revokeObjectURL(url);
-      return prev.filter((_, i) => i !== index);
-    });
-  }, []);
-
-  const removeExistingImage = useCallback((index: number) => {
-    setExistingImages((prev) => prev.filter((_, i) => i !== index));
-  }, []);
+  }, [sizeRows, comboRows, variantFilenamesBySize]);
 
   // Image handling functions
   const handleSizeRowImageUpload = (sizeId: string, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -484,23 +365,19 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
       [sizeId]: [...(prev[sizeId] || []), ...files],
     }));
 
+    // Store filenames
     setVariantFilenamesBySize(prev => ({
       ...prev,
-      [sizeId]: [
-        ...(prev[sizeId] || []),
-        ...files.map(f => f.name),
-      ],
+      [sizeId]: [...(prev[sizeId] || []), ...files.map(f => f.name)],
     }));
   };
 
   const removeVariantImage = (sizeId: string, index: number) => {
-    const existingCount = (variantExistingBySize[sizeId] || []).length;
-
+    // Remove preview URL and revoke it
     setVariantPreviewsBySize(prev => {
       const urls = prev[sizeId] || [];
-      const target = urls[index];
-      if (target && index >= existingCount) {
-        URL.revokeObjectURL(target);
+      if (urls[index]) {
+        URL.revokeObjectURL(urls[index]);
       }
       return {
         ...prev,
@@ -508,22 +385,17 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
       };
     });
 
-    if (index < existingCount) {
-      setVariantExistingBySize(prev => ({
-        ...prev,
-        [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== index),
-      }));
-    } else {
-      const adjustedIndex = index - existingCount;
-      setVariantFilesBySize(prev => ({
-        ...prev,
-        [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== adjustedIndex),
-      }));
-      setVariantFilenamesBySize(prev => ({
-        ...prev,
-        [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== adjustedIndex),
-      }));
-    }
+    // Remove file
+    setVariantFilesBySize(prev => ({
+      ...prev,
+      [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== index),
+    }));
+
+    // Remove filename
+    setVariantFilenamesBySize(prev => ({
+      ...prev,
+      [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== index),
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -872,20 +744,11 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                                 });
                                 setVariantPreviewsBySize(prev => {
                                   const next = { ...prev };
-                                  (prev[removedId] || []).forEach((url, idx) => {
-                                    if (idx >= (variantExistingBySize[removedId] || []).length) {
-                                      URL.revokeObjectURL(url);
-                                    }
-                                  });
+                                  (prev[removedId] || []).forEach(url => URL.revokeObjectURL(url));
                                   delete next[removedId];
                                   return next;
                                 });
                                 setVariantFilenamesBySize(prev => {
-                                  const next = { ...prev };
-                                  delete next[removedId];
-                                  return next;
-                                });
-                                setVariantExistingBySize(prev => {
                                   const next = { ...prev };
                                   delete next[removedId];
                                   return next;

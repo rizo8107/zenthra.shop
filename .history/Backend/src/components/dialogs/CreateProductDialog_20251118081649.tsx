@@ -1309,19 +1309,6 @@ Only return the JSON, no explanations.`;
                           <p className="text-xs text-gray-500 mt-1">Upload product photos</p>
                         </CardHeader>
                         <CardContent className="p-6">
-                          {(isCompressing || activeCompressionProgress !== null) && (
-                            <div className="mb-4 flex items-center gap-3 text-sm text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>
-                                Optimizing images
-                                {activeCompressionProgress !== null ? ` ${activeCompressionProgress}%` : ''}
-                              </span>
-                              {activeCompressionProgress !== null && (
-                                <Progress value={activeCompressionProgress} className="h-2 flex-1 max-w-[160px]" />
-                              )}
-                            </div>
-                          )}
-
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {imagePreviewUrls.map((url, index) => (
                               <div key={index} className="relative group overflow-hidden rounded-md border">
@@ -1359,7 +1346,6 @@ Only return the JSON, no explanations.`;
                                   multiple
                                   className="sr-only"
                                   onChange={handleImageUpload}
-                                  disabled={isCompressing}
                                 />
                               </label>
                             </div>
@@ -1477,7 +1463,6 @@ Only return the JSON, no explanations.`;
                               multiple
                               className="sr-only"
                               onChange={handleImageUpload}
-                              disabled={isCompressing}
                             />
                           </label>
                         </div>
@@ -1508,7 +1493,7 @@ Only return the JSON, no explanations.`;
                               multiple
                               className="sr-only"
                               onChange={handleVariantImageUpload}
-                              disabled={!selectedVariantSizeId || isCompressing}
+                              disabled={!selectedVariantSizeId}
                             />
                           </div>
                         </div>
@@ -1940,7 +1925,6 @@ Only return the JSON, no explanations.`;
                                     multiple
                                     className="sr-only"
                                     onChange={(e)=>handleComboImageUpload(cb.id, e)}
-                                    disabled={isCompressing}
                                   />
                                   <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[cb.id] || []).length} selected</span>
                                 </div>

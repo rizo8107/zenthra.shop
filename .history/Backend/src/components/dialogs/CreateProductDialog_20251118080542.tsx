@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+  import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -29,7 +29,7 @@ import { CreateProductData } from '@/types/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { X, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { X, Upload, Image as ImageIcon } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { pb } from '@/lib/pocketbase';
@@ -514,64 +514,16 @@ Only return the JSON, no explanations.`;
     fetchProducts();
   }, [open]);
 
-  const compressionOptions = useMemo<CompressImageOptions>(() => ({
-    quality: 0.8,
-    maxWidth: 1600,
-    maxHeight: 1600,
-  }), []);
-
-  const applyCompression = useCallback(
-    async (files: File[], key: string): Promise<File[]> => {
-      const output: File[] = [];
-      for (let index = 0; index < files.length; index += 1) {
-        const file = files[index];
-        const progressKey = `${key}-${index}`;
-        try {
-          const next = await compressImageToWebp(file, {
-            ...compressionOptions,
-            onProgress: (value) => {
-              setUploadProgressByKey((prev) => ({ ...prev, [progressKey]: value }));
-            },
-          });
-          output.push(next);
-        } catch (error) {
-          console.warn('Compression failed, using original file', error);
-          output.push(file);
-        } finally {
-          setUploadProgressByKey((prev) => {
-            const next = { ...prev };
-            delete next[progressKey];
-            return next;
-          });
-        }
-      }
-      return output;
-    },
-    [compressionOptions],
-  );
-
-  const activeCompressionProgress = useMemo(() => {
-    const values = Object.values(uploadProgressByKey);
-    if (!values.length) return null;
-    const total = values.reduce((sum, value) => sum + value, 0);
-    return Math.max(0, Math.min(100, Math.round(total / values.length)));
-  }, [uploadProgressByKey]);
-
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files || e.target.files.length === 0) return;
-    const rawFiles = Array.from(e.target.files);
-    setIsCompressing(true);
-    try {
+    if (e.target.files && e.target.files.length > 0) {
+      const rawFiles = Array.from(e.target.files);
+      setIsCompressing(true);
       const compressed = await applyCompression(rawFiles, 'base');
-      const renamed = compressed.map((file, index) =>
-        renameFile(file, `${Date.now()}-${index}-${file.name}`),
-      );
-      const previews = renamed.map((file) => URL.createObjectURL(file));
-      setUploadedImages((prev) => [...prev, ...renamed]);
-      setImagePreviewUrls((prev) => [...prev, ...previews]);
-    } finally {
       setIsCompressing(false);
-      e.target.value = '';
+
+      const previews = compressed.map((file) => URL.createObjectURL(file));
+      setUploadedImages((prev) => [...prev, ...compressed]);
+      setImagePreviewUrls((prev) => [...prev, ...previews]);
     }
   };
 
@@ -590,32 +542,29 @@ Only return the JSON, no explanations.`;
     if (!sizeKey) return;
     if (!e.target.files || e.target.files.length === 0) return;
     setIsCompressing(true);
-    try {
-      const compressed = await applyCompression(Array.from(e.target.files), `variant-${sizeKey}`);
-      const renamed = compressed.map((file, index) => {
-        const unique = generateRowId();
-        return renameFile(file, `${sizeKey}-${unique}-${index}.webp`);
-      });
+    const compressed = await applyCompression(Array.from(e.target.files), `variant-${sizeKey}`);
+    setIsCompressing(false);
 
-      setVariantFilesBySize((prev) => ({
-        ...prev,
-        [sizeKey]: [...(prev[sizeKey] || []), ...renamed],
-      }));
+    const renamed = compressed.map((file, index) => {
+      const unique = generateRowId();
+      return renameFile(file, `${sizeKey}-${unique}-${index}.webp`);
+    });
 
-      const previews = renamed.map((file) => URL.createObjectURL(file));
-      setVariantPreviewsBySize((prev) => ({
-        ...prev,
-        [sizeKey]: [...(prev[sizeKey] || []), ...previews],
-      }));
+    setVariantFilesBySize((prev) => ({
+      ...prev,
+      [sizeKey]: [...(prev[sizeKey] || []), ...renamed],
+    }));
 
-      setVariantFilenamesBySize((prev) => ({
-        ...prev,
-        [sizeKey]: [...(prev[sizeKey] || []), ...renamed.map((file) => file.name)],
-      }));
-    } finally {
-      setIsCompressing(false);
-      e.target.value = '';
-    }
+    const previews = renamed.map((file) => URL.createObjectURL(file));
+    setVariantPreviewsBySize((prev) => ({
+      ...prev,
+      [sizeKey]: [...(prev[sizeKey] || []), ...previews],
+    }));
+
+    setVariantFilenamesBySize((prev) => ({
+      ...prev,
+      [sizeKey]: [...(prev[sizeKey] || []), ...renamed.map((file) => file.name)],
+    }));
   };
 
   // Helper: upload for a specific size row directly
@@ -623,20 +572,18 @@ Only return the JSON, no explanations.`;
     const key = String(sizeId || '').trim();
     if (!key || !e.target.files || e.target.files.length === 0) return;
     setIsCompressing(true);
-    try {
-      const compressed = await applyCompression(Array.from(e.target.files), `size-${key}`);
-      const renamed = compressed.map((file, index) => {
-        const unique = generateRowId();
-        return renameFile(file, `${key}-${unique}-${index}.webp`);
-      });
-      setVariantFilesBySize((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed] }));
-      const previews = renamed.map((file) => URL.createObjectURL(file));
-      setVariantPreviewsBySize((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
-      setVariantFilenamesBySize((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed.map((file) => file.name)] }));
-    } finally {
-      setIsCompressing(false);
-      e.target.value = '';
-    }
+    const compressed = await applyCompression(Array.from(e.target.files), `size-${key}`);
+    setIsCompressing(false);
+
+    const renamed = compressed.map((file, index) => {
+      const unique = generateRowId();
+      return renameFile(file, `${key}-${unique}-${index}.webp`);
+    });
+
+    setVariantFilesBySize((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed] }));
+    const previews = renamed.map((file) => URL.createObjectURL(file));
+    setVariantPreviewsBySize((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
+    setVariantFilenamesBySize((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed.map((file) => file.name)] }));
   };
 
   // Combo uploads per-row
@@ -644,20 +591,18 @@ Only return the JSON, no explanations.`;
     const key = String(comboId || '').trim();
     if (!key || !e.target.files || e.target.files.length === 0) return;
     setIsCompressing(true);
-    try {
-      const compressed = await applyCompression(Array.from(e.target.files), `combo-${key}`);
-      const renamed = compressed.map((file, index) => {
-        const unique = generateRowId();
-        return renameFile(file, `${key}-${unique}-${index}.webp`);
-      });
-      setComboFilesByKey((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed] }));
-      const previews = renamed.map((file) => URL.createObjectURL(file));
-      setComboPreviewsByKey((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
-      setComboFilenamesByKey((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed.map((file) => file.name)] }));
-    } finally {
-      setIsCompressing(false);
-      e.target.value = '';
-    }
+    const compressed = await applyCompression(Array.from(e.target.files), `combo-${key}`);
+    setIsCompressing(false);
+
+    const renamed = compressed.map((file, index) => {
+      const unique = generateRowId();
+      return renameFile(file, `${key}-${unique}-${index}.webp`);
+    });
+
+    setComboFilesByKey((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed] }));
+    const previews = renamed.map((file) => URL.createObjectURL(file));
+    setComboPreviewsByKey((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...previews] }));
+    setComboFilenamesByKey((prev) => ({ ...prev, [key]: [...(prev[key] || []), ...renamed.map((file) => file.name)] }));
   };
   const removeComboImage = (key: string, index: number) => {
     setComboFilesByKey(prev => ({ ...prev, [key]: (prev[key] || []).filter((_, i) => i !== index) }));
@@ -1309,19 +1254,6 @@ Only return the JSON, no explanations.`;
                           <p className="text-xs text-gray-500 mt-1">Upload product photos</p>
                         </CardHeader>
                         <CardContent className="p-6">
-                          {(isCompressing || activeCompressionProgress !== null) && (
-                            <div className="mb-4 flex items-center gap-3 text-sm text-muted-foreground">
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                              <span>
-                                Optimizing images
-                                {activeCompressionProgress !== null ? ` ${activeCompressionProgress}%` : ''}
-                              </span>
-                              {activeCompressionProgress !== null && (
-                                <Progress value={activeCompressionProgress} className="h-2 flex-1 max-w-[160px]" />
-                              )}
-                            </div>
-                          )}
-
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {imagePreviewUrls.map((url, index) => (
                               <div key={index} className="relative group overflow-hidden rounded-md border">
@@ -1359,7 +1291,6 @@ Only return the JSON, no explanations.`;
                                   multiple
                                   className="sr-only"
                                   onChange={handleImageUpload}
-                                  disabled={isCompressing}
                                 />
                               </label>
                             </div>
@@ -1477,7 +1408,6 @@ Only return the JSON, no explanations.`;
                               multiple
                               className="sr-only"
                               onChange={handleImageUpload}
-                              disabled={isCompressing}
                             />
                           </label>
                         </div>
@@ -1508,7 +1438,7 @@ Only return the JSON, no explanations.`;
                               multiple
                               className="sr-only"
                               onChange={handleVariantImageUpload}
-                              disabled={!selectedVariantSizeId || isCompressing}
+                              disabled={!selectedVariantSizeId}
                             />
                           </div>
                         </div>
@@ -1940,7 +1870,6 @@ Only return the JSON, no explanations.`;
                                     multiple
                                     className="sr-only"
                                     onChange={(e)=>handleComboImageUpload(cb.id, e)}
-                                    disabled={isCompressing}
                                   />
                                   <span className="text-xs text-muted-foreground">{(comboFilenamesByKey[cb.id] || []).length} selected</span>
                                 </div>

@@ -145,9 +145,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
     return Math.random().toString(36).slice(2);
   };
 
-  const renameFile = (file: File, newName: string) =>
-    new File([file], newName, { type: file.type, lastModified: Date.now() });
-
   const slugify = (text: string) => {
     return text
       .toLowerCase()
