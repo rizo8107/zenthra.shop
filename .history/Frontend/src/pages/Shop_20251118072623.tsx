@@ -156,8 +156,6 @@ export default function Shop() {
       return;
     }
 
-    setPriceRange(priceBounds);
-
     const params = new URLSearchParams();
     const trimmedSearch = searchTerm.trim();
     if (trimmedSearch) {
