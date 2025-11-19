@@ -2,6 +2,7 @@ import React, { memo, useState } from 'react';
 import ProductCard from './ProductCard';
 import { Product } from '@/lib/pocketbase';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 type ProductGridProps = {
   products: Product[];
@@ -18,13 +19,13 @@ const ProductGrid = ({ products, title, loading = false }: ProductGridProps) => 
   
   if (loading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {Array.from({ length: 8 }).map((_, index) => (
-          <div key={index} className="animate-pulse rounded-xl border border-border/60 bg-card p-4 space-y-3">
-            <div className="aspect-square rounded-lg bg-muted" />
-            <div className="space-y-2">
-              <div className="h-4 w-3/4 rounded bg-muted" />
-              <div className="h-4 w-1/2 rounded bg-muted/80" />
+          <div key={index} className="animate-pulse">
+            <div className="aspect-square bg-muted rounded-lg mb-4"></div>
+            <div className="space-y-3">
+              <div className="h-4 bg-muted rounded w-3/4"></div>
+              <div className="h-4 bg-muted rounded w-1/2"></div>
             </div>
           </div>
         ))}
@@ -33,15 +34,12 @@ const ProductGrid = ({ products, title, loading = false }: ProductGridProps) => 
   }
   
   return (
-    <div className="space-y-10">
+    <div>
       {title && (
-        <div className="mb-4 text-center space-y-4">
-          <h2 className="text-3xl font-semibold text-primary">{title}</h2>
-          <div className="mx-auto h-1 w-16 rounded-full bg-primary" />
-        </div>
+        <h2 className="text-2xl font-bold mb-8 text-center">{title}</h2>
       )}
       
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {products.slice(0, displayCount).map((product, index) => (
           <ProductCard key={product.id} product={product} priority={index < 4} />
         ))}
@@ -53,7 +51,7 @@ const ProductGrid = ({ products, title, loading = false }: ProductGridProps) => 
             onClick={showMore}
             variant="default"
             size="lg"
-            className="gap-2 shadow-sm"
+            className="gap-2"
           >
             Load More Products
           </Button>

@@ -1660,6 +1660,7 @@ const ProductDetail = () => {
                           )}
 
                           {/* Color Variants */}
+                          {colorOptions.length > 0 && (
                             <div className="space-y-3">
                               <h4 className="text-sm font-medium text-gray-900">Available Colors</h4>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1674,8 +1675,8 @@ const ProductDetail = () => {
                                       className={cn(
                                         'flex items-center space-x-2 p-3 rounded-lg border transition-all cursor-pointer',
                                         isSelected
-                                          ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/10'
-                                          : 'bg-background border-border hover:border-primary/40 hover:bg-accent/5',
+                                          ? 'bg-white border-blue-300 shadow-sm'
+                                          : 'bg-white/70 border-gray-200 hover:border-blue-200 hover:bg-white',
                                       )}
                                     >
                                       <input
@@ -1709,7 +1710,7 @@ const ProductDetail = () => {
                                             };
                                           });
                                         }}
-                                        className="rounded border-border text-primary focus:ring-primary"
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                       />
                                       <div className="flex items-center space-x-2 flex-1">
                                         <div

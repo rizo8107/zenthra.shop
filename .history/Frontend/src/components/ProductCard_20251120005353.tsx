@@ -37,16 +37,6 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
   const primaryColor = themeData?.primary?.hex;
   const primaryHover = themeData?.primary?.hoverHex ?? primaryColor;
   const primaryForeground = themeData?.textOnPrimary;
-  const ctaVars = useMemo(() => {
-    if (!primaryColor && !primaryForeground) {
-      return undefined;
-    }
-    return {
-      '--cta-color': primaryColor ?? undefined,
-      '--cta-hover': primaryHover ?? primaryColor ?? undefined,
-      '--cta-text': primaryForeground ?? undefined,
-    } as React.CSSProperties;
-  }, [primaryColor, primaryHover, primaryForeground]);
 
 
   const pc = useMemo(() => ({
@@ -159,37 +149,21 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       </div>
 
       <div className={cn(bodyPadding)}>
-        <h3 className={cn('font-semibold mb-1 text-primary group-hover:text-primary/90 transition-colors line-clamp-2', titleSizeCls)}>
+        <h3 className={cn('font-semibold mb-1 group-hover:text-primary transition-colors line-clamp-2', titleSizeCls)}>
           {product.name}
         </h3>
         {pc.showDescription && (
           <p className={cn('text-muted-foreground line-clamp-2 mb-2', descSizeCls)}>{product.description}</p>
         )}
 
-        <div className="flex items-center justify-between gap-3" style={ctaVars}>
+        <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <div className="hidden sm:flex items-center border rounded-md overflow-hidden bg-background">
-              <Button
-                onClick={(e) => handleQuantityChange(e, -1)}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  'h-8 w-8 p-0 rounded-none',
-                  primaryColor ? 'hover:bg-[var(--cta-color)] hover:text-[var(--cta-text)] focus-visible:ring-[var(--cta-color)]' : ''
-                )}
-              >
+              <Button onClick={(e) => handleQuantityChange(e, -1)} variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-none">
                 <Minus className="h-3 w-3" />
               </Button>
               <span className="w-8 text-center text-sm font-medium">{quantity}</span>
-              <Button
-                onClick={(e) => handleQuantityChange(e, 1)}
-                variant="ghost"
-                size="sm"
-                className={cn(
-                  'h-8 w-8 p-0 rounded-none',
-                  primaryColor ? 'hover:bg-[var(--cta-color)] hover:text-[var(--cta-text)] focus-visible:ring-[var(--cta-color)]' : ''
-                )}
-              >
+              <Button onClick={(e) => handleQuantityChange(e, 1)} variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-none">
                 <Plus className="h-3 w-3" />
               </Button>
             </div>
@@ -205,6 +179,15 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                   ? '!bg-[var(--cta-color)] !text-[var(--cta-text)] hover:!bg-[var(--cta-hover)]'
                   : null
               )}
+              style={
+                primaryColor || primaryForeground
+                  ? {
+                      '--cta-color': primaryColor ?? undefined,
+                      '--cta-hover': primaryHover ?? primaryColor ?? undefined,
+                      '--cta-text': primaryForeground ?? undefined,
+                    }
+                  : undefined
+              }
             >
               <Plus className="mr-2 h-4 w-4" />
               {pc.ctaLabel}
