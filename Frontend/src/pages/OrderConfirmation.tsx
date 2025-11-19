@@ -67,7 +67,7 @@ export default function OrderConfirmation() {
   const [activeTab, setActiveTab] = useState<string>('order');
 
   useEffect(() => {
-    document.title = 'Order Confirmation | Konipai';
+    document.title = 'Order Confirmation';
     trackPageView('Order Confirmation', window.location.pathname);
 
     const fetchOrderDetails = async () => {
@@ -191,7 +191,6 @@ export default function OrderConfirmation() {
             <div className="px-6 pt-6 pb-4 bg-white">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-xs uppercase tracking-widest text-muted-foreground">KONIPAI</div>
                   <div className="text-[15px] font-semibold">Thank you for your purchase!</div>
                 </div>
                 <div className="text-right text-xs text-muted-foreground">
