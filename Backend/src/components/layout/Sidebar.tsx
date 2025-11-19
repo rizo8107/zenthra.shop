@@ -81,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   const items = [
     { title: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { title: 'Orders', path: '/admin/orders', icon: ShoppingCart },
+    { title: 'Coupons', path: '/admin/coupons', icon: FileText },
     { title: 'Customers', path: '/admin/customers', icon: Users },
     { title: 'Abandoned carts', path: '/admin/abandoned-carts', icon: AlertTriangle },
     { title: 'Products', path: '/admin/products', icon: Package },
