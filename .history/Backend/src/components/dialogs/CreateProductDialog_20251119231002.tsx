@@ -1682,7 +1682,7 @@ Only return the JSON, no explanations.`;
                                     placeholder="100"
                                   />
                                 </div>
-                                <div className="col-span-12 sm:col-span-2">
+                                <div className="col-span-12 sm:col-span-3">
                                   <Select
                                     value={s.unit || 'ml'}
                                     onValueChange={(val) => {
@@ -1700,7 +1700,7 @@ Only return the JSON, no explanations.`;
                                     </SelectContent>
                                   </Select>
                                 </div>
-                                <div className="col-span-12 sm:col-span-2">
+                                <div className="col-span-12 sm:col-span-3">
                                   <div className="flex items-center gap-2">
                                     <Switch
                                       checked={!!s.useBasePrice}
@@ -1729,34 +1729,13 @@ Only return the JSON, no explanations.`;
                                     />
                                   )}
                                 </div>
-                                <div className="col-span-12 sm:col-span-3">
-                                  <Input
-                                    className="w-full"
-                                    type="number"
-                                    value={s.originalPrice ?? '' as any}
-                                    onChange={(e) => {
-                                      const targetId = s.id;
-                                      const nextOriginal = e.target.value ? Number(e.target.value) : undefined;
-                                      setSizeRows(prev => prev.map(row => row.id === targetId ? { ...row, originalPrice: nextOriginal } : row));
-                                    }}
-                                    placeholder="Original price"
-                                  />
+                                <div className="hidden sm:block col-span-1 text-xs text-muted-foreground">
+                                  {s.value && s.unit ? `${s.value} ${s.unit}` : ''}
                                 </div>
                                 <div className="col-span-12 text-xs text-muted-foreground">
                                   {(() => {
                                     const base = Number(form.watch('price')) || 0;
                                     const final = s.useBasePrice ? base : (s.sizePrice ?? base);
-                                    const globalOriginal = Number(form.watch('original_price'));
-                                    const resolvedOriginal =
-                                      typeof s.originalPrice === 'number'
-                                        ? s.originalPrice
-                                        : Number.isFinite(globalOriginal) && globalOriginal > 0
-                                          ? globalOriginal
-                                          : undefined;
-                                    if (resolvedOriginal && resolvedOriginal > final) {
-                                      const discount = Math.round((1 - final / resolvedOriginal) * 100);
-                                      return `Offer price ₹${final.toFixed(2)} (MRP ₹${resolvedOriginal.toFixed(2)}${discount > 0 ? `, ${discount}% off` : ''})`;
-                                    }
                                     return `Final price for this size will be ₹${final.toFixed(2)}`;
                                   })()}
                                 </div>

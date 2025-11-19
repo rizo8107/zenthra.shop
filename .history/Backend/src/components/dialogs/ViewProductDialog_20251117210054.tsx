@@ -53,31 +53,6 @@ export function ViewProductDialog({ open, onOpenChange, product, onDelete }: Vie
     return String(value);
   };
 
-  const normalizeVariantNumber = (value: unknown): number | undefined => {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : undefined;
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return undefined;
-      const parsed = Number(trimmed);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-    return undefined;
-  };
-
-  const formatPrice = (value?: number) =>
-    typeof value === 'number' && Number.isFinite(value) ? `₹${value.toFixed(2)}` : '—';
-
-  const computeSizePricing = (size: any) => {
-    const basePrice = Number(product?.price) || 0;
-    const override = normalizeVariantNumber(size?.priceOverride);
-    const delta = normalizeVariantNumber(size?.priceDelta);
-    const original = normalizeVariantNumber(size?.originalPrice ?? size?.original_price) ?? normalizeVariantNumber(product?.original_price);
-    const final = typeof override === 'number' ? override : typeof delta === 'number' ? basePrice + delta : basePrice;
-    return { final, original };
-  };
-
   if (!product) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -347,11 +322,6 @@ export function ViewProductDialog({ open, onOpenChange, product, onDelete }: Vie
                                   <div>Value: {combo.value}</div>
                                   <div>Discount: {combo.discountValue} ({combo.discountType})</div>
                                   <div>Images: {combo.images ? combo.images.length : 0}</div>
-                                  {normalizeVariantNumber(combo.priceOverride) !== undefined && (
-                                    <div className="col-span-2 font-medium text-green-600">
-                                      Combo Price: {formatPrice(normalizeVariantNumber(combo.priceOverride))}
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             ))}

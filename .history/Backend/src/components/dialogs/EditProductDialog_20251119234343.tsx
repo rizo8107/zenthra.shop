@@ -141,19 +141,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const { deleteProduct } = useProducts();
 
   // Helper functions
-  const normalizeVariantNumber = (value: unknown): number | undefined => {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : undefined;
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return undefined;
-      const parsed = Number(trimmed);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-    return undefined;
-  };
-
   const generateRowId = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
@@ -325,8 +312,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
             value: size.value || '',
             unit: size.unit || '',
             inStock: size.inStock !== false,
-            priceOverride: normalizeVariantNumber(size.priceOverride),
-            originalPrice: normalizeVariantNumber((size as any)?.originalPrice),
+            priceOverride: size.priceOverride,
+            originalPrice: size.originalPrice,
             images: Array.isArray(size.images) ? size.images : [],
           })),
           combos: (variantData.combos || []).map((combo) => ({
@@ -348,8 +335,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
 
           variantData.sizes.forEach((size) => {
             const id = generateRowId();
-            const priceOverride = normalizeVariantNumber(size.priceOverride);
-            const sizeOriginal = normalizeVariantNumber((size as any)?.originalPrice);
+            const priceOverride = typeof size.priceOverride === 'number' ? size.priceOverride : undefined;
+            const sizeOriginal = typeof (size as any).originalPrice === 'number' ? (size as any).originalPrice : undefined;
             newSizeRows.push({
               id,
               value: size.value || '',
@@ -816,7 +803,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               placeholder="100"
                             />
                           </div>
-                          <div className="col-span-12 sm:col-span-2">
+                          <div className="col-span-12 sm:col-span-3">
                             <Select
                               value={s.unit || 'ml'}
                               onValueChange={(val) => {
@@ -834,7 +821,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               </SelectContent>
                             </Select>
                           </div>
-                          <div className="col-span-12 sm:col-span-2">
+                          <div className="col-span-12 sm:col-span-3">
                             <div className="flex items-center gap-2">
                               <Switch
                                 checked={!!s.useBasePrice}
@@ -851,7 +838,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                           <div className="col-span-12 sm:col-span-2">
                             {!s.useBasePrice && (
                               <Input
-                                className="w-full"
+                                className="w-28"
                                 type="number"
                                 value={s.sizePrice ?? '' as any}
                                 onChange={(e) => {
@@ -863,33 +850,13 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
                               />
                             )}
                           </div>
-                          <div className="col-span-12 sm:col-span-3">
-                            <Input
-                              className="w-full"
-                              type="number"
-                              value={s.originalPrice ?? '' as any}
-                              onChange={(e) => {
-                                const targetId = s.id;
-                                const nextOriginal = e.target.value ? Number(e.target.value) : undefined;
-                                setSizeRows(prev => prev.map(row => row.id === targetId ? { ...row, originalPrice: nextOriginal } : row));
-                              }}
-                              placeholder="Original price"
-                            />
+                          <div className="hidden sm:block col-span-1 text-xs text-muted-foreground">
+                            {s.value && s.unit ? `${s.value} ${s.unit}` : ''}
                           </div>
                           <div className="col-span-12 text-xs text-muted-foreground">
                             {(() => {
                               const base = Number(price) || 0;
                               const final = s.useBasePrice ? base : (s.sizePrice ?? base);
-                              const parsedProductOriginal = originalPrice && originalPrice.trim() !== '' ? Number(originalPrice) : NaN;
-                              const resolvedOriginal = Number.isFinite(s.originalPrice)
-                                ? s.originalPrice
-                                : Number.isFinite(parsedProductOriginal) && parsedProductOriginal > 0
-                                  ? parsedProductOriginal
-                                  : undefined;
-                              if (resolvedOriginal && resolvedOriginal > final) {
-                                const discount = Math.round((1 - final / resolvedOriginal) * 100);
-                                return `Offer price ₹${final.toFixed(2)} (MRP ₹${resolvedOriginal.toFixed(2)}${discount > 0 ? `, ${discount}% off` : ''})`;
-                              }
                               return `Final price for this size will be ₹${final.toFixed(2)}`;
                             })()}
                           </div>
