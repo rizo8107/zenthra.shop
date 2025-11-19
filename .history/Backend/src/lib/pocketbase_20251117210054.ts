@@ -727,20 +727,8 @@ export const getMonthlyRevenueData = async (params?: {
 
     const buckets = new Map<string, number>();
 
-    const normalizeDate = (input: unknown): Date | null => {
-      const value = typeof input === 'string' || typeof input === 'number' || input instanceof Date
-        ? new Date(input)
-        : null;
-      return value && !Number.isNaN(value.getTime()) ? value : null;
-    };
-
     ordersResult.forEach((order) => {
-      const created = normalizeDate(order.created);
-      if (!created) {
-        console.warn('Skipping order with invalid created date when aggregating revenue:', order?.id, order?.created);
-        return;
-      }
-
+      const created = new Date(order.created);
       const total = Number(order.total || 0);
 
       let key: string;
