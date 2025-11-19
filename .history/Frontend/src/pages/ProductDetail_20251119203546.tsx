@@ -1982,17 +1982,6 @@ const ProductDetail = () => {
             </div>
 
             {/* total + secondary actions */}
-            <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <div className="text-sm font-semibold text-foreground">
-                ₹{stickyCartTotal.toFixed(2)}
-              </div>
-              {isInCart ? (
-                <span>Subtotal in cart</span>
-              ) : (
-                <span>Total for selected options</span>
-              )}
-            </div>
-
             {isInCart ? (
               <div className="flex w-full items-center gap-3">
                 <Button
@@ -2013,7 +2002,14 @@ const ProductDetail = () => {
                   <Link to="/checkout">Buy now</Link>
                 </Button>
               </div>
-            ) : null}
+            ) : (
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="text-sm font-semibold text-foreground">
+                  ₹{selectedTotal.toFixed(2)}
+                </div>
+                <span>Total for selected options</span>
+              </div>
+            )}
           </div>
         </div>
       </div>

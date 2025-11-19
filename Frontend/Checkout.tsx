@@ -55,6 +55,13 @@ interface CouponData {
   current_uses?: number;
   discountAmount?: number;
   description?: string;
+  // PocketBase fields (snake_case) mirrored for convenience
+  discount_type?: 'percentage' | 'fixed';
+  discount_value?: number;
+  display_on_checkout?: boolean;
+  min_order_value?: number;
+  start_date?: string;
+  end_date?: string;
 }
 
 interface CheckoutFormData {
@@ -134,6 +141,9 @@ export default function CheckoutPage() {
   const [suggestedCouponsLoading, setSuggestedCouponsLoading] = useState(false);
   const [errors, setErrors] = useState<{ [key: string]: string | null }>({});
 
+  const highlightedCoupon = suggestedCoupons[0];
+  const additionalSuggestedCoupons = suggestedCoupons.slice(1);
+
   // Calculate final total with all discounts and shipping - removed duplicate
   
   // Load Razorpay script
@@ -157,23 +167,23 @@ export default function CheckoutPage() {
       try {
         if (isMounted) setSuggestedCouponsLoading(true);
         
-        // Get current date/time for comparison
         const now = new Date();
         
         try {
-          // Fetch active coupons from PocketBase that are marked for display on checkout
-          const coupons = await pocketbase.collection('coupons').getList(1, 5, {
-            filter: `active = true && display_on_checkout = true && start_date <= "${now.toISOString()}" && end_date >= "${now.toISOString()}"`,
+          const coupons = await pocketbase.collection('coupons').getList(1, 10, {
+            filter: 'active = true && display_on_checkout = true',
             sort: '-display_priority'
           });
           
-          if (isMounted && coupons && coupons.items.length > 0) {
-            // Cast RecordModel[] to CouponData[] for UI suggestions
-            setSuggestedCoupons(coupons.items as unknown as CouponData[]);
-            console.log('Suggested coupons found:', coupons.items.length);
+          if (isMounted && coupons) {
+            const filtered = coupons.items.filter((coupon: any) => {
+              const startsOk = !coupon.start_date || new Date(coupon.start_date) <= now;
+              const endsOk = !coupon.end_date || new Date(coupon.end_date) >= now;
+              return startsOk && endsOk;
+            });
+            setSuggestedCoupons(filtered as unknown as CouponData[]);
           }
         } catch (collectionError) {
-          // Collection might not exist yet
           console.warn('Coupons collection not found:', collectionError);
         }
       } catch (error) {
@@ -540,6 +550,20 @@ const removeCoupon = () => {
   setAppliedCoupon(null);
   setCouponCode('');
   setCouponError(null);
+};
+
+const formatCouponDiscountLabel = (coupon: CouponData) => {
+  const discountValue = coupon.discount_value ?? coupon.amount ?? 0;
+  return coupon.discount_type === 'percentage'
+    ? `${discountValue}% OFF`
+    : `₹${discountValue} OFF`;
+};
+
+const getCouponMinimumLabel = (coupon: CouponData) => {
+  const minValue = coupon.min_order_value ?? coupon.min_purchase;
+  return typeof minValue === 'number' && minValue > 0
+    ? `Min order ₹${minValue}`
+    : null;
 };
 
   const handlePaymentSuccess = async (response: RazorpayResponse, orderId: string) => {
@@ -1742,8 +1766,8 @@ const removeCoupon = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-6xl mx-auto">
+    <main className="mx-auto w-full max-w-5xl px-4 py-10">
+      <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
         {/* Checkout Header with Progress */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-center mb-6">Checkout</h1>
@@ -2087,32 +2111,55 @@ const removeCoupon = () => {
               </Button>
             )}
           </div>
+          {highlightedCoupon && (
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">Suggested coupon for this order</p>
+                  <p className="text-xs text-blue-700">
+                    {formatCouponDiscountLabel(highlightedCoupon)}{getCouponMinimumLabel(highlightedCoupon) ? ` · ${getCouponMinimumLabel(highlightedCoupon)}` : ''}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="border-blue-400 text-blue-700 hover:bg-blue-100"
+                  onClick={() => handleApplyCoupon(highlightedCoupon.code)}
+                >
+                  Apply {highlightedCoupon.code}
+                </Button>
+              </div>
+              {highlightedCoupon.description && (
+                <p className="mt-2 text-xs text-blue-800/90">{highlightedCoupon.description}</p>
+              )}
+            </div>
+          )}
+
           {couponError && <p className="text-red-500 text-sm">{couponError}</p>}
           
           {/* Suggested Coupons Section */}
-          {suggestedCouponsLoading ? (
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <Loader2 className="h-4 w-4 animate-spin" />
-              <span>Loading available coupons...</span>
-            </div>
-          ) : suggestedCoupons.length > 0 && (
-            <div className="mt-3">
-              <p className="text-sm text-gray-500 mb-2">Available coupons:</p>
-              <div className="flex flex-wrap gap-2">
-                {suggestedCoupons.map((coupon) => (
+          {additionalSuggestedCoupons.length > 0 && (
+            <div className="rounded-2xl border border-dashed border-blue-200 bg-blue-50/40 p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-blue-900">More coupons you can try</p>
+                  <p className="text-xs text-blue-700">Tap a code to auto-fill</p>
+                </div>
+              </div>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {additionalSuggestedCoupons.map((coupon) => (
                   <button
                     key={coupon.id}
                     type="button"
-                    onClick={() => {
-                      // Apply the coupon directly with the code instead of relying on state update
-                      handleApplyCoupon(coupon.code);
-                    }}
-                    className="inline-flex items-center px-3 py-1.5 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-md text-sm transition-colors"
+                    onClick={() => handleApplyCoupon(coupon.code)}
+                    className="group rounded-full border border-blue-200 bg-white/80 px-4 py-1.5 text-xs font-semibold text-blue-700 shadow-sm transition hover:border-blue-400 hover:bg-white"
                   >
-                    <span className="font-medium">{coupon.code}</span>
-                    {coupon.description && (
-                      <span className="ml-1 text-xs text-gray-500">- {coupon.description}</span>
-                    )}
+                    <span>{coupon.code}</span>
+                    <span className="ml-2 rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 group-hover:bg-blue-200">
+                      {coupon.discount_type === 'percentage'
+                        ? `${coupon.discount_value || coupon.amount}%`
+                        : `₹${coupon.discount_value || coupon.amount}`}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -2157,11 +2204,11 @@ const removeCoupon = () => {
           <span>Secure checkout powered by Razorpay</span>
         </div>
       </form>
-          </div>
-          
-          {/* Order summary removed for a cleaner checkout experience */}
-        </div>
-      </div>
     </div>
+
+    {/* Order summary removed for a cleaner checkout experience */}
+  </div>
+</div>
+</main>
   );
 }

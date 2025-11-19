@@ -67,7 +67,7 @@ export default function OrderConfirmation() {
   const [activeTab, setActiveTab] = useState<string>('order');
 
   useEffect(() => {
-    document.title = 'Order Confirmation | Konipai';
+    document.title = 'Order Confirmation';
     trackPageView('Order Confirmation', window.location.pathname);
 
     const fetchOrderDetails = async () => {
@@ -171,7 +171,8 @@ export default function OrderConfirmation() {
   const shippingNum = Number(order.shipping_cost || 0);
   const totalCalc = subtotalNum + shippingNum - discountNum;
 
-  const orderLink = typeof window !== 'undefined' ? window.location.href : `https://konipai.com/orders/${order.id}`;
+  const frontendBase = (import.meta.env.VITE_ZENTHRA_FRONTEND_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+  const orderLink = `${frontendBase}/order-confirmation/${order.id}`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(orderLink)}`;
 
   return (
@@ -191,7 +192,6 @@ export default function OrderConfirmation() {
             <div className="px-6 pt-6 pb-4 bg-white">
               <div className="flex items-start justify-between">
                 <div>
-                  <div className="text-xs uppercase tracking-widest text-muted-foreground">KONIPAI</div>
                   <div className="text-[15px] font-semibold">Thank you for your purchase!</div>
                 </div>
                 <div className="text-right text-xs text-muted-foreground">

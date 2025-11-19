@@ -12,6 +12,7 @@ import CustomersPage from "./pages/admin/CustomersPage";
 import AbandonedCartsPage from "./pages/admin/AbandonedCartsPage";
 import ProductsPage from "./pages/admin/ProductsPage";
 import SettingsPage from "./pages/admin/SettingsPage";
+import CouponsPage from "./pages/admin/CouponsPage";
 import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 import PwaUpdateNotification from "./components/PwaUpdateNotification";
@@ -75,6 +76,7 @@ const App = () => {
             <Route path="/admin/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
             <Route path="/admin/abandoned-carts" element={<ProtectedRoute><AbandonedCartsPage /></ProtectedRoute>} />
             <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
+            <Route path="/admin/coupons" element={<ProtectedRoute><CouponsPage /></ProtectedRoute>} />
             <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
             <Route path="/admin/pages" element={<ProtectedRoute><ZenthraPagesManager /></ProtectedRoute>} />
             <Route path="/admin/pages/:pageId/edit" element={<ProtectedRoute><ZenthraPageEditor /></ProtectedRoute>} />
