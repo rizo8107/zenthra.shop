@@ -2014,6 +2014,18 @@ const ProductDetail = () => {
         {/* mobile bottom bar */}
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 py-2.5 shadow-[0_-6px_16px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
           <div className="konipai-container mx-auto max-w-7xl px-4 space-y-2">
+            {/* total + label */}
+            <div className="flex flex-col items-start gap-0.5 text-xs text-muted-foreground">
+              <div className="text-sm font-semibold text-foreground">
+                ₹{stickyCartTotal.toFixed(2)}
+              </div>
+              {isInCart ? (
+                <span>Subtotal in cart</span>
+              ) : (
+                <span>Total for selected options</span>
+              )}
+            </div>
+
             {/* variant + qty + button row */}
             <div className="flex w-full items-center gap-2">
               <span className="inline-flex min-w-[96px] max-w-[40%] items-center truncate rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -2051,18 +2063,6 @@ const ProductDetail = () => {
                   <ShoppingCart className="mr-2 h-4 w-4" />
                   {product.inStock ? 'Add to cart' : 'Out of stock'}
                 </Button>
-              )}
-            </div>
-
-            {/* total + secondary actions */}
-            <div className="flex flex-col items-start gap-0.5 text-xs text-muted-foreground">
-              <div className="text-sm font-semibold text-foreground">
-                ₹{stickyCartTotal.toFixed(2)}
-              </div>
-              {isInCart ? (
-                <span>Subtotal in cart</span>
-              ) : (
-                <span>Total for selected options</span>
               )}
             </div>
 

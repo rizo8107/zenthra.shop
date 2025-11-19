@@ -99,7 +99,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
   return (
     <Link
       to={`/product/${product.id}`}
-      className={cn('group block bg-card overflow-hidden transition-all duration-300 relative', cardRadius, shadowCls, 'hover:shadow-lg')}
+      className={cn('group block bg-card text-foreground overflow-hidden transition-all duration-300 relative', cardRadius, shadowCls, 'hover:shadow-lg')}
     >
       <div className={cn('relative overflow-hidden bg-muted', aspectCls)}>
         <ProductImage
@@ -159,7 +159,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       </div>
 
       <div className={cn(bodyPadding)}>
-        <h3 className={cn('font-semibold mb-1 text-primary group-hover:text-primary/90 transition-colors line-clamp-2', titleSizeCls)}>
+        <h3 className={cn('font-semibold mb-1 text-foreground group-hover:text-primary transition-colors line-clamp-2', titleSizeCls)}>
           {product.name}
         </h3>
         {pc.showDescription && (

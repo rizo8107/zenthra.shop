@@ -1410,17 +1410,17 @@ const ProductDetail = () => {
                           }}
                           disabled={sz.inStock === false}
                           className={cn(
-                            'rounded-xl border px-3.5 py-2.5 text-xs font-medium transition-all bg-background/80 hover:bg-background shadow-sm/0',
+                            'rounded-2xl border px-3 py-2 text-xs font-medium transition-all',
                             selectedSize?.value === sz.value
-                              ? 'border-primary border-dashed bg-primary/5 text-primary shadow-sm ring-1 ring-primary/10'
-                              : 'border-border text-foreground/80 hover:border-primary/40 hover:bg-accent/5',
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-white text-foreground hover:border-primary/50',
                             sz.inStock === false &&
                               'cursor-not-allowed opacity-40 line-through',
                           )}
                         >
-                          <div className="flex flex-col items-start gap-0.5 text-left">
+                          <div className="flex flex-col items-center gap-0.5">
                             <span>{formatSizeOptionLabel(sz)}</span>
-                            <span className="text-[11px] font-semibold text-foreground">
+                            <span className="text-[11px] font-semibold">
                               ₹{finalPrice.toFixed(2)}
                             </span>
                             {originalPrice && (
@@ -1472,10 +1472,10 @@ const ProductDetail = () => {
                             setLastVariantPick('combo');
                           }}
                           className={cn(
-                            'rounded-full border px-3.5 py-1.5 text-[11px] font-medium transition-all bg-background/80 hover:bg-background',
+                            'rounded-full border px-3 py-1.5 text-xs font-medium transition-all',
                             selectedCombo?.value === cb.value
-                              ? 'border-primary border-dashed bg-primary/5 text-primary shadow-sm ring-1 ring-primary/10'
-                              : 'border-border text-foreground/80 hover:border-primary/40 hover:bg-accent/5',
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-border bg-white text-foreground hover:border-blue-400',
                           )}
                           title={cb.description || cb.name}
                         >
@@ -1541,10 +1541,10 @@ const ProductDetail = () => {
                             setLastVariantPick('combo');
                           }}
                           className={cn(
-                            'p-3 text-left rounded-lg border transition-colors bg-background/80',
+                            'p-3 text-left rounded-lg border transition-all',
                             selectedCombo?.value === bundle.value
-                              ? 'border-primary bg-primary/5 text-primary'
-                              : 'border-border text-foreground/80 hover:border-primary/40 hover:bg-accent/5',
+                              ? 'border-blue-600 bg-blue-50 text-blue-700'
+                              : 'border-border bg-white text-foreground hover:border-blue-400 hover:bg-blue-50/50',
                           )}
                         >
                           <div className="font-medium text-sm">{bundle.name}</div>
@@ -1607,8 +1607,8 @@ const ProductDetail = () => {
                                       className={cn(
                                         'flex items-center space-x-2 p-3 rounded-lg border transition-all cursor-pointer',
                                         isSelected
-                                          ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/10'
-                                          : 'bg-background border-border hover:border-primary/30 hover:bg-accent/5',
+                                          ? 'bg-white border-blue-300 shadow-sm'
+                                          : 'bg-white/70 border-gray-200 hover:border-blue-200 hover:bg-white',
                                       )}
                                     >
                                       <input
@@ -1642,7 +1642,7 @@ const ProductDetail = () => {
                                             };
                                           });
                                         }}
-                                        className="rounded border-border text-primary focus:ring-primary"
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                       />
                                       <label htmlFor={`variant-${variantKey}`} className="flex-1 cursor-pointer">
                                         <div className="text-sm font-medium text-gray-900">
@@ -1660,6 +1660,7 @@ const ProductDetail = () => {
                           )}
 
                           {/* Color Variants */}
+                          {colorOptions.length > 0 && (
                             <div className="space-y-3">
                               <h4 className="text-sm font-medium text-gray-900">Available Colors</h4>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -1674,8 +1675,8 @@ const ProductDetail = () => {
                                       className={cn(
                                         'flex items-center space-x-2 p-3 rounded-lg border transition-all cursor-pointer',
                                         isSelected
-                                          ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/10'
-                                          : 'bg-background border-border hover:border-primary/40 hover:bg-accent/5',
+                                          ? 'bg-white border-blue-300 shadow-sm'
+                                          : 'bg-white/70 border-gray-200 hover:border-blue-200 hover:bg-white',
                                       )}
                                     >
                                       <input
@@ -1709,7 +1710,7 @@ const ProductDetail = () => {
                                             };
                                           });
                                         }}
-                                        className="rounded border-border text-primary focus:ring-primary"
+                                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                                       />
                                       <div className="flex items-center space-x-2 flex-1">
                                         <div
@@ -1834,31 +1835,33 @@ const ProductDetail = () => {
           </div>
         </div>
 
-        {/* description / reviews tabs - minimal underline style */}
+        {/* description / reviews tabs full width */}
         <div className="mt-3 mb-20 md:mb-3 rounded-xl bg-white p-3 shadow-sm md:p-4">
           <Tabs defaultValue="description" className="w-full">
-            <TabsList className="inline-flex w-full items-center gap-6 border-b border-border bg-transparent px-1 text-sm">
+            <TabsList className="inline-flex h-10 w-full gap-1 rounded-full bg-muted/70 p-1 text-sm">
               <TabsTrigger
                 value="description"
-                className="flex-1 justify-start rounded-none border-b-2 border-transparent px-0 pb-2 text-left text-xs font-medium text-muted-foreground transition data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                className="flex-1 rounded-full px-4 py-1 text-xs font-medium text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
                 Description
               </TabsTrigger>
               <TabsTrigger
                 value="reviews"
-                className="flex-1 justify-start rounded-none border-b-2 border-transparent px-0 pb-2 text-left text-xs font-medium text-muted-foreground transition data-[state=active]:border-primary data-[state=active]:text-foreground data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+                className="flex-1 rounded-full px-4 py-1 text-xs font-medium text-muted-foreground transition data-[state=active]:bg-white data-[state=active]:text-foreground data-[state=active]:shadow-sm"
               >
                 Reviews ({product.reviews || 0})
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="description" className="mt-4">
+            <Separator className="mt-2" />
+
+            <TabsContent value="description" className="mt-2">
               <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
                 <ProductDetails product={product} />
               </Suspense>
             </TabsContent>
 
-            <TabsContent value="reviews" className="mt-4" id="reviews">
+            <TabsContent value="reviews" className="mt-2" id="reviews">
               {orderConfig?.showReviews && (
                 <Suspense fallback={<div className="flex items-center justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>}>
                   <ProductReviews
@@ -2055,7 +2058,7 @@ const ProductDetail = () => {
             </div>
 
             {/* total + secondary actions */}
-            <div className="flex flex-col items-start gap-0.5 text-xs text-muted-foreground">
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
               <div className="text-sm font-semibold text-foreground">
                 ₹{stickyCartTotal.toFixed(2)}
               </div>

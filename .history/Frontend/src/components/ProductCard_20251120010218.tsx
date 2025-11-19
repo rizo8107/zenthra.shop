@@ -159,7 +159,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       </div>
 
       <div className={cn(bodyPadding)}>
-        <h3 className={cn('font-semibold mb-1 text-primary group-hover:text-primary/90 transition-colors line-clamp-2', titleSizeCls)}>
+        <h3 className={cn('font-semibold mb-1 group-hover:text-primary transition-colors line-clamp-2', titleSizeCls)}>
           {product.name}
         </h3>
         {pc.showDescription && (
