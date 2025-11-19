@@ -159,72 +159,33 @@ export const PrintableSlip = forwardRef<HTMLDivElement, { orders: Order[]; layou
           {pageOrders.map((order) => {
             // Extract shipping address from order
             const address = order.expand?.shipping_address;
+            const customerName = address ? address.name : order.customer_name || '';
+            const customerPhone = address ? address.phone : order.customer_phone || '';
             const rawAddress = address
               ? `${address.street || ''}${address.street ? ', ' : ''}${address.city || ''}${address.city ? ', ' : ''}${address.state || ''} ${address.postal_code || ''}`.trim()
               : (order.shipping_address_text || order.shipping_address || '').toString();
 
-            // Parse JSON/plain address text and capture potential name/phone hints
-            const parseAddressText = (txt: string): { lines: string[]; name?: string; phone?: string } => {
-              const result = { lines: [] as string[], name: undefined as string | undefined, phone: undefined as string | undefined };
-              const safe = (s: any) => (typeof s === 'string' ? s.trim() : s?.toString?.().trim?.() || '');
-              if (!txt) return result;
+            // Parse JSON address text if applicable
+            const formatAddressLines = (txt: string): string[] => {
+              const safe = (s: any) => (typeof s === 'string' ? s : s?.toString?.() || '');
+              if (!txt) return [];
               const t = txt.trim();
-
-              const coalesce = (...vals: (string | undefined)[]) => vals.map((v) => safe(v)).find((v) => !!v);
-
               if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
                 try {
-                  const parsed = JSON.parse(t);
-                  if (Array.isArray(parsed)) {
-                    result.lines = parsed.map((x) => safe(x)).filter(Boolean);
-                    return result;
-                  }
-                  const name = coalesce(parsed.name, parsed.contactName, parsed.fullName, parsed.full_name);
-                  const phone = coalesce(parsed.phone, parsed.phoneNumber, parsed.mobile, parsed.contactNumber);
-                  const line1 = [safe(parsed.street), safe(parsed.area), safe(parsed.landmark)].filter(Boolean).join(', ');
-                  const line2 = [safe(parsed.city), safe(parsed.state)].filter(Boolean).join(', ');
-                  const line3 = [safe(parsed.postalCode) || safe(parsed.pincode), safe(parsed.country)].filter(Boolean).join(' ');
-                  result.lines = [line1, line2, line3].filter(Boolean);
-                  result.name = name;
-                  result.phone = phone;
-                  return result;
+                  const obj = JSON.parse(t);
+                  if (Array.isArray(obj)) return obj.map((x) => safe(x)).filter(Boolean);
+                  const line1 = [safe(obj.street), safe(obj.area), safe(obj.landmark)].filter(Boolean).join(', ');
+                  const line2 = [safe(obj.city), safe(obj.state)].filter(Boolean).join(', ');
+                  const line3 = [safe(obj.postalCode) || safe(obj.pincode), safe(obj.country)].filter(Boolean).join(' ');
+                  return [line1, line2, line3].filter(Boolean);
                 } catch {
-                  // fall through to plain text handling
+                  // fallback to as-is string
+                  return [txt];
                 }
               }
-
-              result.lines = [t];
-              return result;
+              return [txt];
             };
-
-            const parsedAddress = parseAddressText(rawAddress);
-            const addressLines = parsedAddress.lines;
-
-            const expandedUser = Array.isArray(order.expand?.user) ? order.expand?.user?.[0] : order.expand?.user;
-            const fallbackName = [
-              parsedAddress.name,
-              order.customer_name,
-              order.user_name,
-              expandedUser?.name,
-            ].find((value) => typeof value === 'string' && value.trim().length > 0) || '';
-
-            const fallbackPhone = [
-              parsedAddress.phone,
-              order.customer_phone,
-              expandedUser?.phone,
-            ].find((value) => typeof value === 'string' && value.trim().length > 0) || '';
-
-            const customerName = (() => {
-              const values = [address?.name, (address as any)?.contact_name, fallbackName];
-              const match = values.find((v) => typeof v === 'string' && v.trim().length > 0);
-              return match ? match.trim() : '';
-            })();
-
-            const customerPhone = (() => {
-              const values = [address?.phone, (address as any)?.contact_phone, fallbackPhone];
-              const match = values.find((v) => typeof v === 'string' && v.trim().length > 0);
-              return match ? match.trim() : '';
-            })();
+            const addressLines = formatAddressLines(rawAddress);
             
             // Generate tracking number
             const trackingNumber = order.tracking_number || order.id.slice(0, 8);
