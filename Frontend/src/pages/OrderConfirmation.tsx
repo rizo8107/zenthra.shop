@@ -171,7 +171,8 @@ export default function OrderConfirmation() {
   const shippingNum = Number(order.shipping_cost || 0);
   const totalCalc = subtotalNum + shippingNum - discountNum;
 
-  const orderLink = typeof window !== 'undefined' ? window.location.href : `https://konipai.com/orders/${order.id}`;
+  const frontendBase = (import.meta.env.VITE_ZENTHRA_FRONTEND_URL || (typeof window !== 'undefined' ? window.location.origin : '')).replace(/\/$/, '');
+  const orderLink = `${frontendBase}/order-confirmation/${order.id}`;
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(orderLink)}`;
 
   return (
