@@ -1661,7 +1661,6 @@ const ProductDetail = () => {
                           )}
 
                           {/* Color Variants */}
-                          {colorOptions.length > 0 && (
                             <div className="space-y-3">
                               <h4 className="text-sm font-medium text-gray-900">Available Colors</h4>
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
