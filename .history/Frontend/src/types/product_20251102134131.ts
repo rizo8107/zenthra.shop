@@ -9,11 +9,7 @@ export type ProductColor = {
 export type ProductSize = {
   name: string;
   value: string;
-  unit?: string;
   inStock?: boolean;
-  priceOverride?: number;
-  priceDelta?: number;
-  originalPrice?: number;
 };
 
 export type ProductVariants = {

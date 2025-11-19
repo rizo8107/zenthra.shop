@@ -141,19 +141,6 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const { deleteProduct } = useProducts();
 
   // Helper functions
-  const normalizeVariantNumber = (value: unknown): number | undefined => {
-    if (typeof value === 'number') {
-      return Number.isFinite(value) ? value : undefined;
-    }
-    if (typeof value === 'string') {
-      const trimmed = value.trim();
-      if (!trimmed) return undefined;
-      const parsed = Number(trimmed);
-      return Number.isFinite(parsed) ? parsed : undefined;
-    }
-    return undefined;
-  };
-
   const generateRowId = () => {
     if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
       return crypto.randomUUID();
@@ -325,8 +312,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
             value: size.value || '',
             unit: size.unit || '',
             inStock: size.inStock !== false,
-            priceOverride: normalizeVariantNumber(size.priceOverride),
-            originalPrice: normalizeVariantNumber((size as any)?.originalPrice),
+            priceOverride: size.priceOverride,
+            originalPrice: size.originalPrice,
             images: Array.isArray(size.images) ? size.images : [],
           })),
           combos: (variantData.combos || []).map((combo) => ({
@@ -348,8 +335,8 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
 
           variantData.sizes.forEach((size) => {
             const id = generateRowId();
-            const priceOverride = normalizeVariantNumber(size.priceOverride);
-            const sizeOriginal = normalizeVariantNumber((size as any)?.originalPrice);
+            const priceOverride = typeof size.priceOverride === 'number' ? size.priceOverride : undefined;
+            const sizeOriginal = typeof (size as any).originalPrice === 'number' ? (size as any).originalPrice : undefined;
             newSizeRows.push({
               id,
               value: size.value || '',
