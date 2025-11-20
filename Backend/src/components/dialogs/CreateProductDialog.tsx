@@ -25,11 +25,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { CreateProductData } from '@/types/schema';
+import { CreateProductData, Product, UpdateProductData } from '@/types/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { X, Upload, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Loader2, Eye, Pencil, Package } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { pb } from '@/lib/pocketbase';
@@ -89,25 +89,40 @@ type ProductFormValues = {
   free_shipping?: boolean;
 };
 
+export type ProductDialogMode = 'create' | 'edit' | 'view';
+
 interface CreateProductDialogProps {
+  mode?: ProductDialogMode;
+  product?: Product | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (data: CreateProductData | FormData) => Promise<void>;
+  onCreate?: (data: CreateProductData | FormData) => Promise<void>;
+  onUpdate?: (payload: { id: string; data: UpdateProductData | FormData }) => Promise<unknown>;
+  onDelete?: () => Promise<void>;
 }
 
 export function CreateProductDialog({
+  mode = 'create',
+  product,
   open,
   onOpenChange,
-  onSubmit,
+  onCreate,
+  onUpdate,
+  onDelete,
 }: CreateProductDialogProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadedImages, setUploadedImages] = useState<File[]>([]);
   const [imagePreviewUrls, setImagePreviewUrls] = useState<string[]>([]);
+  // Existing images for edit/view mode
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  
   // Variant images state (per size value)
   const [selectedVariantSizeId, setSelectedVariantSizeId] = useState<string>("");
   const [variantFilesBySize, setVariantFilesBySize] = useState<Record<string, File[]>>({});
   const [variantPreviewsBySize, setVariantPreviewsBySize] = useState<Record<string, string[]>>({});
   const [variantFilenamesBySize, setVariantFilenamesBySize] = useState<Record<string, string[]>>({});
+  const [variantExistingBySize, setVariantExistingBySize] = useState<Record<string, string[]>>({});
+  
   // Combo images state (per combo value)
   const [comboFilesByKey, setComboFilesByKey] = useState<Record<string, File[]>>({});
   const [comboPreviewsByKey, setComboPreviewsByKey] = useState<Record<string, string[]>>({});
@@ -201,6 +216,9 @@ export function CreateProductDialog({
   const [existingVideos, setExistingVideos] = useState<Array<{id: string, videos: string}>>([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
+  
+  const isViewMode = mode === 'view';
+  const isEditMode = mode === 'edit';
 
   const buildVariantsFromRows = () => {
     const variants: any = {};
@@ -212,7 +230,10 @@ export function CreateProductDialog({
       inStock: s.inStock !== false,
       priceOverride: s.useBasePrice ? undefined : (typeof s.sizePrice === 'number' ? s.sizePrice : undefined),
       originalPrice: typeof s.originalPrice === 'number' ? s.originalPrice : undefined,
-      images: variantFilenamesBySize[s.id] || [],
+      images: [
+        ...(variantExistingBySize[s.id] || []),
+        ...(variantFilenamesBySize[s.id] || [])
+      ],
     }));
     if (comboRows.length) variants.combos = comboRows.map(cb => ({ 
       name: cb.name, 
@@ -232,6 +253,8 @@ export function CreateProductDialog({
     const json = JSON.stringify(variants);
     form.setValue('variants', json);
   };
+
+  // ... (AI Generation functions skipped for brevity, they remain same)
 
   const handleGenerateVariants = async () => {
     const values = form.getValues();
@@ -404,7 +427,11 @@ Only return the JSON, no explanations.`;
         newHighlighted.add('features');
       }
       if (result.specifications) {
-        form.setValue('specifications', result.specifications, { shouldDirty: true });
+        // Stringify if it's an object
+        const specsValue = typeof result.specifications === 'object'
+          ? JSON.stringify(result.specifications, null, 2)
+          : result.specifications;
+        form.setValue('specifications', specsValue, { shouldDirty: true });
         newHighlighted.add('specifications');
       }
       if (result.tags) {
@@ -412,11 +439,23 @@ Only return the JSON, no explanations.`;
         newHighlighted.add('tags');
       }
       if (result.care_instructions) {
-        form.setValue('care_instructions', result.care_instructions, { shouldDirty: true });
+        // Stringify if it's an object, handle null/undefined
+        const careValue = result.care_instructions == null 
+          ? ''
+          : typeof result.care_instructions === 'object' 
+            ? JSON.stringify(result.care_instructions, null, 2)
+            : String(result.care_instructions);
+        form.setValue('care_instructions', careValue, { shouldDirty: true });
         newHighlighted.add('care_instructions');
       }
       if (result.usage_guidelines) {
-        form.setValue('usage_guidelines', result.usage_guidelines, { shouldDirty: true });
+        // Stringify if it's an object, handle null/undefined
+        const guidelinesValue = result.usage_guidelines == null
+          ? ''
+          : typeof result.usage_guidelines === 'object'
+            ? JSON.stringify(result.usage_guidelines, null, 2)
+            : String(result.usage_guidelines);
+        form.setValue('usage_guidelines', guidelinesValue, { shouldDirty: true });
         newHighlighted.add('usage_guidelines');
       }
 
@@ -433,6 +472,53 @@ Only return the JSON, no explanations.`;
     }
   };
   
+  // Helper functions
+  const normalizeVariantNumber = (value: unknown): number | undefined => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : undefined;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return undefined;
+      const parsed = Number(trimmed);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    }
+    return undefined;
+  };
+
+  const getImageUrl = (imagePath: string) => {
+    if (!imagePath) return 'https://placehold.co/300x300/e2e8f0/64748b?text=No+Image';
+    if (imagePath.startsWith('http')) return imagePath;
+    
+    const pocketbaseUrl = pb.baseUrl || (import.meta as any).env?.VITE_POCKETBASE_URL || 'https://backend-pocketbase.p3ibd8.easypanel.host';
+    
+    // If imagePath already contains collection/record structure (e.g., "collectionId/recordId/filename")
+    if (imagePath.includes('/')) {
+      return `${pocketbaseUrl}/api/files/${imagePath}`;
+    }
+    
+    // For simple filenames, construct the full path using product data
+    // PocketBase file URL format: {baseUrl}/api/files/{collectionName}/{recordId}/{filename}
+    if (product?.id) {
+      // Use 'products' as collection name (not collectionId)
+      return `${pocketbaseUrl}/api/files/products/${product.id}/${imagePath}`;
+    }
+    
+    // Last resort fallback
+    return `${pocketbaseUrl}/api/files/products/${imagePath}`;
+  };
+
+  const removeExistingImage = (index: number) => {
+    const removedImage = existingImages[index];
+    console.log('Removing existing image:', removedImage);
+    setExistingImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingVariantImage = (sizeId: string, index: number) => {
+    setVariantExistingBySize(prev => ({
+      ...prev,
+      [sizeId]: (prev[sizeId] || []).filter((_, i) => i !== index)
+    }));
+  };
+
   // Initialize form
   const form = useForm<ProductFormValues>({
     resolver: zodResolver(formSchema),
@@ -472,8 +558,207 @@ Only return the JSON, no explanations.`;
     },
   });
 
+  // Hydration effect
+  useEffect(() => {
+    if (mode === 'create') {
+      form.reset({
+        name: '',
+        description: '',
+        price: 0,
+        stock: undefined,
+        category: undefined,
+        status: 'active',
+        material: '',
+        dimensions: '',
+        features: '',
+        variants: '',
+        colors: '',
+        tags: '',
+        care: '',
+        specifications: '',
+        care_instructions: '',
+        usage_guidelines: '',
+        bestseller: false,
+        new: false,
+        inStock: true,
+        review: 0,
+        list_order: undefined,
+        original_price: undefined,
+        qikink_sku: '',
+        print_type_id: undefined,
+        product_type: '',
+        available_colors: '',
+        available_sizes: '',
+        videoUrl: '',
+        videoThumbnail: '',
+        videoDescription: '',
+        tn_shipping_enabled: true,
+        free_shipping: false,
+      });
+      setExistingImages([]);
+      setSizeRows([]);
+      setComboRows([]);
+      setColorRows([]);
+      setVariantExistingBySize({});
+      setVariantFilesBySize({});
+      setVariantPreviewsBySize({});
+      setVariantFilenamesBySize({});
+      setComboFilesByKey({});
+      setComboPreviewsByKey({});
+      setComboFilenamesByKey({});
+      setUploadedImages([]);
+      setImagePreviewUrls([]);
+    } else if (product) {
+       form.reset({
+          name: product.name || '',
+          description: product.description || '',
+          price: product.price || 0,
+          stock: product.stock,
+          category: product.category as any,
+          status: (product.status as any) || 'active',
+          material: product.material || '',
+          dimensions: product.dimensions || '',
+          features: product.features || '',
+          variants: typeof product.variants === 'string' ? product.variants : JSON.stringify(product.variants),
+          colors: product.colors || '',
+          tags: product.tags || '',
+          care: product.care || '',
+          specifications: product.specifications || '',
+          care_instructions: product.care_instructions || '',
+          usage_guidelines: product.usage_guidelines || '',
+          bestseller: product.bestseller || false,
+          new: product.new || false,
+          inStock: product.inStock !== false,
+          review: product.review,
+          list_order: product.list_order,
+          original_price: product.original_price,
+          qikink_sku: product.qikink_sku || '',
+          print_type_id: product.print_type_id,
+          product_type: product.product_type || '',
+          available_colors: product.available_colors || '',
+          available_sizes: product.available_sizes || '',
+          videoUrl: product.videoUrl || '',
+          videoThumbnail: product.videoThumbnail || '',
+          videoDescription: product.videoDescription || '',
+          tn_shipping_enabled: product.tn_shipping_enabled !== false,
+          free_shipping: product.free_shipping || false,
+       });
+
+       const existing = Array.isArray(product.images)
+        ? product.images.filter((img): img is string => typeof img === 'string' && img.length > 0)
+        : typeof product.image === 'string' && product.image.length > 0
+          ? [product.image]
+          : [];
+       console.log('=== PRODUCT IMAGE LOADING ===');
+       console.log('Raw product.images:', product.images);
+       console.log('Filtered existing images:', existing);
+       setExistingImages(existing);
+       setUploadedImages([]);
+       setImagePreviewUrls([]);
+
+       if (product.variants && typeof product.variants === 'object') {
+          const variantData = product.variants as any;
+          if (variantData.sizes && Array.isArray(variantData.sizes)) {
+             const newSizeRows = variantData.sizes.map((s: any) => ({
+                id: generateRowId(),
+                value: s.value || '',
+                unit: s.unit || 'pcs',
+                name: s.name || '',
+                inStock: s.inStock !== false,
+                useBasePrice: s.priceOverride == null,
+                sizePrice: normalizeVariantNumber(s.priceOverride),
+                originalPrice: normalizeVariantNumber(s.originalPrice),
+             }));
+             setSizeRows(newSizeRows);
+             
+             // Match variant image names with actual product images
+             const existingVarImages: Record<string, string[]> = {};
+             console.log('Product images available:', existing);
+             variantData.sizes.forEach((s: any, idx: number) => {
+                if (s.images && Array.isArray(s.images)) {
+                   console.log(`Variant "${s.name || s.value}" images from JSON:`, s.images);
+                   // For each variant image name, try to find matching image in product.images
+                   const matchedImages = s.images.map((variantImgName: string) => {
+                      // Try exact match first
+                      if (existing.includes(variantImgName)) {
+                         console.log(`✓ Exact match found for "${variantImgName}"`);
+                         return variantImgName;
+                      }
+                      
+                      // PocketBase stores filenames with underscores and adds random suffix
+                      // e.g., "08b05c98-...-0.jpg" becomes "08b05c98_..._0_58rq9jbejh.jpg"
+                      // Convert dashes to underscores and remove extension for matching
+                      const variantNameWithoutExt = variantImgName.replace(/\.[^.]+$/, '').replace(/-/g, '_');
+                      const normalizedMatch = existing.find((img: string) => {
+                        const imgWithoutExt = img.replace(/\.[^.]+$/, '').replace(/-/g, '_');
+                        // Check if PocketBase filename starts with the variant filename
+                        // This handles the random suffix that PocketBase adds
+                        return imgWithoutExt.startsWith(variantNameWithoutExt) || 
+                               imgWithoutExt === variantNameWithoutExt;
+                      });
+                      
+                      if (normalizedMatch) {
+                         console.log(`✓ Normalized match found: "${variantImgName}" → "${normalizedMatch}"`);
+                         return normalizedMatch;
+                      }
+                      
+                      // Try to find image that ends with or contains the variant image name
+                      const match = existing.find((img: string) => 
+                        img.endsWith(variantImgName) || 
+                        img.includes(variantImgName) ||
+                        variantImgName.includes(img.split('.')[0]) // Match without extension
+                      );
+                      
+                      if (match) {
+                         console.log(`✓ Partial match found: "${variantImgName}" → "${match}"`);
+                         return match;
+                      }
+                      
+                      // If no match found, return the original name (will fail to load but shows what was expected)
+                      console.warn(`✗ No match found for "${variantImgName}"`);
+                      return variantImgName;
+                   });
+                   existingVarImages[newSizeRows[idx].id] = matchedImages;
+                   console.log(`Matched images for variant "${s.name || s.value}":`, matchedImages);
+                }
+             });
+             setVariantExistingBySize(existingVarImages);
+             setVariantFilenamesBySize({});
+             setVariantFilesBySize({});
+             setVariantPreviewsBySize({});
+          }
+          
+          if (variantData.combos && Array.isArray(variantData.combos)) {
+             setComboRows(variantData.combos.map((c: any) => ({
+                id: generateRowId(),
+                name: c.name || '',
+                value: c.value || '',
+                type: c.type || 'bundle',
+                items: c.items || 2,
+                discountType: c.discountType || 'amount',
+                discountValue: c.discountValue || 0,
+                priceOverride: c.priceOverride,
+                availableProducts: c.availableProducts || [],
+                requiredQuantity: c.requiredQuantity || c.items,
+                allowDuplicates: c.allowDuplicates !== false
+             })));
+          }
+          
+          if (variantData.colors && Array.isArray(variantData.colors)) {
+             setColorRows(variantData.colors.map((c: any) => ({
+                name: c.name || '',
+                hex: c.hex || '#000000',
+                value: c.value || '',
+                inStock: c.inStock !== false,
+             })));
+          }
+       }
+    }
+  }, [product, mode, form, open]);
+
+
   // Rebuild variants JSON when rows change (after form exists)
-  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows, variantFilenamesBySize, comboFilenamesByKey]);
+  useEffect(() => { buildVariantsFromRows(); }, [colorRows, sizeRows, comboRows, variantFilenamesBySize, comboFilenamesByKey, variantExistingBySize]);
   // Initialize selected variant size when sizes are present
   useEffect(() => {
     if (!sizeRows.length) {
@@ -820,8 +1105,12 @@ Only return the JSON, no explanations.`;
       if (processedValues.videoThumbnail) productData.videoThumbnail = processedValues.videoThumbnail;
       if (processedValues.videoDescription) productData.videoDescription = processedValues.videoDescription;
 
-      // If there are images, send multipart/form-data directly to the products collection
-      if (uploadedImages.length > 0 || Object.keys(variantFilesBySize).length > 0) {
+      // Always use FormData for updates to handle image removal
+      // For create, only use FormData if there are new images
+      const hasNewImages = uploadedImages.length > 0 || Object.keys(variantFilesBySize).length > 0;
+      const hasImageChanges = hasNewImages || (isEditMode && existingImages.length !== (product?.images?.length || 0));
+      
+      if (hasNewImages || (isEditMode && hasImageChanges)) {
         const formData = new FormData();
         // Append scalar fields
         Object.entries(productData).forEach(([key, value]) => {
@@ -829,43 +1118,71 @@ Only return the JSON, no explanations.`;
             formData.append(key, String(value));
           }
         });
-        // Append image files under the 'images' field (multiple)
+        // In edit mode, handle image updates
+        if (isEditMode && product?.images) {
+          // Find which images were removed
+          const originalImages = Array.isArray(product.images) ? product.images : [];
+          const removedImages = originalImages.filter(img => !existingImages.includes(img));
+          
+          console.log('Original images:', originalImages);
+          console.log('Remaining images:', existingImages);
+          console.log('Removed images:', removedImages);
+          
+          // Mark removed images with '-' prefix (PocketBase convention)
+          removedImages.forEach((imgName) => {
+            formData.append('images-', imgName);
+          });
+          
+          // Keep existing images by appending their filenames
+          existingImages.forEach((imgName) => {
+            formData.append('images', imgName);
+          });
+        }
+        
+        // Append new image files (both create and edit modes)
         uploadedImages.forEach((file) => { formData.append('images', file); });
-        // Append variant files as well
         Object.values(variantFilesBySize).forEach(files => { files.forEach(f => formData.append('images', f)); });
         Object.values(comboFilesByKey).forEach(files => { files.forEach(f => formData.append('images', f)); });
         // Ensure latest variants JSON with filenames
         buildVariantsFromRows();
         formData.set('variants', form.getValues('variants') || '');
-        // Pass FormData to onSubmit; the hook will send it as-is
-        await onSubmit(formData);
+        
+        // Call appropriate handler based on mode
+        if (isEditMode && onUpdate && product?.id) {
+          await onUpdate({ id: product.id, data: formData });
+        } else if (onCreate) {
+          await onCreate(formData);
+        }
       } else {
         // No images: submit JSON payload
-        await onSubmit(productData);
+        if (isEditMode && onUpdate && product?.id) {
+          await onUpdate({ id: product.id, data: productData });
+        } else if (onCreate) {
+          await onCreate(productData);
+        }
       }
       
       // Reset form and state
       form.reset();
-      // Clean up image preview URLs to prevent memory leaks
       imagePreviewUrls.forEach(url => URL.revokeObjectURL(url));
       setUploadedImages([]);
       setImagePreviewUrls([]);
-      // Clean variant previews
+      setExistingImages([]);
       Object.values(variantPreviewsBySize).flat().forEach(url => URL.revokeObjectURL(url));
       setVariantFilesBySize({});
       setVariantPreviewsBySize({});
       setVariantFilenamesBySize({});
+      setVariantExistingBySize({});
       setComboFilesByKey({});
       setComboPreviewsByKey({});
       setComboFilenamesByKey({});
       setSelectedVariantSizeId("");
-      // Clean up video state
       setShowMediaLibrary(false);
       onOpenChange(false);
-      toast.success('Product created successfully');
+      toast.success(isEditMode ? 'Product updated successfully' : 'Product created successfully');
     } catch (error) {
-      console.error('Error creating product:', error);
-      toast.error('Failed to create product');
+      console.error(`Error ${isEditMode ? 'updating' : 'creating'} product:`, error);
+      toast.error(`Failed to ${isEditMode ? 'update' : 'create'} product`);
     }
   };
 
@@ -873,12 +1190,17 @@ Only return the JSON, no explanations.`;
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-full h-[95vh] max-w-[96vw] sm:max-w-[96vw] xl:max-w-[96vw] overflow-hidden flex flex-col bg-background">
         <DialogHeader className="border-b pb-4">
-          <DialogTitle className="text-2xl font-semibold">Create Product</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">Add a new product to your store</p>
+          <DialogTitle className="text-2xl font-semibold">
+            {isViewMode ? 'Product Details' : isEditMode ? 'Edit Product' : 'Create Product'}
+          </DialogTitle>
+          <DialogDescription>
+            {isViewMode ? 'View product information' : isEditMode ? 'Update product details' : 'Add a new product to your store'}
+          </DialogDescription>
         </DialogHeader>
         
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="flex-1 overflow-hidden flex flex-col">
+            <fieldset disabled={isViewMode} className="flex-1 overflow-hidden flex flex-col group disabled:opacity-100">
             <Tabs defaultValue="basic" className="flex-1 overflow-hidden flex flex-col">
               <TabsList className="grid grid-cols-2 mb-6 bg-muted shadow-sm rounded-lg p-1">
                 <TabsTrigger value="basic" className="rounded-md data-[state=active]:bg-purple-600 data-[state=active]:text-white">Overview</TabsTrigger>
@@ -936,7 +1258,10 @@ Only return the JSON, no explanations.`;
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                   </svg>
                                 </div>
-                                <FormLabel className="text-base font-semibold text-purple-900">AI Assistant</FormLabel>
+                                <div>
+                                  <div className="text-base font-semibold text-purple-900">AI Assistant</div>
+                                  <div className="text-xs text-purple-700">Generate product content with AI</div>
+                                </div>
                               </div>
                               <Button
                                 type="button"
@@ -950,9 +1275,9 @@ Only return the JSON, no explanations.`;
                             </div>
                             
                             {showAiPrompt && (
-                              <div className="space-y-2 animate-in slide-in-from-top-2 duration-300">
+                              <div className="space-y-2 mt-3 animate-in slide-in-from-top-2 duration-300">
                                 <Input
-                                  placeholder="Enter keywords, mood, or product details (e.g., 'organic lavender soap, calming, luxury')"
+                                  placeholder="Enter keywords or product details (optional)"
                                   value={aiKeywords}
                                   onChange={(e) => setAiKeywords(e.target.value)}
                                   className="border-purple-300 focus:border-purple-500 focus:ring-purple-500"
@@ -1333,6 +1658,30 @@ Only return the JSON, no explanations.`;
                           )}
 
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {existingImages.map((url, index) => (
+                              <div key={`existing-${index}`} className="relative group overflow-hidden rounded-md border">
+                                <AspectRatio ratio={1 / 1}>
+                                  <img
+                                    src={getImageUrl(url)}
+                                    alt={`Product image ${index + 1}`}
+                                    className="object-cover w-full h-full"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
+                                    }}
+                                  />
+                                </AspectRatio>
+                                {!isViewMode && (
+                                <button
+                                  type="button"
+                                  onClick={() => removeExistingImage(index)}
+                                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
+                                  aria-label={`Remove image ${index + 1}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                                )}
+                              </div>
+                            ))}
                             {imagePreviewUrls.map((url, index) => (
                               <div key={index} className="relative group overflow-hidden rounded-md border">
                                 <AspectRatio ratio={1 / 1}>
@@ -1355,6 +1704,7 @@ Only return the JSON, no explanations.`;
                                 </button>
                               </div>
                             ))}
+                            {!isViewMode && (
                             <div className="flex items-center justify-center rounded-md border border-dashed p-4 h-full min-h-[150px]">
                               <label htmlFor="image-upload" className="flex flex-col items-center justify-center cursor-pointer w-full h-full">
                                 <div className="flex flex-col items-center justify-center gap-2">
@@ -1373,6 +1723,7 @@ Only return the JSON, no explanations.`;
                                 />
                               </label>
                             </div>
+                            )}
                           </div>
                         </CardContent>
                       </Card>
@@ -1807,20 +2158,63 @@ Only return the JSON, no explanations.`;
                                     className="sr-only"
                                     onChange={(e)=>handleSizeRowImageUpload(s.id, e)}
                                   />
-                                  <span className="text-xs text-muted-foreground">{(variantFilenamesBySize[s.id] || []).length} selected</span>
+                                  <span className="text-xs text-muted-foreground">
+                                    {(variantExistingBySize[s.id] || []).length > 0 && `${(variantExistingBySize[s.id] || []).length} existing, `}
+                                    {(variantFilenamesBySize[s.id] || []).length} new selected
+                                  </span>
                                 </div>
+                                {/* Display existing variant images from product */}
+                                {(variantExistingBySize[s.id] || []).length > 0 && (
+                                  <div className="col-span-12">
+                                    <p className="text-xs text-muted-foreground mb-2">Existing Images:</p>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                      {(variantExistingBySize[s.id] || []).map((imageName, idx) => {
+                                        const imageUrl = getImageUrl(imageName);
+                                        console.log('Variant image URL:', { imageName, imageUrl, productId: product?.id, collectionId: product?.collectionId });
+                                        return (
+                                          <div key={`existing-${idx}`} className="relative group overflow-hidden rounded-md border">
+                                            <AspectRatio ratio={1/1}>
+                                              <img 
+                                                src={imageUrl} 
+                                                alt={`Existing variant ${idx + 1}`} 
+                                                className="object-cover w-full h-full" 
+                                                onError={(e) => { 
+                                                  console.error('Failed to load variant image:', imageUrl);
+                                                  (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found'; 
+                                                }} 
+                                              />
+                                            </AspectRatio>
+                                            {!isViewMode && (
+                                              <button 
+                                                type="button" 
+                                                onClick={() => removeExistingVariantImage(s.id, idx)} 
+                                                className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70"
+                                              >
+                                                <X className="h-4 w-4" />
+                                              </button>
+                                            )}
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  </div>
+                                )}
+                                {/* Display new uploaded variant images */}
                                 {(variantPreviewsBySize[s.id] || []).length > 0 && (
-                                  <div className="col-span-12 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                                    {(variantPreviewsBySize[s.id] || []).map((url, idx)=> (
-                                      <div key={idx} className="relative group overflow-hidden rounded-md border">
-                                        <AspectRatio ratio={1/1}>
-                                          <img src={url} alt="Variant preview" className="object-cover w-full h-full" onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Preview+Not+Found'; }} />
-                                        </AspectRatio>
-                                        <button type="button" onClick={()=>removeVariantImage(s.id, idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70">
-                                          <X className="h-4 w-4" />
-                                        </button>
-                                      </div>
-                                    ))}
+                                  <div className="col-span-12">
+                                    <p className="text-xs text-muted-foreground mb-2">New Images:</p>
+                                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                                      {(variantPreviewsBySize[s.id] || []).map((url, idx)=> (
+                                        <div key={`new-${idx}`} className="relative group overflow-hidden rounded-md border">
+                                          <AspectRatio ratio={1/1}>
+                                            <img src={url} alt="Variant preview" className="object-cover w-full h-full" onError={(e)=>{ (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Preview+Not+Found'; }} />
+                                          </AspectRatio>
+                                          <button type="button" onClick={()=>removeVariantImage(s.id, idx)} className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70">
+                                            <X className="h-4 w-4" />
+                                          </button>
+                                        </div>
+                                      ))}
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -2218,30 +2612,63 @@ Only return the JSON, no explanations.`;
                 </div>
               </Tabs>
 
-              <Alert className="mt-6 bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800 rounded-lg">
-                <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
-                  <strong>Tip:</strong> For fields like Features, Colors, and Tags, you can enter simple comma-separated values and they will be automatically converted to the required JSON format.
-                </AlertDescription>
-              </Alert>
-
-              <DialogFooter className="mt-6 pt-6 border-t bg-background sticky bottom-0 flex gap-3">
-                <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="px-6">
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isSubmitting} className="px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
-                  {isSubmitting ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Creating...
-                    </>
-                  ) : (
-                    'Create Product'
-                  )}
-                </Button>
-              </DialogFooter>
+              </fieldset>
+              
+              <div className="mt-6 pt-6 border-t bg-background sticky bottom-0 flex items-center justify-end gap-3">
+                {isViewMode ? (
+                  <>
+                    {onDelete && product?.id && (
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this product?')) {
+                            onDelete();
+                            onOpenChange(false);
+                          }
+                        }}
+                        className="mr-auto"
+                      >
+                        Delete Product
+                      </Button>
+                    )}
+                    <Button type="button" onClick={() => onOpenChange(false)} className="px-6">
+                      Close
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    {isEditMode && onDelete && product?.id && (
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        onClick={() => {
+                          if (window.confirm('Are you sure you want to delete this product?')) {
+                            onDelete();
+                            onOpenChange(false);
+                          }
+                        }}
+                        className="mr-auto"
+                      >
+                        Delete
+                      </Button>
+                    )}
+                    <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="px-6">
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting} className="px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {isEditMode ? 'Updating...' : 'Creating...'}
+                        </>
+                      ) : (
+                        isEditMode ? 'Update Product' : 'Create Product'
+                      )}
+                    </Button>
+                  </>
+                )}
+              </div>
           </form>
         </Form>
       </DialogContent>

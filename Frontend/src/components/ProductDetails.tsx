@@ -160,36 +160,43 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
     // First priority: Check if there's a dedicated videoThumbnail field
     if (product.videoThumbnail) {
       try {
-        // Get the file extension to determine format
-        const fileExtension = product.videoThumbnail.split('.').pop()?.toLowerCase() || '';
-        let format: 'webp' | 'jpeg' | 'png' | 'avif' = 'webp';
-        
-        // Set format based on file extension
-        if (fileExtension === 'png') format = 'png';
-        else if (fileExtension === 'jpg' || fileExtension === 'jpeg') format = 'jpeg';
-        else if (fileExtension === 'avif') format = 'avif';
-        
-        // Use the same approach as the video URL construction
-        // First check if the videoThumbnail is already a full URL
+        // Check if the videoThumbnail is already a full URL
         if (product.videoThumbnail.startsWith('http')) {
           setThumbnailUrl(product.videoThumbnail);
           console.log('Using full URL video thumbnail:', product.videoThumbnail);
+          setThumbnailLoading(false);
         } else {
-          // Otherwise construct the URL using the same pattern as getPocketBaseFileUrl
+          // Construct the URL using PocketBase pattern
           const baseUrl = pocketbase.baseUrl.endsWith('/') 
             ? pocketbase.baseUrl.slice(0, -1) 
             : pocketbase.baseUrl;
           
-          // Use the direct URL approach that's known to work
+          // Use the direct URL approach
           const videoThumbnail = `${baseUrl}/api/files/${Collections.PRODUCTS}/${product.id}/${product.videoThumbnail}`;
           setThumbnailUrl(videoThumbnail);
           console.log('Using constructed video thumbnail URL:', videoThumbnail);
+          setThumbnailLoading(false);
         }
-        
-        setThumbnailLoading(false);
       } catch (error) {
         console.error('Error using dedicated video thumbnail:', error);
-        setThumbnailError(true);
+        // Fallback to using product image as thumbnail
+        if (product.images && product.images.length > 0) {
+          try {
+            const thumbnailImage = getPocketBaseImageUrl(
+              product.images[0], 
+              Collections.PRODUCTS, 
+              "medium", 
+              "webp"
+            );
+            setThumbnailUrl(thumbnailImage);
+            console.log('Fallback: Using product image as video thumbnail:', thumbnailImage);
+          } catch (imgError) {
+            console.error('Error generating thumbnail from product image:', imgError);
+            setThumbnailError(true);
+          }
+        } else {
+          setThumbnailError(true);
+        }
         setThumbnailLoading(false);
       }
     }
@@ -224,7 +231,7 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
         }
       } else {
         // Fallback to direct URL
-        setThumbnailUrl(getPocketBaseFileUrl(product.videoUrl));
+        setThumbnailUrl(getPocketBaseFileUrl(product.videoUrl, product.id));
         console.log('Using direct video URL as thumbnail:', product.videoUrl);
         setThumbnailLoading(false);
       }

@@ -53,7 +53,7 @@ export function getPocketBaseImageUrl(
   baseUrl?: string
 ): string {
   // Use the environment variable or fallback to a default
-  const pbBaseUrl = baseUrl || import.meta.env.VITE_POCKETBASE_URL || 'http://localhost:8090';
+  const pbBaseUrl = baseUrl || import.meta.env.VITE_POCKETBASE_URL || 'https://backend.karigaistore.in';
   
   // Skip processing if URL is already a full URL (starts with http or data:)
   if (url.startsWith('http') || url.startsWith('data:')) {
