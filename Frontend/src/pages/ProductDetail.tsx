@@ -343,12 +343,17 @@ const ProductDetail = () => {
       if (!uniqueVariantImages.includes(img)) uniqueVariantImages.push(img);
     });
     
-    // If we have variant images, use ONLY variant images (skip main product images)
-    // If no variant images, fall back to main product images
+    // If we have variant images, use variant images + base images for thumbnail gallery
+    // This ensures thumbnails always show all available images
     let finalImages: string[];
     if (uniqueVariantImages.length > 0) {
-      finalImages = uniqueVariantImages;
-      console.log('Using variant images only:', finalImages);
+      // Use variant images, but also include base images in the thumbnail gallery
+      const combined = [...uniqueVariantImages];
+      base.forEach((img) => {
+        if (!combined.includes(img)) combined.push(img);
+      });
+      finalImages = combined;
+      console.log('Using variant + base images:', finalImages);
     } else {
       // No variant images available, use base product images
       const uniqueBaseImages: string[] = [];
