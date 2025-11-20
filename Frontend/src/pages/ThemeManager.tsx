@@ -18,6 +18,14 @@ export default function ThemeManager() {
   const [pc, setPc] = useState<ProductCardSettings>({ corner: 'rounded', shadow: 'soft', showWishlist: true, showTags: true, showDescription: true, ctaLabel: 'Add to Cart', ctaStyle: 'pill' });
   const [bgHex, setBgHex] = useState<string>('#ffffffff');
   const [darkBgHex, setDarkBgHex] = useState<string>('#0f172a');
+  const [branding, setBranding] = useState({
+    siteTitle: import.meta.env.VITE_SITE_TITLE || 'Karigai - Handmade Natural Soaps',
+    siteDescription:
+      'Discover our handmade natural soaps, crafted with care for your skin and the environment.',
+    logoUrl: import.meta.env.VITE_SITE_LOGO || '',
+    faviconUrl: '/soap-favicon.svg',
+    socialImageUrl: '/og-image.png',
+  });
 
   // Premade template themes (no backend schema change required)
   const templates = [
@@ -111,6 +119,15 @@ export default function ThemeManager() {
         ctaSize: d.productCard.ctaSize || 'md',
         spacing: d.productCard.spacing || 'compact'
       });
+      if (d.branding) {
+        setBranding((prev) => ({
+          siteTitle: d.branding.siteTitle || prev.siteTitle,
+          siteDescription: d.branding.siteDescription || prev.siteDescription,
+          logoUrl: d.branding.logoUrl || prev.logoUrl,
+          faviconUrl: d.branding.faviconUrl || prev.faviconUrl,
+          socialImageUrl: d.branding.socialImageUrl || prev.socialImageUrl,
+        }));
+      }
     } else {
       // Fallback to legacy fields
       setEditing({ ...selected });
@@ -193,6 +210,7 @@ export default function ThemeManager() {
           productCard: pc,
           background: { hex: bgHex, hsl: hexToHslString(bgHex) },
           darkBackground: { hsl: hexToHslString(darkBgHex) },
+          branding,
         }
       });
       const list = await getAllThemes();
@@ -227,6 +245,7 @@ export default function ThemeManager() {
     if (!selected || !editing) return;
     setSaving(true);
     try {
+      const existingData = (selected as any).data as any | undefined;
       const updated = await updateTheme(selected.id, {
         name: editing.name || selected.name,
         is_active: Boolean(editing.is_active),
@@ -249,6 +268,10 @@ export default function ThemeManager() {
           productCard: pc,
           background: { hex: bgHex, hsl: hexToHslString(bgHex) },
           darkBackground: { hsl: hexToHslString(darkBgHex) },
+          branding: {
+            ...(existingData?.branding || {}),
+            ...branding,
+          },
         }
       });
       setThemes(prev => prev.map(t => t.id === updated.id ? updated : t));
@@ -426,6 +449,97 @@ export default function ThemeManager() {
                   <div className="px-3 py-2 text-sm text-muted-foreground">No themes yet</div>
                 )}
               </nav>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Branding &amp; SEO</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="branding-title">Site Title</Label>
+                  <Input
+                    id="branding-title"
+                    value={branding.siteTitle}
+                    onChange={(e) => setBranding({ ...branding, siteTitle: e.target.value })}
+                    placeholder="Site title used for document title"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="branding-favicon">Favicon URL</Label>
+                  <Input
+                    id="branding-favicon"
+                    value={branding.faviconUrl}
+                    onChange={(e) => setBranding({ ...branding, faviconUrl: e.target.value })}
+                    placeholder="https://.../favicon.svg or /soap-favicon.svg"
+                  />
+                  {branding.faviconUrl && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Preview:</span>
+                      <img
+                        src={branding.faviconUrl}
+                        alt="Favicon preview"
+                        className="h-6 w-6 rounded border bg-background"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="branding-description">Default Meta Description</Label>
+                <textarea
+                  id="branding-description"
+                  value={branding.siteDescription}
+                  onChange={(e) => setBranding({ ...branding, siteDescription: e.target.value })}
+                  placeholder="Short description used for SEO meta description"
+                  className="w-full min-h-[80px] rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="branding-logo">Logo URL</Label>
+                  <Input
+                    id="branding-logo"
+                    value={branding.logoUrl}
+                    onChange={(e) => setBranding({ ...branding, logoUrl: e.target.value })}
+                    placeholder="https://.../logo.png or PocketBase content URL"
+                  />
+                  {branding.logoUrl && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Preview:</span>
+                      <img
+                        src={branding.logoUrl}
+                        alt="Logo preview"
+                        className="h-10 rounded bg-background border"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="branding-social">Social / OG Image URL</Label>
+                  <Input
+                    id="branding-social"
+                    value={branding.socialImageUrl}
+                    onChange={(e) => setBranding({ ...branding, socialImageUrl: e.target.value })}
+                    placeholder="Image used for OpenGraph / Twitter cards"
+                  />
+                  {branding.socialImageUrl && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Preview:</span>
+                      <img
+                        src={branding.socialImageUrl}
+                        alt="Social image preview"
+                        className="h-12 rounded bg-background border object-cover"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             </CardContent>
           </Card>
 

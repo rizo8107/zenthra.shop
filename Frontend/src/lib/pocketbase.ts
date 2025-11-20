@@ -696,6 +696,14 @@ export interface ThemeData {
     productCard?: ProductCardSettings;
     background?: { hex: string; hsl: string };
     darkBackground?: { hsl: string };
+    // Optional branding information for logos, favicons and SEO defaults
+    branding?: {
+        siteTitle?: string;
+        siteDescription?: string;
+        logoUrl?: string;
+        faviconUrl?: string;
+        socialImageUrl?: string;
+    };
 }
 
 export interface ThemeSettings extends RecordModel {
