@@ -1874,6 +1874,86 @@ Only return the JSON, no explanations.`;
 
                 <TabsContent value="variants" className="space-y-4 mt-0">
 
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="list_order"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>List Order</FormLabel>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 123"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="original_price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Original Price</FormLabel>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 999.99"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="qikink_sku"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Qikink SKU</FormLabel>
+                          <Input {...field} placeholder="e.g., SKU-123" />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="print_type_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Print Type ID</FormLabel>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 123"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="product_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Type</FormLabel>
+                        <Input {...field} placeholder="e.g., Apparel" />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
                   <FormField
                     control={form.control}
                     name="features"

@@ -37,10 +37,13 @@ export function ProductCardGrid({ products, onView, onEdit, isLoading = false }:
         {Array.from({ length: 12 }).map((_, i) => (
           <div key={i} className="flex flex-col space-y-2">
             <Skeleton className="h-[160px] w-full rounded-lg" />
-            <div className="space-y-1.5 px-2 pb-3">
+            <div className="space-y-1.5 px-2">
               <Skeleton className="h-3 w-3/4" />
               <Skeleton className="h-3 w-1/2" />
               <Skeleton className="h-3 w-1/4" />
+            </div>
+            <div className="flex justify-end px-2 pt-1">
+              <Skeleton className="h-7 w-16" />
             </div>
           </div>
         ))}

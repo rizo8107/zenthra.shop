@@ -33,14 +33,18 @@ export function ProductCardGrid({ products, onView, onEdit, isLoading = false }:
   // Display loading state
   if (isLoading) {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <div key={i} className="flex flex-col space-y-2">
-            <Skeleton className="h-[160px] w-full rounded-lg" />
-            <div className="space-y-1.5 px-2 pb-3">
-              <Skeleton className="h-3 w-3/4" />
-              <Skeleton className="h-3 w-1/2" />
-              <Skeleton className="h-3 w-1/4" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <div key={i} className="flex flex-col space-y-3">
+            <Skeleton className="h-[200px] w-full rounded-lg" />
+            <div className="space-y-2">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-1/4" />
+            </div>
+            <div className="flex space-x-2 pt-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
             </div>
           </div>
         ))}
@@ -72,7 +76,7 @@ export function ProductCardGrid({ products, onView, onEdit, isLoading = false }:
 
   // Render product cards
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       {validProducts.map((product) => (
         <ProductCard 
           key={product.id} 

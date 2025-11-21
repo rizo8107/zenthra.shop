@@ -1,9 +1,11 @@
 import React from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Product } from '@/types/schema';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { formatDate } from '@/lib/utils';
+import { Pencil } from 'lucide-react';
 import { getImageUrl } from '@/lib/pocketbase';
 
 interface ProductCardProps {
@@ -102,6 +104,21 @@ export function ProductCard({ product, onView, onEdit }: ProductCardProps) {
           </div>
         </div>
       </CardContent>
+      
+      <CardFooter className="pt-2 pb-4 px-4 flex justify-end">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="h-8 px-3"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(product);
+          }}
+        >
+          <Pencil className="h-3.5 w-3.5 mr-1.5" />
+          Edit
+        </Button>
+      </CardFooter>
     </Card>
   );
 }
