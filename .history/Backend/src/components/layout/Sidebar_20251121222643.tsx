@@ -86,7 +86,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { title: 'Abandoned carts', path: '/admin/abandoned-carts', icon: AlertTriangle },
     { title: 'Products', path: '/admin/products', icon: Package },
     { title: 'Automation', path: '/admin/automation', icon: Workflow, badge: 'Beta' },
-    { title: 'Checkout Flow', path: '/admin/checkout-flow', icon: Workflow },
     { title: 'Pages', path: '/admin/pages', icon: FileText },
     { title: 'Navbar', path: '/admin/navbar', icon: Menu },
     { title: 'Themes', path: '/admin/themes', icon: Palette },

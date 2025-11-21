@@ -1188,13 +1188,13 @@ Only return the JSON, no explanations.`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full h-[95vh] max-w-[1080px] overflow-hidden flex flex-col bg-background">
-        <DialogHeader className="border-b pb-3 px-6">
-          <DialogTitle className="text-xl font-semibold">
-            {isViewMode ? 'Product Details' : isEditMode ? 'Edit Product' : 'Add New Product'}
+      <DialogContent className="w-full h-[95vh] max-w-[100px] overflow-hidden flex flex-col bg-background">
+        <DialogHeader className="border-b pb-4">
+          <DialogTitle className="text-2xl font-semibold">
+            {isViewMode ? 'Product Details' : isEditMode ? 'Edit Product' : 'Create Product'}
           </DialogTitle>
-          <DialogDescription className="text-sm">
-            {isViewMode ? 'View product information' : isEditMode ? 'Update product details' : 'Fill in the product information below'}
+          <DialogDescription>
+            {isViewMode ? 'View product information' : isEditMode ? 'Update product details' : 'Add a new product to your store'}
           </DialogDescription>
         </DialogHeader>
         
@@ -1207,7 +1207,7 @@ Only return the JSON, no explanations.`;
                 <TabsTrigger value="variants" className="rounded-md data-[state=active]:bg-green-600 data-[state=active]:text-white">Variants & Combos</TabsTrigger>
               </TabsList>
 
-              <div className="flex-1 overflow-auto px-6 py-4">
+              <div className="flex-1 overflow-auto px-2 py-1">
                 <TabsContent value="basic" className="mt-0">
                   <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
                     {/* Left column: Description and Category */}
@@ -1615,8 +1615,8 @@ Only return the JSON, no explanations.`;
                       </Card>
                     </div>
 
-                    {/* Right column: Images, Shipping, Pricing - Sticky */}
-                    <div className="space-y-4 sticky top-4 self-start">
+                    {/* Right column: Images, Shipping, Pricing */}
+                    <div className="space-y-4">
                       <Card className="shadow-sm border rounded-lg overflow-hidden">
                         <CardHeader className="bg-muted/30 border-b py-3 px-4 flex flex-row items-center justify-between">
                           <CardTitle className="text-sm font-semibold">Product Images</CardTitle>
@@ -1870,9 +1870,203 @@ Only return the JSON, no explanations.`;
                       </div>
                     )}
                   </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5" />
+                        Product Images
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {imagePreviewUrls.map((url, index) => (
+                          <div key={index} className="relative group overflow-hidden rounded-md border">
+                            <AspectRatio ratio={1 / 1}>
+                              <img
+                                src={url}
+                                alt={`Product image ${index + 1}`}
+                                className="object-cover w-full h-full"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
+                                }}
+                              />
+                            </AspectRatio>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
+                              aria-label={`Remove image ${index + 1}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-center rounded-md border border-dashed p-4 h-full min-h-[150px]">
+                          <label htmlFor="image-upload" className="flex flex-col items-center justify-center cursor-pointer w-full h-full">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Upload className="h-8 w-8 text-muted-foreground" />
+                              <span className="text-sm font-medium text-muted-foreground">Upload Image</span>
+                              <span className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 5MB</span>
+                            </div>
+                            <input
+                              id="image-upload"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="sr-only"
+                              onChange={handleImageUpload}
+                              disabled={isCompressing}
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-medium" htmlFor="variant-size-select">Variant Images — Size</label>
+                          <select
+                            id="variant-size-select"
+                            className="h-8 rounded-md border bg-background px-2 text-sm"
+                            value={selectedVariantSizeId}
+                            onChange={(e) => setSelectedVariantSizeId(e.target.value)}
+                          >
+                            <option value="" disabled>Select a size</option>
+                            {sizeRows.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name || (s.unit ? `${s.value} ${s.unit}` : s.value)}</option>
+                            ))}
+                          </select>
+                          <div className="ml-auto">
+                            <label htmlFor="variant-image-upload" className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                              <Upload className="h-4 w-4" /> Upload for size
+                            </label>
+                            <input
+                              id="variant-image-upload"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="sr-only"
+                              onChange={handleVariantImageUpload}
+                              disabled={!selectedVariantSizeId || isCompressing}
+                            />
+                          </div>
+                        </div>
+                        {selectedVariantSizeId ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {(variantPreviewsBySize[selectedVariantSizeId] || []).map((url, index) => (
+                              <div key={index} className="relative group overflow-hidden rounded-md border">
+                                <AspectRatio ratio={1 / 1}>
+                                  <img
+                                    src={url}
+                                    alt={`Variant image ${index + 1}`}
+                                    className="object-cover w-full h-full"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
+                                    }}
+                                  />
+                                </AspectRatio>
+                                <button
+                                  type="button"
+                                  onClick={() => removeVariantImage(selectedVariantSizeId, index)}
+                                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
+                                  aria-label={`Remove variant image ${index + 1}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Alert>
+                            <AlertDescription>Select a size first, then upload images for that variant.</AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
                 <TabsContent value="variants" className="space-y-4 mt-0">
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="list_order"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>List Order</FormLabel>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 123"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="original_price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Original Price</FormLabel>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 999.99"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="qikink_sku"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Qikink SKU</FormLabel>
+                          <Input {...field} placeholder="e.g., SKU-123" />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="print_type_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Print Type ID</FormLabel>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 123"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="product_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Type</FormLabel>
+                        <Input {...field} placeholder="e.g., Apparel" />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -2116,56 +2310,17 @@ Only return the JSON, no explanations.`;
                         </div>
                         <div className="space-y-3">
                           <FormLabel className="text-sm font-medium">Combos</FormLabel>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <Select
-                              onValueChange={(val) => {
-                                setComboRows(prev => {
-                                  const next = [...prev];
-                                  const id = generateRowId();
-                                  if (val === 'bogo') {
-                                    next.push({ id, name: 'Buy 1 Get 1', value: 'bogo', type: 'bogo' });
-                                  } else if (val === '2-pack') {
-                                    next.push({ id, name: '2-Pack', value: '2-pack', type: 'bundle', items: 2 });
-                                  } else if (val === '3-pack') {
-                                    next.push({ id, name: '3-Pack', value: '3-pack', type: 'bundle', items: 3 });
-                                  } else if (val === '4-pack') {
-                                    next.push({ id, name: '4-Pack', value: '4-pack', type: 'bundle', items: 4 });
-                                  } else if (val === 'custom') {
-                                    next.push({ id, name: '', value: '', type: 'bundle' });
-                                  } else if (val === 'buy-any-2') {
-                                    next.push({ id, name: 'Buy Any 2', value: 'buy-any-2', type: 'buy_any_x', requiredQuantity: 2, allowDuplicates: true, availableProducts: [] });
-                                  } else if (val === 'buy-any-3') {
-                                    next.push({ id, name: 'Buy Any 3', value: 'buy-any-3', type: 'buy_any_x', requiredQuantity: 3, allowDuplicates: true, availableProducts: [] });
-                                  } else if (val === '2-pack-10off') {
-                                    next.push({ id, name: '2-Pack', value: '2-pack-10off', type: 'bundle', items: 2, discountType: 'percent', discountValue: 10 });
-                                  } else if (val === '3-pack-15off') {
-                                    next.push({ id, name: '3-Pack', value: '3-pack-15off', type: 'bundle', items: 3, discountType: 'percent', discountValue: 15 });
-                                  } else if (val === '4-pack-20off') {
-                                    next.push({ id, name: '4-Pack', value: '4-pack-20off', type: 'bundle', items: 4, discountType: 'percent', discountValue: 20 });
-                                  }
-                                  return next;
-                                });
-                              }}
-                            >
-                              <SelectTrigger className="w-full sm:w-64 h-9 text-sm">
-                                <SelectValue placeholder="Add a combo preset" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="bogo">Buy 1 Get 1</SelectItem>
-                                <SelectItem value="2-pack">2-Pack</SelectItem>
-                                <SelectItem value="3-pack">3-Pack</SelectItem>
-                                <SelectItem value="4-pack">4-Pack</SelectItem>
-                                <SelectItem value="custom">Custom</SelectItem>
-                                <SelectItem value="buy-any-2">Buy Any 2</SelectItem>
-                                <SelectItem value="buy-any-3">Buy Any 3</SelectItem>
-                                <SelectItem value="2-pack-10off">2-Pack −10%</SelectItem>
-                                <SelectItem value="3-pack-15off">3-Pack −15%</SelectItem>
-                                <SelectItem value="4-pack-20off">4-Pack −20%</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <span className="text-xs text-muted-foreground">
-                              {comboRows.length ? `${comboRows.length} combo(s) added` : 'No combos added yet'}
-                            </span>
+                          <div className="grid grid-cols-3 gap-3">
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
+                            <Button type="button" variant="secondary" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'',value:'',type:'bundle'}])}>Add Custom</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 2', value:'buy-any-2', type:'buy_any_x', requiredQuantity: 2, allowDuplicates: true, availableProducts: []}])}>Buy Any 2</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 3', value:'buy-any-3', type:'buy_any_x', requiredQuantity: 3, allowDuplicates: true, availableProducts: []}])}>Buy Any 3</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
                           </div>
                           <div className="space-y-2">
                             {comboRows.map((cb) => (

@@ -681,16 +681,10 @@ export const OrdersTable: FC<OrdersTableProps> = ({
                     {/* middle: customer + badges */}
                     <div className="mt-2">
                       <div className="text-sm font-medium">
-                        {order.customer_name?.trim() ||
-                          order.user_name?.trim() ||
-                          (order as any).expand?.user?.[0]?.name?.trim() ||
-                          "N/A"}
+                        {order.customer_name || order.user_name || "N/A"}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {order.customer_email?.trim() ||
-                          order.user_email?.trim() ||
-                          (order as any).expand?.user?.[0]?.email?.trim() ||
-                          "N/A"}
+                        {order.customer_email || order.user_email || "N/A"}
                       </div>
                     </div>
 
@@ -812,16 +806,10 @@ export const OrdersTable: FC<OrdersTableProps> = ({
                   <TableCell>
                     <div>
                       <div className="font-medium">
-                        {order.customer_name?.trim() ||
-                          order.user_name?.trim() ||
-                          (order as any).expand?.user?.[0]?.name?.trim() ||
-                          "N/A"}
+                        {order.customer_name || order.user_name || "N/A"}
                       </div>
                       <div className="text-xs text-muted-foreground">
-                        {order.customer_email?.trim() ||
-                          order.user_email?.trim() ||
-                          (order as any).expand?.user?.[0]?.email?.trim() ||
-                          "N/A"}
+                        {order.customer_email || order.user_email || "N/A"}
                       </div>
                     </div>
                   </TableCell>

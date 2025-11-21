@@ -32,10 +32,6 @@ import {
   getRazorpayKeySecret,
   loadRazorpayScript,
 } from "@/lib/razorpay-client";
-import {
-  getEnabledPaymentMethodsForDefaultFlow,
-  type CheckoutContext,
-} from "@/lib/checkoutFlow";
 import { sendWebhookEvent } from '@/lib/webhooks';
 import { trackEcommerceEvent } from "@/utils/analytics";
 import {
@@ -1233,6 +1229,7 @@ export default function CheckoutPage() {
         affiliation: "Karigai Web Store",
       })),
       calculateFinalTotal().finalTotal,
+      // Removed third parameter as trackBeginCheckout only accepts two parameters
     );
 
     // Track the checkout button click
@@ -1283,39 +1280,6 @@ export default function CheckoutPage() {
         throw new Error(
           "Some items in your cart are invalid. Please try refreshing the page.",
         );
-      }
-
-      // Evaluate checkout flow and ensure Razorpay is allowed for this order
-      const totalsForFlow = calculateFinalTotal();
-      const flowContext: CheckoutContext = {
-        subtotal: Number(totalsForFlow.finalSubtotal || 0),
-        shippingCost: Number(totalsForFlow.shippingCost || 0),
-        discountTotal: Number(totalsForFlow.finalDiscount || 0),
-        total: Number(totalsForFlow.finalTotal || 0),
-        destinationState: formData.state,
-        destinationCountry: "India",
-        isGuest: isGuestCheckout || !user,
-        items: items.map((item) => ({
-          productId: item.productId,
-          category: (item.product as any)?.category,
-          tn_shipping_enabled: (item.product as any)?.tn_shipping_enabled,
-        })),
-      };
-
-      const enabledMethods = getEnabledPaymentMethodsForDefaultFlow(flowContext);
-      const razorpayAllowed = enabledMethods.some(
-        (m) => m.method === "razorpay",
-      );
-
-      if (!razorpayAllowed) {
-        toast({
-          variant: "destructive",
-          title: "Payment not available",
-          description:
-            "Online payment is not available for this order. Please contact support or change your address/order.",
-        });
-        setIsSubmitting(false);
-        return;
       }
 
       // Enforce Tamil Nadu shipping restrictions based on per-product flag

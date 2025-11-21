@@ -35,48 +35,12 @@ export const mapPocketBaseOrderToOrder = (record: any): Order => {
     product_image: item.product_image || undefined
   })) || [];
 
-  // Derive sensible customer identity values
-  const rawCustomerName = (record.customer_name as string) || '';
-  const rawCustomerEmail = (record.customer_email as string) || '';
-  const rawCustomerPhone = (record.customer_phone as string) || '';
-
-  const customer_name =
-    (typeof rawCustomerName === 'string' && rawCustomerName.trim()) ||
-    (typeof shippingAddress?.name === 'string' && shippingAddress.name.trim()) ||
-    (typeof user?.name === 'string' && user.name.trim()) ||
-    '';
-
-  const customer_email =
-    (typeof rawCustomerEmail === 'string' && rawCustomerEmail.trim()) ||
-    (typeof user?.email === 'string' && user.email.trim()) ||
-    '';
-
-  const customer_phone =
-    (typeof rawCustomerPhone === 'string' && rawCustomerPhone.trim()) ||
-    (typeof shippingAddress?.phone === 'string' && shippingAddress.phone.trim()) ||
-    '';
-
-  const user_name =
-    (typeof user?.name === 'string' && user.name.trim()) ||
-    customer_name ||
-    (typeof record.user_name === 'string' && record.user_name.trim()) ||
-    '';
-
-  const user_email =
-    (typeof user?.email === 'string' && user.email.trim()) ||
-    customer_email ||
-    (typeof record.user_email === 'string' && record.user_email.trim()) ||
-    '';
-
   // Map to our Order type
   return {
     id: record.id || '',
     user_id: record.user_id || '',
-    user_name,
-    user_email,
-    customer_name,
-    customer_email,
-    customer_phone,
+    user_name: user.name || record.user_name || '',
+    user_email: user.email || record.user_email || '',
     status: (record.status as OrderStatus) || 'pending',
     payment_status: (record.payment_status as PaymentStatus) || 'pending',
     payment_id: record.payment_id,

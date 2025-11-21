@@ -57,10 +57,6 @@ export interface Order {
   user_id: string;
   user_name: string;
   user_email: string;
-  // Optional direct customer fields when available
-  customer_name?: string;
-  customer_email?: string;
-  customer_phone?: string;
   status: OrderStatus;
   payment_status: PaymentStatus;
   payment_id?: string;

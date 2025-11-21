@@ -1,9 +1,11 @@
 import React from 'react';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Product } from '@/types/schema';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { formatDate } from '@/lib/utils';
+import { Eye, Pencil } from 'lucide-react';
 import { getImageUrl } from '@/lib/pocketbase';
 
 interface ProductCardProps {
@@ -42,10 +44,7 @@ export function ProductCard({ product, onView, onEdit }: ProductCardProps) {
   };
 
   return (
-    <Card 
-      className="h-full flex flex-col overflow-hidden hover:shadow-lg transition-all duration-200 touch-pan-y cursor-pointer border-2 hover:border-primary/50"
-      onClick={() => onEdit(product)}
-    >
+    <Card className="h-full flex flex-col overflow-hidden hover:shadow-md transition-shadow duration-200 touch-pan-y">
       <div className="relative">
         <AspectRatio ratio={1}>
           <img
@@ -84,24 +83,45 @@ export function ProductCard({ product, onView, onEdit }: ProductCardProps) {
         </div>
       </div>
       
-      <CardHeader className="pb-3 pt-4 px-4">
-        <div className="flex flex-col space-y-1.5">
-          <h3 className="font-semibold text-sm leading-tight line-clamp-2">{product.name || 'Unnamed Product'}</h3>
-          <p className="text-xs text-muted-foreground">{product.category || 'Uncategorized'}</p>
+      <CardHeader className="pb-2">
+        <div className="flex flex-col space-y-1">
+          <h3 className="font-semibold text-base leading-tight line-clamp-2">{product.name || 'Unnamed Product'}</h3>
+          <p className="text-sm text-muted-foreground">{product.category || 'Uncategorized'}</p>
         </div>
       </CardHeader>
       
-      <CardContent className="pb-3 px-4 flex-grow">
-        <div className="flex flex-col space-y-1.5">
-          <p className="text-base font-semibold">₹{product.price ? product.price.toFixed(2) : '0.00'}</p>
+      <CardContent className="pb-2 flex-grow">
+        <div className="flex flex-col space-y-2">
+          <p className="text-lg font-semibold">₹{product.price ? product.price.toFixed(2) : '0.00'}</p>
           {product.description && (
-            <p className="text-xs text-muted-foreground line-clamp-2">{product.description}</p>
+            <p className="text-sm text-muted-foreground line-clamp-2">{product.description}</p>
           )}
-          <div className="text-[10px] text-muted-foreground mt-auto pt-1">
+          <div className="text-xs text-muted-foreground mt-auto">
             <span>Added: {product.created ? formatDate(product.created) : 'Unknown'}</span>
           </div>
         </div>
       </CardContent>
+      
+      <CardFooter className="pt-2 flex justify-between gap-2">
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="flex-1"
+          onClick={() => onView(product)}
+        >
+          <Eye className="h-4 w-4 mr-1" />
+          View
+        </Button>
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="flex-1"
+          onClick={() => onEdit(product)}
+        >
+          <Pencil className="h-4 w-4 mr-1" />
+          Edit
+        </Button>
+      </CardFooter>
     </Card>
   );
 }

@@ -29,7 +29,7 @@ import { CreateProductData, Product, UpdateProductData } from '@/types/schema';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/components/ui/accordion';
-import { X, Upload, Image as ImageIcon, Loader2, Eye, Pencil, Package } from 'lucide-react';
+import { X, Upload, Image as ImageIcon, Loader2, Eye, Pencil, Package, ArrowLeft, HelpCircle } from 'lucide-react';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { pb } from '@/lib/pocketbase';
@@ -1188,14 +1188,24 @@ Only return the JSON, no explanations.`;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full h-[95vh] max-w-[1080px] overflow-hidden flex flex-col bg-background">
-        <DialogHeader className="border-b pb-3 px-6">
-          <DialogTitle className="text-xl font-semibold">
-            {isViewMode ? 'Product Details' : isEditMode ? 'Edit Product' : 'Add New Product'}
-          </DialogTitle>
-          <DialogDescription className="text-sm">
-            {isViewMode ? 'View product information' : isEditMode ? 'Update product details' : 'Fill in the product information below'}
-          </DialogDescription>
+      <DialogContent className="w-full h-[95vh] max-w-[96vw] sm:max-w-[96vw] xl:max-w-[96vw] overflow-hidden flex flex-col bg-gray-50">
+        <DialogHeader className="border-b pb-4 bg-white px-6 pt-6">
+          <div className="flex items-center gap-4">
+            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <DialogTitle className="text-xl font-bold">
+                {isViewMode ? 'Product Details' : isEditMode ? 'Edit Product' : 'Add New Product'}
+              </DialogTitle>
+              <DialogDescription className="hidden">
+                 Product Form
+              </DialogDescription>
+            </div>
+            <div className="ml-auto">
+               <Button variant="outline" size="sm">View Shop</Button>
+            </div>
+          </div>
         </DialogHeader>
         
         <Form {...form}>
@@ -1207,26 +1217,27 @@ Only return the JSON, no explanations.`;
                 <TabsTrigger value="variants" className="rounded-md data-[state=active]:bg-green-600 data-[state=active]:text-white">Variants & Combos</TabsTrigger>
               </TabsList>
 
-              <div className="flex-1 overflow-auto px-6 py-4">
+              <div className="flex-1 overflow-auto px-2 py-1">
                 <TabsContent value="basic" className="mt-0">
-                  <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-5">
-                    {/* Left column: Description and Category */}
-                    <div className="space-y-4">
-                      <Card className="shadow-sm border rounded-lg overflow-hidden">
-                        <CardHeader className="bg-muted/30 border-b py-3 px-4">
-                          <CardTitle className="text-sm font-semibold">Description</CardTitle>
+                  <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,2.2fr)_minmax(0,1.1fr)] gap-8">
+                    {/* Left column: General info + pricing + status */}
+                    <div className="space-y-6">
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="text-base font-semibold">General Information</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">Basic product details</p>
                         </CardHeader>
-                        <CardContent className="space-y-3 p-4">
+                        <CardContent className="space-y-5 p-6">
                           <FormField
                             control={form.control}
                             name="name"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs font-medium text-muted-foreground">Product Name</FormLabel>
+                                <FormLabel>Name</FormLabel>
                                 <Input 
                                   {...field} 
-                                  placeholder="Full Spectrum CBD Tincture - Pet Tincture" 
-                                  className={`h-9 text-sm ${highlightedFields.has('name') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
+                                  placeholder="Product name" 
+                                  className={highlightedFields.has('name') ? 'ring-2 ring-purple-500 animate-pulse' : ''}
                                 />
                                 <FormMessage />
                               </FormItem>
@@ -1238,11 +1249,11 @@ Only return the JSON, no explanations.`;
                             name="description"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-xs font-medium text-muted-foreground">Business Description</FormLabel>
+                                <FormLabel>Description</FormLabel>
                                 <Textarea
                                   {...field}
-                                  placeholder="Enter product description..."
-                                  className={`resize-none min-h-[100px] text-sm ${highlightedFields.has('description') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
+                                  placeholder="Product description"
+                                  className={`resize-none ${highlightedFields.has('description') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
                                 />
                                 <FormMessage />
                               </FormItem>
@@ -1309,49 +1320,93 @@ Only return the JSON, no explanations.`;
                         </CardContent>
                       </Card>
 
-                      <Card className="shadow-sm border rounded-lg overflow-hidden">
-                        <CardHeader className="bg-muted/30 border-b py-3 px-4">
-                          <CardTitle className="text-sm font-semibold">Category</CardTitle>
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="text-base font-semibold">Pricing & Stock</CardTitle>
+                          <p className="text-xs text-muted-foreground mt-1">Set pricing and inventory</p>
                         </CardHeader>
-                        <CardContent className="space-y-3 p-4">
-                          <FormField
-                            control={form.control}
-                            name="category"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs font-medium text-muted-foreground">Product Category</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
+                        <CardContent className="space-y-5 p-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="price"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Price</FormLabel>
                                   <FormControl>
-                                    <SelectTrigger className="h-9 text-sm">
-                                      <SelectValue placeholder="Health & Medicine" />
-                                    </SelectTrigger>
+                                    <Input
+                                      {...field}
+                                      type="number"
+                                      step="0.01"
+                                      onChange={(e) => field.onChange(Number(e.target.value))}
+                                      placeholder="0.00"
+                                    />
                                   </FormControl>
-                                  <SelectContent>
-                                    {CATEGORY_OPTIONS.map((opt) => (
-                                      <SelectItem key={opt} value={opt}>
-                                        {opt.charAt(0).toUpperCase() + opt.slice(1)}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <FormField
-                            control={form.control}
-                            name="status"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs font-medium text-muted-foreground">Product Category</FormLabel>
-                                <Select
-                                  onValueChange={field.onChange}
-                                  defaultValue={field.value}
-                                >
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="original_price"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Original Price</FormLabel>
                                   <FormControl>
-                                    <SelectTrigger className="h-9 text-sm">
-                                      <SelectValue placeholder="Beauty" />
+                                    <Input
+                                      {...field}
+                                      type="number"
+                                      step="0.01"
+                                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                                      placeholder="0.00"
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField
+                              control={form.control}
+                              name="category"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Category</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select category" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {CATEGORY_OPTIONS.map((opt) => (
+                                        <SelectItem key={opt} value={opt}>
+                                          {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="status"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Status</FormLabel>
+                                  <Select
+                                    onValueChange={field.onChange}
+                                    defaultValue={field.value}
+                                  >
+                                    <FormControl>
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="Select status" />
                                       </SelectTrigger>
                                     </FormControl>
                                     <SelectContent>
@@ -1363,54 +1418,27 @@ Only return the JSON, no explanations.`;
                                 </FormItem>
                               )}
                             />
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="shadow-sm border rounded-lg overflow-hidden">
-                        <CardHeader className="bg-muted/30 border-b py-3 px-4">
-                          <CardTitle className="text-sm font-semibold">Inventory</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 p-4">
-                          <div className="grid grid-cols-2 gap-3">
-                            <FormField
-                              control={form.control}
-                              name="stock"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs font-medium text-muted-foreground">Quantity</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      type="number"
-                                      min="0"
-                                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                                      placeholder="1020"
-                                      className="h-9 text-sm"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={form.control}
-                              name="qikink_sku"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs font-medium text-muted-foreground">SKU (Optional)</FormLabel>
-                                  <FormControl>
-                                    <Input
-                                      {...field}
-                                      placeholder="UOG-BB-PUR-06"
-                                      className="h-9 text-sm"
-                                    />
-                                  </FormControl>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
                           </div>
+
+                          <FormField
+                            control={form.control}
+                            name="stock"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Stock</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    type="number"
+                                    min="0"
+                                    onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                                    placeholder="Available quantity"
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </CardContent>
                       </Card>
 
@@ -1615,14 +1643,17 @@ Only return the JSON, no explanations.`;
                       </Card>
                     </div>
 
-                    {/* Right column: Images, Shipping, Pricing - Sticky */}
-                    <div className="space-y-4 sticky top-4 self-start">
-                      <Card className="shadow-sm border rounded-lg overflow-hidden">
-                        <CardHeader className="bg-muted/30 border-b py-3 px-4 flex flex-row items-center justify-between">
-                          <CardTitle className="text-sm font-semibold">Product Images</CardTitle>
-                          <span className="text-xs text-muted-foreground">ℹ️</span>
+                    {/* Right column: Upload images, similar to reference UI */}
+                    <div className="space-y-6">
+                      <Card className="shadow-sm border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden sticky top-4">
+                        <CardHeader className="bg-gradient-to-r from-gray-50 to-white dark:from-gray-800 dark:to-gray-900 border-b">
+                          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                            <ImageIcon className="h-5 w-5" />
+                            Product Images
+                          </CardTitle>
+                          <p className="text-xs text-gray-500 mt-1">Upload product photos</p>
                         </CardHeader>
-                        <CardContent className="p-4">
+                        <CardContent className="p-6">
                           {(isCompressing || activeCompressionProgress !== null) && (
                             <div className="mb-4 flex items-center gap-3 text-sm text-muted-foreground">
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -1636,7 +1667,7 @@ Only return the JSON, no explanations.`;
                             </div>
                           )}
 
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {existingImages.map((url, index) => (
                               <div key={`existing-${index}`} className="relative group overflow-hidden rounded-md border">
                                 <AspectRatio ratio={1 / 1}>
@@ -1653,10 +1684,10 @@ Only return the JSON, no explanations.`;
                                 <button
                                   type="button"
                                   onClick={() => removeExistingImage(index)}
-                                  className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-black/80 transition-colors"
+                                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
                                   aria-label={`Remove image ${index + 1}`}
                                 >
-                                  <X className="h-3 w-3" />
+                                  <X className="h-4 w-4" />
                                 </button>
                                 )}
                               </div>
@@ -1676,22 +1707,20 @@ Only return the JSON, no explanations.`;
                                 <button
                                   type="button"
                                   onClick={() => removeImage(index)}
-                                  className="absolute top-1.5 right-1.5 bg-black/60 text-white p-1 rounded-full hover:bg-black/80 transition-colors"
+                                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
                                   aria-label={`Remove image ${index + 1}`}
                                 >
-                                  <X className="h-3 w-3" />
+                                  <X className="h-4 w-4" />
                                 </button>
                               </div>
                             ))}
                             {!isViewMode && (
-                            <div className="flex items-center justify-center rounded-md border-2 border-dashed border-muted-foreground/25 bg-muted/20 p-6 h-full min-h-[120px] hover:border-primary/50 hover:bg-muted/30 transition-colors">
+                            <div className="flex items-center justify-center rounded-md border border-dashed p-4 h-full min-h-[150px]">
                               <label htmlFor="image-upload" className="flex flex-col items-center justify-center cursor-pointer w-full h-full">
-                                <div className="flex flex-col items-center justify-center gap-1.5 text-center">
-                                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-                                    <Upload className="h-5 w-5 text-primary" />
-                                  </div>
-                                  <span className="text-xs font-medium text-primary">Click to upload or drag and drop</span>
-                                  <span className="text-[10px] text-muted-foreground">SVG, PNG, JPG or GIF</span>
+                                <div className="flex flex-col items-center justify-center gap-2">
+                                  <Upload className="h-8 w-8 text-muted-foreground" />
+                                  <span className="text-sm font-medium text-muted-foreground">Upload Image</span>
+                                  <span className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 5MB</span>
                                 </div>
                                 <input
                                   id="image-upload"
@@ -1705,103 +1734,6 @@ Only return the JSON, no explanations.`;
                               </label>
                             </div>
                             )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="shadow-sm border rounded-lg overflow-hidden">
-                        <CardHeader className="bg-muted/30 border-b py-3 px-4">
-                          <CardTitle className="text-sm font-semibold">Shipping and Delivery</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 p-4">
-                          <FormField
-                            control={form.control}
-                            name="dimensions"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-xs font-medium text-muted-foreground">Items Weight</FormLabel>
-                                <Input 
-                                  {...field} 
-                                  placeholder="12.00"
-                                  className="h-9 text-sm"
-                                />
-                                <div className="flex justify-end">
-                                  <span className="text-xs text-muted-foreground">kg</span>
-                                </div>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          
-                          <div>
-                            <FormLabel className="text-xs font-medium text-muted-foreground">Package Size (The package you use to ship your product)</FormLabel>
-                            <div className="grid grid-cols-3 gap-2 mt-2">
-                              <div>
-                                <Input placeholder="12.00" className="h-9 text-sm" />
-                                <span className="text-[10px] text-muted-foreground">Length</span>
-                              </div>
-                              <div>
-                                <Input placeholder="12.00" className="h-9 text-sm" />
-                                <span className="text-[10px] text-muted-foreground">Breadth</span>
-                              </div>
-                              <div>
-                                <Input placeholder="12.00" className="h-9 text-sm" />
-                                <span className="text-[10px] text-muted-foreground">Width</span>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                      
-                      <Card className="shadow-sm border rounded-lg overflow-hidden">
-                        <CardHeader className="bg-muted/30 border-b py-3 px-4">
-                          <CardTitle className="text-sm font-semibold">Pricing</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3 p-4">
-                          <div className="grid grid-cols-2 gap-3">
-                            <FormField
-                              control={form.control}
-                              name="price"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs font-medium text-muted-foreground">Price</FormLabel>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                                    <Input
-                                      {...field}
-                                      type="number"
-                                      step="0.01"
-                                      onChange={(e) => field.onChange(Number(e.target.value))}
-                                      placeholder="180.00"
-                                      className="h-9 text-sm pl-7"
-                                    />
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            
-                            <FormField
-                              control={form.control}
-                              name="original_price"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel className="text-xs font-medium text-muted-foreground">Compare at Price <span className="text-[10px]">ℹ️</span></FormLabel>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
-                                    <Input
-                                      {...field}
-                                      type="number"
-                                      step="0.01"
-                                      onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
-                                      placeholder="320.00"
-                                      className="h-9 text-sm pl-7"
-                                    />
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
                           </div>
                         </CardContent>
                       </Card>
@@ -1870,9 +1802,203 @@ Only return the JSON, no explanations.`;
                       </div>
                     )}
                   </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5" />
+                        Product Images
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {imagePreviewUrls.map((url, index) => (
+                          <div key={index} className="relative group overflow-hidden rounded-md border">
+                            <AspectRatio ratio={1 / 1}>
+                              <img
+                                src={url}
+                                alt={`Product image ${index + 1}`}
+                                className="object-cover w-full h-full"
+                                onError={(e) => {
+                                  (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
+                                }}
+                              />
+                            </AspectRatio>
+                            <button
+                              type="button"
+                              onClick={() => removeImage(index)}
+                              className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
+                              aria-label={`Remove image ${index + 1}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                        <div className="flex items-center justify-center rounded-md border border-dashed p-4 h-full min-h-[150px]">
+                          <label htmlFor="image-upload" className="flex flex-col items-center justify-center cursor-pointer w-full h-full">
+                            <div className="flex flex-col items-center justify-center gap-2">
+                              <Upload className="h-8 w-8 text-muted-foreground" />
+                              <span className="text-sm font-medium text-muted-foreground">Upload Image</span>
+                              <span className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 5MB</span>
+                            </div>
+                            <input
+                              id="image-upload"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="sr-only"
+                              onChange={handleImageUpload}
+                              disabled={isCompressing}
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="border-t pt-4 space-y-4">
+                        <div className="flex items-center gap-2">
+                          <label className="text-sm font-medium" htmlFor="variant-size-select">Variant Images — Size</label>
+                          <select
+                            id="variant-size-select"
+                            className="h-8 rounded-md border bg-background px-2 text-sm"
+                            value={selectedVariantSizeId}
+                            onChange={(e) => setSelectedVariantSizeId(e.target.value)}
+                          >
+                            <option value="" disabled>Select a size</option>
+                            {sizeRows.map((s) => (
+                              <option key={s.id} value={s.id}>{s.name || (s.unit ? `${s.value} ${s.unit}` : s.value)}</option>
+                            ))}
+                          </select>
+                          <div className="ml-auto">
+                            <label htmlFor="variant-image-upload" className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm cursor-pointer hover:bg-muted">
+                              <Upload className="h-4 w-4" /> Upload for size
+                            </label>
+                            <input
+                              id="variant-image-upload"
+                              type="file"
+                              accept="image/*"
+                              multiple
+                              className="sr-only"
+                              onChange={handleVariantImageUpload}
+                              disabled={!selectedVariantSizeId || isCompressing}
+                            />
+                          </div>
+                        </div>
+                        {selectedVariantSizeId ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {(variantPreviewsBySize[selectedVariantSizeId] || []).map((url, index) => (
+                              <div key={index} className="relative group overflow-hidden rounded-md border">
+                                <AspectRatio ratio={1 / 1}>
+                                  <img
+                                    src={url}
+                                    alt={`Variant image ${index + 1}`}
+                                    className="object-cover w-full h-full"
+                                    onError={(e) => {
+                                      (e.target as HTMLImageElement).src = 'https://placehold.co/300x300/darkgray/white?text=Image+Not+Found';
+                                    }}
+                                  />
+                                </AspectRatio>
+                                <button
+                                  type="button"
+                                  onClick={() => removeVariantImage(selectedVariantSizeId, index)}
+                                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full hover:bg-black/70 transition-colors"
+                                  aria-label={`Remove variant image ${index + 1}`}
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <Alert>
+                            <AlertDescription>Select a size first, then upload images for that variant.</AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </TabsContent>
 
                 <TabsContent value="variants" className="space-y-4 mt-0">
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="list_order"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>List Order</FormLabel>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 123"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="original_price"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Original Price</FormLabel>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 999.99"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="qikink_sku"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Qikink SKU</FormLabel>
+                          <Input {...field} placeholder="e.g., SKU-123" />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="print_type_id"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Print Type ID</FormLabel>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => field.onChange(e.target.value ? Number(e.target.value) : undefined)}
+                            placeholder="e.g., 123"
+                          />
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="product_type"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Product Type</FormLabel>
+                        <Input {...field} placeholder="e.g., Apparel" />
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
                   <FormField
                     control={form.control}
@@ -2116,56 +2242,17 @@ Only return the JSON, no explanations.`;
                         </div>
                         <div className="space-y-3">
                           <FormLabel className="text-sm font-medium">Combos</FormLabel>
-                          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <Select
-                              onValueChange={(val) => {
-                                setComboRows(prev => {
-                                  const next = [...prev];
-                                  const id = generateRowId();
-                                  if (val === 'bogo') {
-                                    next.push({ id, name: 'Buy 1 Get 1', value: 'bogo', type: 'bogo' });
-                                  } else if (val === '2-pack') {
-                                    next.push({ id, name: '2-Pack', value: '2-pack', type: 'bundle', items: 2 });
-                                  } else if (val === '3-pack') {
-                                    next.push({ id, name: '3-Pack', value: '3-pack', type: 'bundle', items: 3 });
-                                  } else if (val === '4-pack') {
-                                    next.push({ id, name: '4-Pack', value: '4-pack', type: 'bundle', items: 4 });
-                                  } else if (val === 'custom') {
-                                    next.push({ id, name: '', value: '', type: 'bundle' });
-                                  } else if (val === 'buy-any-2') {
-                                    next.push({ id, name: 'Buy Any 2', value: 'buy-any-2', type: 'buy_any_x', requiredQuantity: 2, allowDuplicates: true, availableProducts: [] });
-                                  } else if (val === 'buy-any-3') {
-                                    next.push({ id, name: 'Buy Any 3', value: 'buy-any-3', type: 'buy_any_x', requiredQuantity: 3, allowDuplicates: true, availableProducts: [] });
-                                  } else if (val === '2-pack-10off') {
-                                    next.push({ id, name: '2-Pack', value: '2-pack-10off', type: 'bundle', items: 2, discountType: 'percent', discountValue: 10 });
-                                  } else if (val === '3-pack-15off') {
-                                    next.push({ id, name: '3-Pack', value: '3-pack-15off', type: 'bundle', items: 3, discountType: 'percent', discountValue: 15 });
-                                  } else if (val === '4-pack-20off') {
-                                    next.push({ id, name: '4-Pack', value: '4-pack-20off', type: 'bundle', items: 4, discountType: 'percent', discountValue: 20 });
-                                  }
-                                  return next;
-                                });
-                              }}
-                            >
-                              <SelectTrigger className="w-full sm:w-64 h-9 text-sm">
-                                <SelectValue placeholder="Add a combo preset" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="bogo">Buy 1 Get 1</SelectItem>
-                                <SelectItem value="2-pack">2-Pack</SelectItem>
-                                <SelectItem value="3-pack">3-Pack</SelectItem>
-                                <SelectItem value="4-pack">4-Pack</SelectItem>
-                                <SelectItem value="custom">Custom</SelectItem>
-                                <SelectItem value="buy-any-2">Buy Any 2</SelectItem>
-                                <SelectItem value="buy-any-3">Buy Any 3</SelectItem>
-                                <SelectItem value="2-pack-10off">2-Pack −10%</SelectItem>
-                                <SelectItem value="3-pack-15off">3-Pack −15%</SelectItem>
-                                <SelectItem value="4-pack-20off">4-Pack −20%</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <span className="text-xs text-muted-foreground">
-                              {comboRows.length ? `${comboRows.length} combo(s) added` : 'No combos added yet'}
-                            </span>
+                          <div className="grid grid-cols-3 gap-3">
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy 1 Get 1', value:'bogo', type:'bogo'}])}>Add BOGO</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack', type:'bundle', items:2}])}>Add 2‑Pack</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack', type:'bundle', items:3}])}>Add 3‑Pack</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack', type:'bundle', items:4}])}>Add 4‑Pack</Button>
+                            <Button type="button" variant="secondary" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'',value:'',type:'bundle'}])}>Add Custom</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 2', value:'buy-any-2', type:'buy_any_x', requiredQuantity: 2, allowDuplicates: true, availableProducts: []}])}>Buy Any 2</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'Buy Any 3', value:'buy-any-3', type:'buy_any_x', requiredQuantity: 3, allowDuplicates: true, availableProducts: []}])}>Buy Any 3</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'2-Pack', value:'2-pack-10off', type:'bundle', items:2, discountType:'percent', discountValue:10}])}>2‑Pack −10%</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'3-Pack', value:'3-pack-15off', type:'bundle', items:3, discountType:'percent', discountValue:15}])}>3‑Pack −15%</Button>
+                            <Button type="button" variant="outline" size="sm" className="rounded-full shadow-sm hover:shadow-md transition-shadow" onClick={()=>setComboRows(prev => [...prev,{ id: generateRowId(), name:'4-Pack', value:'4-pack-20off', type:'bundle', items:4, discountType:'percent', discountValue:20}])}>4‑Pack −20%</Button>
                           </div>
                           <div className="space-y-2">
                             {comboRows.map((cb) => (
