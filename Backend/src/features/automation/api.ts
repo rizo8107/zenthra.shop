@@ -1,10 +1,10 @@
-import { pb } from '@/lib/pocketbase';
+import { pb } from '../../lib/pocketbase.js';
 import type {
   FlowSummary,
   FlowCanvas,
   FlowRun,
   FlowRunStep,
-} from './types';
+} from './types.js';
 
 type FlowRecord = {
   id: string;
