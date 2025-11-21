@@ -58,41 +58,41 @@ const App = () => {
   }, []);
 
   return (
-  <QueryClientProvider client={queryClient}>
-    <ThemeProvider defaultTheme="dark" storageKey="konipai-theme">
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <PwaUpdateNotification />
-        <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/" element={<Navigate to="/login" />} />
-            <Route path="/login" element={<LoginPage />} />
-            
-            {/* Admin routes */}
-            <Route path="/admin" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
-            <Route path="/admin/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
-            <Route path="/admin/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
-            <Route path="/admin/abandoned-carts" element={<ProtectedRoute><AbandonedCartsPage /></ProtectedRoute>} />
-            <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
-            <Route path="/admin/coupons" element={<ProtectedRoute><CouponsPage /></ProtectedRoute>} />
-            <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-            <Route path="/admin/pages" element={<ProtectedRoute><ZenthraPagesManager /></ProtectedRoute>} />
-            <Route path="/admin/pages/:pageId/edit" element={<ProtectedRoute><ZenthraPageEditor /></ProtectedRoute>} />
-            <Route path="/admin/themes" element={<ProtectedRoute><ZenthraThemes /></ProtectedRoute>} />
-            <Route path="/admin/plugins" element={<ProtectedRoute><ZenthraPlugins /></ProtectedRoute>} />
-            <Route path="/admin/navbar" element={<ProtectedRoute><NavbarSettingsPage /></ProtectedRoute>} />
-            <Route path="/admin/automation" element={<ProtectedRoute><AutomationFlowsPage /></ProtectedRoute>} />
-            <Route path="/admin/automation/:flowId" element={<ProtectedRoute><AutomationFlowBuilderPage /></ProtectedRoute>} />
-            
-            {/* Catch-all route */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
-    </ThemeProvider>
-  </QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider defaultTheme="dark" storageKey="konipai-theme">
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <PwaUpdateNotification />
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/" element={<Navigate to="/login" />} />
+              <Route path="/login" element={<LoginPage />} />
+
+              {/* Admin routes */}
+              <Route path="/admin" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
+              <Route path="/admin/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+              <Route path="/admin/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
+              <Route path="/admin/abandoned-carts" element={<ProtectedRoute><AbandonedCartsPage /></ProtectedRoute>} />
+              <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
+              <Route path="/admin/coupons" element={<ProtectedRoute><CouponsPage /></ProtectedRoute>} />
+              <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
+              <Route path="/admin/pages" element={<ProtectedRoute><ZenthraPagesManager /></ProtectedRoute>} />
+              <Route path="/admin/pages/:pageId/edit" element={<ProtectedRoute><ZenthraPageEditor /></ProtectedRoute>} />
+              <Route path="/admin/themes" element={<ProtectedRoute><ZenthraThemes /></ProtectedRoute>} />
+              <Route path="/admin/plugins" element={<ProtectedRoute><ZenthraPlugins /></ProtectedRoute>} />
+              <Route path="/admin/navbar" element={<ProtectedRoute><NavbarSettingsPage /></ProtectedRoute>} />
+              <Route path="/admin/automation" element={<ProtectedRoute><AutomationFlowsPage /></ProtectedRoute>} />
+              <Route path="/admin/automation/:flowId" element={<ProtectedRoute><AutomationFlowBuilderPage /></ProtectedRoute>} />
+
+              {/* Catch-all route */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 };
 

@@ -5,6 +5,7 @@ import type {
   FlowRun,
   FlowRunStep,
 } from './types';
+import { executeFlow } from './flowExecutor';
 
 type FlowRecord = {
   id: string;
@@ -172,7 +173,18 @@ export async function listRunSteps(runId: string): Promise<FlowRunStep[]> {
 }
 
 export async function triggerTestRun(flowId: string, input: Record<string, unknown>): Promise<FlowRun> {
+  console.log('🎬 ========== TRIGGER TEST RUN ==========');
+  console.log('📋 Flow ID:', flowId);
+  console.log('📋 Input:', input);
+  
+  // Get the flow first
+  console.log('⏳ Fetching flow details...');
+  const flow = await getFlow(flowId);
+  console.log('✅ Flow fetched:', flow.name);
+  console.log('📊 Canvas:', flow.canvasJson);
+  
   // Create the initial run record
+  console.log('⏳ Creating run record...');
   const record = await pb.collection(COLLECTIONS.runs).create<RunRecord>({
     flow_id: flowId,
     status: 'queued',
@@ -181,95 +193,20 @@ export async function triggerTestRun(flowId: string, input: Record<string, unkno
     started_at: new Date().toISOString(),
     input_event: input,
   } as unknown as RunRecord);
+  console.log('✅ Run record created:', record.id);
 
-  // Start mock execution simulation
+  // Start real execution
+  console.log('🚀 Starting flow execution in background...');
   setTimeout(async () => {
     try {
-      await simulateRunExecution(record.id, flowId, input);
+      console.log('⏳ Calling executeFlow...');
+      await executeFlow(record.id, flowId, flow.canvasJson, input);
+      console.log('✅ executeFlow completed');
     } catch (error) {
-      console.error('Mock execution failed:', error);
+      console.error('❌ Flow execution failed:', error);
     }
   }, 100);
 
+  console.log('✅ Test run triggered, returning run object');
   return mapRun(record);
-}
-
-// Mock execution simulation
-async function simulateRunExecution(runId: string, flowId: string, input: Record<string, unknown>) {
-  try {
-    // Update run to running
-    await pb.collection(COLLECTIONS.runs).update(runId, {
-      status: 'running',
-    });
-
-    // Get flow to simulate node execution
-    const flow = await getFlow(flowId);
-    const nodes = flow.canvasJson?.nodes || [];
-    
-    // Find trigger nodes
-    const triggerNodes = nodes.filter(node => 
-      node.data?.type?.toString().startsWith('trigger.')
-    );
-
-    if (triggerNodes.length === 0) {
-      await pb.collection(COLLECTIONS.runs).update(runId, {
-        status: 'success',
-        finished_at: new Date().toISOString(),
-      });
-      return;
-    }
-
-    // Simulate node execution steps
-    for (let i = 0; i < Math.min(nodes.length, 5); i++) {
-      const node = nodes[i];
-      const stepStartTime = new Date().toISOString();
-      
-      // Create run step
-      const stepRecord = await pb.collection(COLLECTIONS.runSteps).create({
-        run_id: runId,
-        node_id: node.id,
-        node_type: node.data?.type || 'unknown',
-        status: 'running',
-        started_at: stepStartTime,
-        input: i === 0 ? input : { processed: true },
-      });
-
-      // Simulate processing time
-      await new Promise(resolve => setTimeout(resolve, 1000 + Math.random() * 2000));
-
-      // Random success/failure (90% success rate)
-      const success = Math.random() > 0.1;
-      
-      await pb.collection(COLLECTIONS.runSteps).update(stepRecord.id, {
-        status: success ? 'success' : 'failed',
-        finished_at: new Date().toISOString(),
-        output: success ? { result: `Node ${node.id} executed successfully` } : undefined,
-        error: success ? undefined : `Simulated error in node ${node.id}`,
-      });
-
-      // If a step fails, fail the entire run
-      if (!success) {
-        await pb.collection(COLLECTIONS.runs).update(runId, {
-          status: 'failed',
-          finished_at: new Date().toISOString(),
-          error: `Execution failed at node ${node.id}`,
-        });
-        return;
-      }
-    }
-
-    // Complete the run
-    await pb.collection(COLLECTIONS.runs).update(runId, {
-      status: 'success',
-      finished_at: new Date().toISOString(),
-    });
-
-  } catch (error) {
-    // Handle execution errors
-    await pb.collection(COLLECTIONS.runs).update(runId, {
-      status: 'failed',
-      finished_at: new Date().toISOString(),
-      error: error instanceof Error ? error.message : 'Unknown execution error',
-    });
-  }
 }

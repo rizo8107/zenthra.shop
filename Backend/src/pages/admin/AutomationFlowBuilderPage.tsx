@@ -19,7 +19,7 @@ import {
   addEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ArrowLeft, Loader2, Save, Share2, Trash2, Zap, Settings } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Share2, Trash2, Zap, Settings, CheckCircle2, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +32,7 @@ import { getFlow, listRunSteps, listRuns, updateFlow, triggerTestRun } from '@/f
 import type { FlowRun, FlowRunStep, FlowSummary, FlowNode, FlowEdge, RunStatus } from '@/features/automation/types';
 import { NodePalette } from '@/features/automation/components/NodePalette';
 import { NodeConfigEditor } from '@/features/automation/components/NodeConfigEditor';
+import { ExecutionLogs } from '@/features/automation/components/ExecutionLogs';
 import { nodeTypes } from '@/features/automation/nodes/nodeTypes';
 import { getNodeDefinition } from '@/features/automation/nodes/nodeDefinitions';
 
@@ -55,7 +56,7 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
   const [flowDescription, setFlowDescription] = useState('');
   const [draggedNodeType, setDraggedNodeType] = useState<string | null>(null);
   const [runningNodes, setRunningNodes] = useState<Set<string>>(new Set());
-  const [errorLogs, setErrorLogs] = useState<Array<{id: string, message: string, timestamp: Date, nodeId?: string}>>([]);
+  const [errorLogs, setErrorLogs] = useState<Array<{ id: string, message: string, timestamp: Date, nodeId?: string }>>([]);
 
   const loadFlow = useCallback(async () => {
     try {
@@ -69,7 +70,7 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
         ...node,
         type: 'customNode', // Ensure all nodes use our custom component
       })) as CanvasNode[];
-      
+
       setNodes(normalizedNodes);
       setEdges((data.canvasJson?.edges ?? []) as CanvasEdge[]);
       if (data.canvasJson?.nodes?.[0]) {
@@ -180,7 +181,7 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
 
   const onDrop = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-    
+
     if (!draggedNodeType) return;
 
     const reactFlowBounds = (event.target as Element).closest('.react-flow')?.getBoundingClientRect();
@@ -215,9 +216,9 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
   }, [draggedNodeType]);
 
   const handleNodeConfigChange = useCallback((nodeId: string, config: Record<string, unknown>) => {
-    setNodes((nds) => 
-      nds.map((node) => 
-        node.id === nodeId 
+    setNodes((nds) =>
+      nds.map((node) =>
+        node.id === nodeId
           ? { ...node, data: { ...node.data, config } }
           : node
       )
@@ -254,7 +255,7 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
     // Simple execution simulation - follow edges
     const visited = new Set<string>();
     const queue = [startNode.id];
-    
+
     while (queue.length > 0) {
       const currentNodeId = queue.shift()!;
       if (visited.has(currentNodeId)) continue;
@@ -274,7 +275,7 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
     executionOrder.forEach((nodeId, index) => {
       setTimeout(() => {
         setRunningNodes(prev => new Set([...prev, nodeId]));
-        
+
         // Simulate random errors occasionally
         if (Math.random() < 0.1) { // 10% chance of error
           setTimeout(() => {
@@ -331,16 +332,16 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
       });
 
       let testData = { trigger: 'manual_test' };
-      
+
       if (manualTriggers.length > 0) {
         const triggerNode = manualTriggers[0];
         const nodeData = triggerNode.data as Record<string, unknown>;
         const config = nodeData?.config as Record<string, unknown>;
-        
+
         if (config?.testData) {
           try {
-            const parsedTestData = typeof config.testData === 'string' 
-              ? JSON.parse(config.testData) 
+            const parsedTestData = typeof config.testData === 'string'
+              ? JSON.parse(config.testData)
               : config.testData;
             testData = { ...testData, ...parsedTestData };
           } catch (e) {
@@ -351,36 +352,36 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
 
       // Start the test run
       const run = await triggerTestRun(flow.id, testData);
-      
+
       // Simulate node execution animation
       simulateNodeExecution();
-      
-      toast({ 
-        title: 'Test run started', 
-        description: manualTriggers.length > 0 
-          ? 'Test execution initiated with manual trigger data.' 
+
+      toast({
+        title: 'Test run started',
+        description: manualTriggers.length > 0
+          ? 'Test execution initiated with manual trigger data.'
           : 'Test execution initiated.'
       });
-      
+
       // Refresh runs immediately and then periodically
       void loadRuns();
-      
+
       // Poll for run updates every 2 seconds for 30 seconds
       const pollInterval = setInterval(async () => {
         await loadRuns();
-        
+
         // Check if run is completed
         const updatedRuns = await listRuns(flow.id);
         const currentRun = updatedRuns.find(r => r.id === run.id);
-        
+
         if (currentRun && (currentRun.status === 'success' || currentRun.status === 'failed')) {
           clearInterval(pollInterval);
-          
+
           // Load run steps to show in error logs if failed
           if (currentRun.status === 'failed') {
             const steps = await listRunSteps(currentRun.id);
             const failedSteps = steps.filter(step => step.status === 'failed');
-            
+
             failedSteps.forEach(step => {
               setErrorLogs(prev => [...prev, {
                 id: `step-error-${step.id}`,
@@ -392,12 +393,37 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
           }
         }
       }, 2000);
-      
+
       // Stop polling after 30 seconds
       setTimeout(() => clearInterval(pollInterval), 30000);
     } catch (error) {
       console.error('Failed to trigger test run', error);
       toast({ title: 'Error', description: 'Unable to start test run.', variant: 'destructive' });
+    }
+  };
+
+  const handleActivateFlow = async () => {
+    if (!flow) return;
+
+    const newStatus = flow.status === 'active' ? 'draft' : 'active';
+
+    try {
+      await updateFlow(flow.id, { status: newStatus });
+      setFlow({ ...flow, status: newStatus });
+
+      toast({
+        title: newStatus === 'active' ? 'Flow activated' : 'Flow deactivated',
+        description: newStatus === 'active'
+          ? 'This flow is now active and will run on schedule.'
+          : 'This flow has been deactivated.'
+      });
+    } catch (error) {
+      console.error('Failed to update flow status', error);
+      toast({
+        title: 'Error',
+        description: 'Unable to update flow status.',
+        variant: 'destructive'
+      });
     }
   };
 
@@ -418,32 +444,50 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
     <AdminLayout>
       <div className="container mx-auto py-8 space-y-8 max-w-none px-4 overflow-hidden">
         {/* Header */}
-        <div className="rounded-xl border bg-gradient-to-br from-primary/5 via-background to-background p-6">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-2">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={() => navigate('/admin/automation')}>
+        <div className="rounded-lg border bg-gradient-to-br from-primary/5 via-background to-background p-3">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate('/admin/automation')}>
                   <ArrowLeft className="w-4 h-4" />
                 </Button>
                 <div>
-                  <h1 className="text-3xl font-bold tracking-tight">Flow builder</h1>
-                  <p className="text-sm text-muted-foreground">
+                  <h1 className="text-xl font-bold tracking-tight">Flow builder</h1>
+                  <p className="text-xs text-muted-foreground">
                     Design your automation canvas with triggers, logic, and actions.
                   </p>
                 </div>
               </div>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={handleTestRun}>
-                <Zap className="w-4 h-4 mr-2" />
+              <Button
+                variant={flow.status === 'active' ? 'default' : 'outline'}
+                size="sm"
+                className="h-8 text-xs"
+                onClick={handleActivateFlow}
+              >
+                {flow.status === 'active' ? (
+                  <>
+                    <CheckCircle2 className="w-3 h-3 mr-2" />
+                    Active
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3 h-3 mr-2" />
+                    Activate Flow
+                  </>
+                )}
+              </Button>
+              <Button variant="outline" size="sm" className="h-8 text-xs" onClick={handleTestRun}>
+                <Zap className="w-3 h-3 mr-2" />
                 Test run
               </Button>
-              <Button variant="outline" size="sm" disabled>
-                <Share2 className="w-4 h-4 mr-2" />
+              <Button variant="outline" size="sm" className="h-8 text-xs" disabled>
+                <Share2 className="w-3 h-3 mr-2" />
                 Share
               </Button>
-              <Button size="sm" onClick={handleSave} disabled={saving}>
-                <Save className="w-4 h-4 mr-2" />
+              <Button size="sm" className="h-8 text-xs" onClick={handleSave} disabled={saving}>
+                <Save className="w-3 h-3 mr-2" />
                 {saving ? 'Saving...' : 'Save'}
               </Button>
             </div>
@@ -451,7 +495,7 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
         </div>
 
         {/* Main Content */}
-        <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_320px] xl:grid-cols-[300px_minmax(0,1fr)_360px] overflow-hidden">
+        <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)_280px] xl:grid-cols-[240px_minmax(0,1fr)_300px] overflow-hidden h-[calc(100vh-140px)]">
           {/* Node Palette */}
           <div className="space-y-6 min-w-0">
             <NodePalette onNodeDragStart={onNodeDragStart} />
@@ -459,20 +503,20 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
 
           {/* Canvas */}
           <div className="rounded-xl border bg-card min-w-0 overflow-hidden">
-            <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center justify-between border-b px-4 py-2">
               <div className="space-y-1">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <div>
                     <Input
                       value={flowName}
                       onChange={(e) => setFlowName(e.target.value)}
-                      className="text-xl font-semibold border-none p-0 h-auto bg-transparent"
+                      className="text-lg font-semibold border-none p-0 h-auto bg-transparent"
                       placeholder="Flow name"
                     />
                     <Input
                       value={flowDescription}
                       onChange={(e) => setFlowDescription(e.target.value)}
-                      className="text-xs text-muted-foreground border-none p-0 h-auto bg-transparent mt-1"
+                      className="text-[10px] text-muted-foreground border-none p-0 h-auto bg-transparent mt-0.5"
                       placeholder="Add description..."
                     />
                   </div>
@@ -485,8 +529,8 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
               </div>
             </div>
 
-            <div 
-              className="relative h-[700px]"
+            <div
+              className="relative h-full"
               onDragOver={onDragOver}
               onDrop={onDrop}
             >
@@ -534,15 +578,15 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
                 onDeleteNode={handleDeleteNode}
               />
             ) : (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+              <Card className="border-none shadow-none bg-transparent">
+                <CardHeader className="px-0 pt-0">
+                  <CardTitle className="flex items-center gap-2 text-sm">
                     <Settings className="w-4 h-4" />
                     Node inspector
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="text-center text-sm text-muted-foreground py-10">
+                <CardContent className="px-0">
+                  <div className="text-center text-xs text-muted-foreground py-10 border rounded-lg border-dashed">
                     Select a node to inspect configuration
                   </div>
                 </CardContent>
@@ -568,178 +612,196 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
               </Card>
             )}
 
-            {/* Run History */}
+            {/* Run History & Execution Logs */}
             <Card>
-              <CardHeader>
-                <CardTitle>Run history</CardTitle>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Execution & Logs</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {runs.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No executions yet. Trigger a test run once your flow is ready.</p>
-                ) : (
-                  <Tabs value={selectedRunId ?? runs[0]?.id} onValueChange={setSelectedRunId}>
-                    <TabsList className="grid w-full grid-cols-3 gap-2 rounded-lg bg-muted/40 p-1">
-                      {runs.slice(0, 3).map((run) => {
-                        const isActive = (selectedRunId ?? runs[0]?.id) === run.id;
-                        return (
-                          <TabsTrigger
-                            key={run.id}
-                            value={run.id}
-                            className="flex flex-col items-start gap-1 rounded-md px-3 py-2 text-left"
-                          >
-                            <div className="flex items-center gap-2">
-                              <Badge variant={runStatusVariant[run.status]} className="text-[10px] uppercase tracking-wide">
-                                {run.status}
-                              </Badge>
-                              {run.testMode && (
-                                <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Test</Badge>
-                              )}
-                            </div>
-                            <span className="text-[11px] text-muted-foreground">
-                              {new Date(run.startedAt).toLocaleString()}
-                            </span>
-                            <span className="text-[11px] text-muted-foreground">
-                              {run.finishedAt
-                                ? `${Math.max(0, (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
-                                : isActive ? 'Viewing…' : 'Running'}
-                            </span>
-                          </TabsTrigger>
-                        );
-                      })}
-                    </TabsList>
-                    {runs.slice(0, 3).map((run) => {
-                      const isActiveRun = run.id === (selectedRunId ?? runs[0]?.id);
-                      const stepStatusVariant = (status: FlowRunStep['status']) =>
-                        status === 'success'
-                          ? 'secondary'
-                          : status === 'failed'
-                            ? 'destructive'
-                            : status === 'running'
-                              ? 'default'
-                              : 'outline';
+              <CardContent className="p-0">
+                <Tabs defaultValue="logs" className="w-full">
+                  <TabsList className="w-full grid grid-cols-2 rounded-none border-b bg-transparent p-0">
+                    <TabsTrigger
+                      value="logs"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                    >
+                      Execution Logs
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="summary"
+                      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent"
+                    >
+                      Summary
+                    </TabsTrigger>
+                  </TabsList>
 
-                      return (
-                        <TabsContent key={run.id} value={run.id} className="mt-4">
-                          <div className="space-y-4 text-sm">
-                            <div className="grid gap-3 sm:grid-cols-2">
-                              <div className="rounded-lg border bg-muted/30 p-3">
-                                <p className="text-xs text-muted-foreground uppercase">Trigger</p>
-                                <p className="mt-1 font-medium capitalize">{run.triggerType}</p>
-                              </div>
-                              <div className="rounded-lg border bg-muted/30 p-3">
-                                <p className="text-xs text-muted-foreground uppercase">Duration</p>
-                                <p className="mt-1 font-medium">
-                                  {run.finishedAt
-                                    ? `${Math.max(0, (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
-                                    : 'In progress'}
-                                </p>
-                              </div>
-                              <div className="rounded-lg border bg-muted/30 p-3">
-                                <p className="text-xs text-muted-foreground uppercase">Started</p>
-                                <p className="mt-1 font-medium">{new Date(run.startedAt).toLocaleString()}</p>
-                              </div>
-                              <div className="rounded-lg border bg-muted/30 p-3">
-                                <p className="text-xs text-muted-foreground uppercase">Completed</p>
-                                <p className="mt-1 font-medium">
-                                  {run.finishedAt ? new Date(run.finishedAt).toLocaleString() : '—'}
-                                </p>
-                              </div>
-                            </div>
+                  <TabsContent value="logs" className="mt-0 p-4">
+                    <ExecutionLogs
+                      runs={runs}
+                      selectedRunId={selectedRunId}
+                      runSteps={runSteps}
+                      onSelectRun={setSelectedRunId}
+                    />
+                  </TabsContent>
 
-                            {run.error && (
-                              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
-                                <p className="text-destructive font-semibold">Run error</p>
-                                <p className="text-destructive/80 mt-1 text-xs">{run.error}</p>
-                              </div>
-                            )}
-
-                            <div className="rounded-xl border bg-muted/40 p-4">
-                              <div className="flex items-center justify-between">
-                                <p className="text-xs uppercase tracking-wide text-muted-foreground">Step events</p>
-                                {isActiveRun && runStepsLoading && (
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                    Loading…
+                  <TabsContent value="summary" className="mt-0 p-4">
+                    <div className="space-y-4">
+                      {runs.length === 0 ? (
+                        <p className="text-sm text-muted-foreground">No executions yet. Trigger a test run once your flow is ready.</p>
+                      ) : (
+                        <Tabs value={selectedRunId ?? runs[0]?.id} onValueChange={setSelectedRunId}>
+                          <TabsList className="grid w-full grid-cols-3 gap-2 rounded-lg bg-muted/40 p-1">
+                            {runs.slice(0, 3).map((run) => {
+                              const isActive = (selectedRunId ?? runs[0]?.id) === run.id;
+                              return (
+                                <TabsTrigger
+                                  key={run.id}
+                                  value={run.id}
+                                  className="flex flex-col items-start gap-1 rounded-md px-3 py-2 text-left"
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant={runStatusVariant[run.status]} className="text-[10px] uppercase tracking-wide">
+                                      {run.status}
+                                    </Badge>
+                                    {run.testMode && (
+                                      <Badge variant="outline" className="text-[10px] uppercase tracking-wide">Test</Badge>
+                                    )}
                                   </div>
-                                )}
-                              </div>
-                              <div className="mt-3 space-y-3">
-                                {!isActiveRun ? (
-                                  <p className="text-xs text-muted-foreground">Select this run to view detailed node output.</p>
-                                ) : runStepsLoading ? (
-                                  <p className="text-xs text-muted-foreground">Fetching step logs…</p>
-                                ) : runSteps.length === 0 ? (
-                                  <p className="text-xs text-muted-foreground">No step events recorded for this execution.</p>
-                                ) : (
-                                  runSteps.map((step) => {
-                                    const nodeDefinition = getNodeDefinition(step.nodeType);
-                                    const nodeLabel = nodeDefinition?.label ?? step.nodeType;
-                                    const started = new Date(step.startedAt);
-                                    const finished = step.finishedAt ? new Date(step.finishedAt) : null;
-                                    const duration = finished
-                                      ? `${Math.max(0, (finished.getTime() - started.getTime()) / 1000).toFixed(1)}s`
-                                      : '—';
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {new Date(run.startedAt).toLocaleString()}
+                                  </span>
+                                  <span className="text-[11px] text-muted-foreground">
+                                    {run.finishedAt
+                                      ? `${Math.max(0, (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
+                                      : isActive ? 'Viewing…' : 'Running'}
+                                  </span>
+                                </TabsTrigger>
+                              );
+                            })}
+                          </TabsList>
+                          {runs.slice(0, 3).map((run) => {
+                            const isActiveRun = run.id === (selectedRunId ?? runs[0]?.id);
+                            const stepStatusVariant = (status: FlowRunStep['status']) =>
+                              status === 'success'
+                                ? 'secondary'
+                                : status === 'failed'
+                                  ? 'destructive'
+                                  : status === 'running'
+                                    ? 'default'
+                                    : 'outline';
 
-                                    return (
-                                      <div key={step.id} className="rounded-lg border bg-background p-3 shadow-sm">
-                                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                                          <div>
-                                            <p className="text-sm font-semibold">{nodeLabel}</p>
-                                            <p className="text-[11px] text-muted-foreground">{step.nodeType}</p>
-                                            <p className="text-[11px] text-muted-foreground">Node ID: {step.nodeId}</p>
-                                          </div>
-                                          <div className="flex flex-col items-start gap-2 text-[11px] text-muted-foreground sm:items-end">
-                                            <Badge variant={stepStatusVariant(step.status)} className="text-[10px] uppercase tracking-wide">
-                                              {step.status}
-                                            </Badge>
-                                            <p>Duration: {duration}</p>
-                                            <p>Started: {started.toLocaleTimeString()}</p>
-                                            <p>Finished: {finished ? finished.toLocaleTimeString() : '—'}</p>
-                                          </div>
-                                        </div>
+                            return (
+                              <TabsContent key={run.id} value={run.id} className="mt-4">
+                                <div className="space-y-4 text-sm">
+                                  <div className="grid gap-3 sm:grid-cols-2">
+                                    <div className="rounded-lg border bg-muted/30 p-3">
+                                      <p className="text-xs text-muted-foreground uppercase">Trigger</p>
+                                      <p className="mt-1 font-medium capitalize">{run.triggerType}</p>
+                                    </div>
+                                    <div className="rounded-lg border bg-muted/30 p-3">
+                                      <p className="text-xs text-muted-foreground uppercase">Duration</p>
+                                      <p className="mt-1 font-medium">
+                                        {run.finishedAt
+                                          ? `${Math.max(0, (new Date(run.finishedAt).getTime() - new Date(run.startedAt).getTime()) / 1000).toFixed(1)}s`
+                                          : 'In progress'}
+                                      </p>
+                                    </div>
+                                    <div className="rounded-lg border bg-muted/30 p-3">
+                                      <p className="text-xs text-muted-foreground uppercase">Started</p>
+                                      <p className="mt-1 font-medium">{new Date(run.startedAt).toLocaleString()}</p>
+                                    </div>
+                                    <div className="rounded-lg border bg-muted/30 p-3">
+                                      <p className="text-xs text-muted-foreground uppercase">Completed</p>
+                                      <p className="mt-1 font-medium">
+                                        {run.finishedAt ? new Date(run.finishedAt).toLocaleString() : '—'}
+                                      </p>
+                                    </div>
+                                  </div>
 
-                                        {step.error && (
-                                          <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
-                                            {step.error}
-                                          </p>
-                                        )}
+                                  {run.error && (
+                                    <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm">
+                                      <p className="font-medium text-destructive">Error</p>
+                                      <p className="mt-1 text-destructive/90">{run.error}</p>
+                                    </div>
+                                  )}
 
-                                        <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                          <details className="group rounded-md border bg-muted/30 p-2">
-                                            <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground group-open:text-foreground">
-                                              Input payload
-                                            </summary>
-                                            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px]">
-                                              {formatPayload(step.input)}
-                                            </pre>
-                                          </details>
-                                          <details className="group rounded-md border bg-muted/30 p-2">
-                                            <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground group-open:text-foreground">
-                                              Output payload
-                                            </summary>
-                                            <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px]">
-                                              {formatPayload(step.output)}
-                                            </pre>
-                                          </details>
-                                        </div>
+                                  <div className="space-y-3">
+                                    <p className="text-xs font-medium uppercase text-muted-foreground">Execution steps</p>
+                                    {runStepsLoading ? (
+                                      <div className="flex items-center justify-center py-8">
+                                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                                       </div>
-                                    );
-                                  })
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </TabsContent>
-                      );
-                    })}
-                  </Tabs>
-                )}
+                                    ) : runSteps.length === 0 ? (
+                                      <p className="text-sm text-muted-foreground">No steps recorded for this run.</p>
+                                    ) : (
+                                      runSteps.map((step, idx) => {
+                                        return (
+                                          <div key={step.id} className="rounded-lg border bg-muted/20 p-3">
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div className="flex items-start gap-3">
+                                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
+                                                  {idx + 1}
+                                                </div>
+                                                <div>
+                                                  <p className="font-medium">{step.nodeType}</p>
+                                                  <p className="text-xs text-muted-foreground">{step.nodeId}</p>
+                                                </div>
+                                              </div>
+                                              <Badge variant={stepStatusVariant(step.status)} className="text-[10px] uppercase">
+                                                {step.status}
+                                              </Badge>
+                                            </div>
+
+                                            <div className="mt-2 text-xs text-muted-foreground">
+                                              Started: {new Date(step.startedAt).toLocaleString()}
+                                              {step.finishedAt && (
+                                                <> • Duration: {Math.max(0, (new Date(step.finishedAt).getTime() - new Date(step.startedAt).getTime()) / 1000).toFixed(2)}s</>
+                                              )}
+                                            </div>
+
+                                            {step.error && (
+                                              <p className="mt-3 rounded-md border border-destructive/30 bg-destructive/10 p-2 text-[11px] text-destructive">
+                                                {step.error}
+                                              </p>
+                                            )}
+
+                                            <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                              <details className="group rounded-md border bg-muted/30 p-2">
+                                                <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground group-open:text-foreground">
+                                                  Input payload
+                                                </summary>
+                                                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px]">
+                                                  {formatPayload(step.input)}
+                                                </pre>
+                                              </details>
+                                              <details className="group rounded-md border bg-muted/30 p-2">
+                                                <summary className="cursor-pointer text-[11px] font-medium text-muted-foreground group-open:text-foreground">
+                                                  Output payload
+                                                </summary>
+                                                <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded bg-background/80 p-2 text-[11px]">
+                                                  {formatPayload(step.output)}
+                                                </pre>
+                                              </details>
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                </div>
+                              </TabsContent>
+                            );
+                          })}
+                        </Tabs>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </CardContent>
             </Card>
           </div>
-        </div>
-      </div>
-    </AdminLayout>
+        </div >
+      </div >
+    </AdminLayout >
   );
 }
 

@@ -26,7 +26,7 @@ export function NodePalette({ onNodeDragStart }: NodePaletteProps) {
 
   const getFilteredNodes = (): NodeDefinition[] => {
     let nodes: NodeDefinition[] = [];
-    
+
     if (selectedCategory === 'all') {
       nodes = Object.values(nodesByCategory).flat();
     } else {
@@ -54,66 +54,64 @@ export function NodePalette({ onNodeDragStart }: NodePaletteProps) {
   };
 
   return (
-    <Card className="h-full">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-lg">Node Palette</CardTitle>
+    <Card className="h-full border-none shadow-none bg-transparent">
+      <CardHeader className="pb-2 px-0 pt-0">
+        <CardTitle className="text-sm font-medium mb-2">Node Palette</CardTitle>
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+          <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3 h-3" />
           <Input
             placeholder="Search nodes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-8 h-8 text-xs"
           />
         </div>
       </CardHeader>
 
       <CardContent className="p-0">
         <Tabs value={selectedCategory} onValueChange={setSelectedCategory} className="w-full">
-          <TabsList className="grid grid-cols-3 w-full mx-4 mb-4">
-            <TabsTrigger value="all" className="text-xs">All</TabsTrigger>
-            <TabsTrigger value="trigger" className="text-xs">Triggers</TabsTrigger>
-            <TabsTrigger value="data" className="text-xs">Data</TabsTrigger>
+          <TabsList className="grid grid-cols-3 w-full mb-2 h-7">
+            <TabsTrigger value="all" className="text-[10px] px-1 h-5">All</TabsTrigger>
+            <TabsTrigger value="trigger" className="text-[10px] px-1 h-5">Triggers</TabsTrigger>
+            <TabsTrigger value="data" className="text-[10px] px-1 h-5">Data</TabsTrigger>
           </TabsList>
-          <TabsList className="grid grid-cols-4 w-full mx-4 mb-4">
-            <TabsTrigger value="logic" className="text-xs">Logic</TabsTrigger>
-            <TabsTrigger value="messaging" className="text-xs">Messages</TabsTrigger>
-            <TabsTrigger value="payments" className="text-xs">Payments</TabsTrigger>
-            <TabsTrigger value="utilities" className="text-xs">Utils</TabsTrigger>
+          <TabsList className="grid grid-cols-4 w-full mb-3 h-7">
+            <TabsTrigger value="logic" className="text-[10px] px-1 h-5">Logic</TabsTrigger>
+            <TabsTrigger value="messaging" className="text-[10px] px-1 h-5">Msgs</TabsTrigger>
+            <TabsTrigger value="payments" className="text-[10px] px-1 h-5">Pay</TabsTrigger>
+            <TabsTrigger value="utilities" className="text-[10px] px-1 h-5">Utils</TabsTrigger>
           </TabsList>
 
-          <div className="px-4 pb-4">
-            <div className="space-y-2 max-h-[500px] overflow-y-auto">
+          <div className="pb-4">
+            <div className="space-y-2 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
               {getFilteredNodes().map((node) => (
                 <div
                   key={node.type}
                   draggable
                   onDragStart={(event) => onNodeDragStart(event, node.type)}
-                  className="p-3 border rounded-lg cursor-grab hover:bg-accent hover:border-accent-foreground/20 transition-colors active:cursor-grabbing"
+                  className="p-2 border rounded-md cursor-grab hover:bg-accent hover:border-accent-foreground/20 transition-colors active:cursor-grabbing bg-card"
                   style={{ borderColor: node.color + '40' }}
                 >
-                  <div className="flex items-start gap-3">
-                    <span className="text-lg flex-shrink-0">{node.icon}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base flex-shrink-0">{node.icon}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-sm truncate">{node.label}</h4>
-                        <Badge 
-                          variant="outline" 
-                          className={`text-xs ${categoryColors[node.category]}`}
+                      <div className="flex items-center justify-between gap-2">
+                        <h4 className="font-medium text-xs truncate">{node.label}</h4>
+                        <Badge
+                          variant="outline"
+                          className={`text-[9px] px-1 py-0 h-4 ${categoryColors[node.category]}`}
                         >
                           {node.category}
                         </Badge>
                       </div>
-                      {/* Description and IO details intentionally hidden for a cleaner UI */}
                     </div>
                   </div>
                 </div>
               ))}
-              
+
               {getFilteredNodes().length === 0 && (
                 <div className="text-center py-8 text-muted-foreground">
-                  <p className="text-sm">No nodes found</p>
-                  <p className="text-xs mt-1">Try adjusting your search or category filter</p>
+                  <p className="text-xs">No nodes found</p>
                 </div>
               )}
             </div>
