@@ -1,6 +1,6 @@
 // Flow Executor for Automation
-import { pb } from '@/lib/pocketbase';
-import type { FlowCanvas, FlowNode } from './types';
+import { pb } from '../lib/pocketbase.js';
+import type { FlowCanvas, FlowEdge, FlowNode } from './types.js';
 import axios from 'axios';
 
 const COLLECTIONS = {
@@ -22,11 +22,13 @@ interface ExecutionContext {
   nodeOutputs: Map<string, any>;
 }
 
+type ExecutionResult = { success: boolean; output?: any; error?: string };
+
 // Execute a single node
 async function executeNode(
   node: FlowNode,
   context: ExecutionContext
-): Promise<{ success: boolean; output?: any; error?: string }> {
+): Promise<ExecutionResult> {
   const nodeType = node.data?.type as string;
   const config = (node.data?.config as Record<string, any>) || {};
   console.log(`🔧 Executing node ${node.id} (${nodeType})`);
@@ -266,6 +268,80 @@ function getNestedValue(obj: any, path: string): any {
     result = result?.[key];
   }
   return result;
+}
+
+async function executeNodeWithStep(node: FlowNode, context: ExecutionContext): Promise<ExecutionResult> {
+  const startedAt = new Date().toISOString();
+  const nodeType = (node.data?.type as string) || node.type;
+  const inputSnapshot = safeSerialize(context.data);
+
+  let runStepId: string | null = null;
+  try {
+    const record = await pb.collection(COLLECTIONS.runSteps).create({
+      run_id: context.runId,
+      node_id: node.id,
+      node_type: nodeType,
+      status: 'running',
+      started_at: startedAt,
+      input: inputSnapshot,
+    });
+    runStepId = record.id;
+  } catch (error) {
+    console.warn('⚠️  Failed to create run step record', { nodeId: node.id, error });
+  }
+
+  const result = await executeNode(node, context);
+
+  const updatePayload: Record<string, any> = {
+    status: result.success ? 'success' : 'failed',
+    finished_at: new Date().toISOString(),
+  };
+
+  const outputSnapshot = safeSerialize(result.output);
+  if (outputSnapshot !== undefined) {
+    updatePayload.output = outputSnapshot;
+  }
+  if (!result.success && result.error) {
+    updatePayload.error = result.error;
+  }
+
+  if (runStepId) {
+    try {
+      await pb.collection(COLLECTIONS.runSteps).update(runStepId, updatePayload);
+    } catch (error) {
+      console.warn('⚠️  Failed to update run step record', { nodeId: node.id, error });
+    }
+  }
+
+  return result;
+}
+
+function findNextNodes(startNodeId: string, edges: FlowEdge[], visited: Set<string>): string[] {
+  const queue: string[] = [startNodeId];
+  const ordered: string[] = [];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    for (const edge of edges) {
+      if (edge.source !== current) continue;
+      const targetId = edge.target;
+      if (!targetId || visited.has(targetId)) continue;
+      visited.add(targetId);
+      ordered.push(targetId);
+      queue.push(targetId);
+    }
+  }
+
+  return ordered;
+}
+
+function safeSerialize<T>(value: T): T | undefined {
+  try {
+    if (value === undefined) return undefined;
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return undefined;
+  }
 }
 
 // Main flow executor
