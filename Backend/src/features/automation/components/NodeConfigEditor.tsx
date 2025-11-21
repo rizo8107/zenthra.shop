@@ -22,12 +22,12 @@ interface NodeConfigEditorProps {
   onDeleteNode: (nodeId: string) => void;
 }
 
-export function NodeConfigEditor({ 
-  nodeId, 
-  nodeType, 
-  config, 
-  onConfigChange, 
-  onDeleteNode 
+export function NodeConfigEditor({
+  nodeId,
+  nodeType,
+  config,
+  onConfigChange,
+  onDeleteNode
 }: NodeConfigEditorProps) {
   const [localConfig, setLocalConfig] = useState<Record<string, unknown>>(config);
   const [qbConditions, setQbConditions] = useState<Array<{ field: string; operator: string; value?: string; value2?: string }>>(
@@ -178,10 +178,10 @@ export function NodeConfigEditor({
 
   const handleTestNode = async () => {
     if (!nodeDefinition) return;
-    
+
     setTesting(true);
     setTestResult(null);
-    
+
     try {
       // Parse test input
       let parsedInput;
@@ -193,18 +193,18 @@ export function NodeConfigEditor({
 
       // Simulate node execution based on type
       const result = await simulateNodeExecution(nodeDefinition, localConfig, parsedInput);
-      
+
       setTestResult({
         success: true,
         output: result,
         timestamp: new Date()
       });
-      
+
       toast({
         title: 'Node test successful',
         description: `${nodeDefinition.label} executed successfully`
       });
-      
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       setTestResult({
@@ -212,7 +212,7 @@ export function NodeConfigEditor({
         error: errorMessage,
         timestamp: new Date()
       });
-      
+
       toast({
         title: 'Node test failed',
         description: errorMessage,
@@ -326,31 +326,31 @@ export function NodeConfigEditor({
       };
       const body = templateName
         ? {
-            messaging_product: 'whatsapp',
-            to: payload.to,
-            type: 'template' as const,
-            template: {
-              name: templateName,
-              language: { code: templateLang },
-              components: payload.variables
-                ? [
-                    {
-                      type: 'body',
-                      parameters: Object.values(payload.variables).map((value) => ({
-                        type: 'text' as const,
-                        text: String(value ?? ''),
-                      })),
-                    },
-                  ]
-                : undefined,
-            },
-          }
+          messaging_product: 'whatsapp',
+          to: payload.to,
+          type: 'template' as const,
+          template: {
+            name: templateName,
+            language: { code: templateLang },
+            components: payload.variables
+              ? [
+                {
+                  type: 'body',
+                  parameters: Object.values(payload.variables).map((value) => ({
+                    type: 'text' as const,
+                    text: String(value ?? ''),
+                  })),
+                },
+              ]
+              : undefined,
+          },
+        }
         : {
-            messaging_product: 'whatsapp',
-            to: payload.to,
-            type: 'text' as const,
-            text: { body: messageText || 'Test message' },
-          };
+          messaging_product: 'whatsapp',
+          to: payload.to,
+          type: 'text' as const,
+          text: { body: messageText || 'Test message' },
+        };
 
       const response = await fetch(url, {
         method: 'POST',
@@ -398,18 +398,18 @@ export function NodeConfigEditor({
 
   // Simulate individual node execution
   const simulateNodeExecution = async (
-    definition: NodeDefinition, 
-    config: Record<string, unknown>, 
+    definition: NodeDefinition,
+    config: Record<string, unknown>,
     input: unknown
   ): Promise<unknown> => {
     // Simulate processing time
     await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1500));
-    
+
     // Simulate different node behaviors
     switch (definition.type) {
       case 'trigger.manual':
         return { ...config, triggered_at: new Date().toISOString(), input };
-        
+
       case 'pb.find': {
         if (!config.collection) throw new Error('Collection is required');
         const collection = String(config.collection);
@@ -433,7 +433,7 @@ export function NodeConfigEditor({
           sort: options.sort || null,
         };
       }
-        
+
       case 'pb.getOne': {
         if (!config.collection) throw new Error('Collection is required');
         const collection = String(config.collection);
@@ -453,13 +453,13 @@ export function NodeConfigEditor({
         const rec = await pb.collection(collection).getFirstListItem(filter, options);
         return { record: rec, exists: !!rec?.id };
       }
-        
+
       case 'logic.if': {
         if (!config.condition) throw new Error('Condition is required');
         const conditionResult = Math.random() > 0.5; // Random true/false
         return { condition_result: conditionResult, input };
       }
-        
+
       case 'iterate.each': {
         const path = typeof config.path === 'string' && config.path.trim().length > 0 ? config.path.trim() : 'items';
         const resolved = path ? resolveValueFromPath(input, path) : input;
@@ -473,7 +473,7 @@ export function NodeConfigEditor({
           processed_items: items.map((item, index) => ({ index, item }))
         };
       }
-        
+
       case 'whatsapp.send': {
         const to = String(resolveValueFromPath(input, typeof config.toPath === 'string' ? config.toPath : undefined) ?? '').trim();
         if (!to) {
@@ -495,7 +495,7 @@ export function NodeConfigEditor({
           response: result,
         };
       }
-        
+
       case 'email.send':
         if (!config.template) throw new Error('Email template is required');
         return {
@@ -504,7 +504,7 @@ export function NodeConfigEditor({
           recipient: config.to || 'test@example.com',
           sent_at: new Date().toISOString()
         };
-        
+
       case 'log':
         return {
           logged_at: new Date().toISOString(),
@@ -512,7 +512,7 @@ export function NodeConfigEditor({
           message: config.message || 'Test log message',
           input
         };
-        
+
       case 'util.delay': {
         const amount = Math.max(0, Number(config.amount) || 0);
         const unit = String(config.unit || 'seconds');
@@ -524,7 +524,7 @@ export function NodeConfigEditor({
           input
         };
       }
-        
+
       case 'http.request':
         if (!config.url) throw new Error('URL is required');
         return {
@@ -533,7 +533,7 @@ export function NodeConfigEditor({
           headers: { 'content-type': 'application/json' },
           url: config.url
         };
-        
+
       default:
         // Random success/failure for unknown nodes
         if (Math.random() < 0.1) {
@@ -558,6 +558,7 @@ export function NodeConfigEditor({
             value={String(value)}
             onChange={(e) => handleConfigChange(field.key, e.target.value)}
             placeholder={field.placeholder}
+            className="h-8 text-xs"
           />
         );
 
@@ -568,6 +569,7 @@ export function NodeConfigEditor({
             value={String(value)}
             onChange={(e) => handleConfigChange(field.key, Number(e.target.value))}
             placeholder={field.placeholder}
+            className="h-8 text-xs"
           />
         );
 
@@ -576,6 +578,7 @@ export function NodeConfigEditor({
           <Switch
             checked={Boolean(value)}
             onCheckedChange={(checked) => handleConfigChange(field.key, checked)}
+            className="scale-75 origin-left"
           />
         );
 
@@ -586,17 +589,17 @@ export function NodeConfigEditor({
             onValueChange={(newValue) => handleConfigChange(field.key, newValue)}
             disabled={field.key === 'subscriptionId' && webhookLoading}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder={field.placeholder} />
             </SelectTrigger>
             <SelectContent>
               {(field.key === 'subscriptionId' ? webhookOptions : field.options ?? []).map((option) => (
-                <SelectItem key={option.value} value={option.value}>
+                <SelectItem key={option.value} value={option.value} className="text-xs">
                   {option.label}
                 </SelectItem>
               ))}
               {field.key === 'subscriptionId' && (webhookError || (!webhookLoading && webhookOptions.length === 0)) && (
-                <SelectItem value="__no-webhooks" disabled>
+                <SelectItem value="__no-webhooks" disabled className="text-xs">
                   {webhookError ? `Error: ${webhookError}` : 'No saved webhooks found'}
                 </SelectItem>
               )}
@@ -611,6 +614,7 @@ export function NodeConfigEditor({
             onChange={(e) => handleConfigChange(field.key, e.target.value)}
             placeholder={field.placeholder}
             rows={3}
+            className="text-xs min-h-[60px]"
           />
         );
 
@@ -628,7 +632,7 @@ export function NodeConfigEditor({
               }
             }}
             placeholder={field.placeholder}
-            className="font-mono text-xs"
+            className="font-mono text-[10px] min-h-[80px]"
             rows={4}
           />
         );
@@ -639,12 +643,12 @@ export function NodeConfigEditor({
             value={String(value)}
             onValueChange={(newValue) => handleConfigChange(field.key, newValue)}
           >
-            <SelectTrigger>
+            <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="Select connection..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="whatsapp_api">WhatsApp API (Plugins Manager)</SelectItem>
-              <SelectItem value="evolution_api">Evolution API (Plugins Manager)</SelectItem>
+              <SelectItem value="whatsapp_api" className="text-xs">WhatsApp API (Plugins Manager)</SelectItem>
+              <SelectItem value="evolution_api" className="text-xs">Evolution API (Plugins Manager)</SelectItem>
             </SelectContent>
           </Select>
         );
@@ -655,6 +659,7 @@ export function NodeConfigEditor({
             value={String(value)}
             onChange={(e) => handleConfigChange(field.key, e.target.value)}
             placeholder={field.placeholder}
+            className="h-8 text-xs"
           />
         );
     }
@@ -677,7 +682,7 @@ export function NodeConfigEditor({
     onConfigChange(nodeId, next);
   };
 
-  const getFieldsForCollection = (collection: string): Array<{ value: string; label: string; type: 'text'|'number'|'enum'|'date'|'relation'|'bool' }> => {
+  const getFieldsForCollection = (collection: string): Array<{ value: string; label: string; type: 'text' | 'number' | 'enum' | 'date' | 'relation' | 'bool' }> => {
     switch (collection) {
       case 'orders':
         return [
@@ -703,8 +708,8 @@ export function NodeConfigEditor({
 
   const enumOptionsFor = (field: string): string[] => {
     if (getCollection() === 'orders') {
-      if (field === 'status') return ['pending','processing','out_for_delivery','delivered','cancelled'];
-      if (field === 'payment_status') return ['pending','paid','failed','authorized'];
+      if (field === 'status') return ['pending', 'processing', 'out_for_delivery', 'delivered', 'cancelled'];
+      if (field === 'payment_status') return ['pending', 'paid', 'failed', 'authorized'];
     }
     return [];
   };
@@ -755,7 +760,7 @@ export function NodeConfigEditor({
     }
   };
 
-  const compileFilter = (conditions: typeof qbConditions, logic: 'AND'|'OR') => {
+  const compileFilter = (conditions: typeof qbConditions, logic: 'AND' | 'OR') => {
     const collectionFields = getFieldsForCollection(getCollection());
     const findType = (f: string) => collectionFields.find(x => x.value === f)?.type || 'text';
     const parts: string[] = [];
@@ -772,7 +777,7 @@ export function NodeConfigEditor({
           if (c.operator === 'eq') parts.push(`${c.field} = ${q(v)}`);
           else if (c.operator === 'neq') parts.push(`${c.field} != ${q(v)}`);
           else if (c.operator === 'contains') parts.push(`${c.field} ~ ${q(v)}`);
-          else if (c.operator === 'starts') parts.push(`${c.field} ~ ${q('^'+v)}`);
+          else if (c.operator === 'starts') parts.push(`${c.field} ~ ${q('^' + v)}`);
           break;
         case 'number':
           if (c.operator === 'between') parts.push(`${c.field} >= ${v} && ${c.field} <= ${v2}`);
@@ -798,7 +803,7 @@ export function NodeConfigEditor({
     return parts.join(joiner);
   };
 
-  const pushConditionsToConfig = (nextConds: typeof qbConditions, nextLogic: 'AND'|'OR') => {
+  const pushConditionsToConfig = (nextConds: typeof qbConditions, nextLogic: 'AND' | 'OR') => {
     const nextFilter = compileFilter(nextConds, nextLogic);
     const nextConfig = { ...localConfig, conditions: nextConds, logic: nextLogic, filter: nextFilter };
     setLocalConfig(nextConfig);
@@ -821,10 +826,10 @@ export function NodeConfigEditor({
     setQbConditions(next);
     pushConditionsToConfig(next, qbLogic);
   };
- 
+
   // --- Simple helpers for Sort/Limit/Expand/Fields ---
   const addSortRow = (field?: string) => {
-    const next = [...sortRows, { field: field || '', dir: 'desc' }];
+    const next = [...sortRows, { field: field || '', dir: 'desc' as const }];
     setSortRows(next);
     handleConfigChange('sort', stringifySort(next));
   };
@@ -861,13 +866,13 @@ export function NodeConfigEditor({
     const collection = getCollection();
     const fields = getFieldsForCollection(collection);
     return (
-      <div className="space-y-4">
-        <h5 className="font-medium text-sm">Configuration</h5>
+      <div className="space-y-3">
+        <h5 className="font-medium text-xs">Configuration</h5>
         {/* Collection */}
-        <div className="space-y-2">
-          <Label className="text-sm font-medium">Collection <span className="text-red-500">*</span></Label>
+        <div className="space-y-1">
+          <Label className="text-[10px] font-medium text-muted-foreground">Collection <span className="text-destructive ml-0.5">*</span></Label>
           <Select value={collection} onValueChange={setCollection}>
-            <SelectTrigger>
+            <SelectTrigger className="h-8 text-xs">
               <SelectValue placeholder="Select collection" />
             </SelectTrigger>
             <SelectContent>
@@ -876,7 +881,7 @@ export function NodeConfigEditor({
                 { value: 'users', label: 'Users' },
                 { value: 'products', label: 'Products' },
               ].map(opt => (
-                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                <SelectItem key={opt.value} value={opt.value} className="text-xs">{opt.label}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -885,17 +890,17 @@ export function NodeConfigEditor({
         {/* Conditions */}
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <h5 className="font-medium text-sm">Conditions</h5>
+            <h5 className="font-medium text-xs">Conditions</h5>
             <div className="flex items-center gap-2">
-              <Label className="text-xs">Match</Label>
-              <Select value={qbLogic} onValueChange={(v) => { const nv = (v as 'AND'|'OR'); setQbLogic(nv); pushConditionsToConfig(qbConditions, nv); }}>
-                <SelectTrigger className="h-8 w-[110px]"><SelectValue /></SelectTrigger>
+              <Label className="text-[10px] text-muted-foreground">Match</Label>
+              <Select value={qbLogic} onValueChange={(v) => { const nv = (v as 'AND' | 'OR'); setQbLogic(nv); pushConditionsToConfig(qbConditions, nv); }}>
+                <SelectTrigger className="h-6 w-[90px] text-[10px]"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="AND">All (AND)</SelectItem>
-                  <SelectItem value="OR">Any (OR)</SelectItem>
+                  <SelectItem value="AND" className="text-xs">All (AND)</SelectItem>
+                  <SelectItem value="OR" className="text-xs">Any (OR)</SelectItem>
                 </SelectContent>
               </Select>
-              <Button size="sm" variant="outline" onClick={addCondition}>Add</Button>
+              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={addCondition}>Add</Button>
             </div>
           </div>
 
@@ -907,47 +912,47 @@ export function NodeConfigEditor({
               const fieldType = fields.find(f => f.value === c.field)?.type || 'text';
               const ops = operatorsForType(fieldType);
               return (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                <div key={idx} className="grid grid-cols-12 gap-1 items-center">
                   {/* Field */}
-                  <div className="col-span-3">
+                  <div className="col-span-4">
                     <Select value={c.field} onValueChange={(v) => updateCondition(idx, { field: v })}>
-                      <SelectTrigger><SelectValue placeholder="Field" /></SelectTrigger>
+                      <SelectTrigger className="h-7 text-[10px] px-2"><SelectValue placeholder="Field" /></SelectTrigger>
                       <SelectContent>
-                        {fields.map(f => (<SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>))}
+                        {fields.map(f => (<SelectItem key={f.value} value={f.value} className="text-xs">{f.label}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
                   {/* Operator */}
                   <div className="col-span-3">
                     <Select value={c.operator} onValueChange={(v) => updateCondition(idx, { operator: v })}>
-                      <SelectTrigger><SelectValue placeholder="Operator" /></SelectTrigger>
+                      <SelectTrigger className="h-7 text-[10px] px-2"><SelectValue placeholder="Op" /></SelectTrigger>
                       <SelectContent>
-                        {ops.map(o => (<SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>))}
+                        {ops.map(o => (<SelectItem key={o.value} value={o.value} className="text-xs">{o.label}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
                   {/* Value(s) */}
-                  <div className="col-span-5 flex gap-2">
+                  <div className="col-span-4 flex gap-1">
                     {fieldType === 'enum' ? (
                       <Select value={c.value ?? ''} onValueChange={(v) => updateCondition(idx, { value: v })}>
-                        <SelectTrigger className="w-full"><SelectValue placeholder="Select value" /></SelectTrigger>
+                        <SelectTrigger className="w-full h-7 text-[10px] px-2"><SelectValue placeholder="Value" /></SelectTrigger>
                         <SelectContent>
-                          {enumOptionsFor(c.field).map(v => (<SelectItem key={v} value={v}>{v}</SelectItem>))}
+                          {enumOptionsFor(c.field).map(v => (<SelectItem key={v} value={v} className="text-xs">{v}</SelectItem>))}
                         </SelectContent>
                       </Select>
                     ) : fieldType === 'date' && c.operator === 'last' ? (
-                      <Input value={c.value ?? ''} onChange={(e) => updateCondition(idx, { value: e.target.value })} placeholder="e.g., 1h, 24h, 7d" />
+                      <Input value={c.value ?? ''} onChange={(e) => updateCondition(idx, { value: e.target.value })} placeholder="1h" className="h-7 text-[10px] px-2" />
                     ) : (
                       <>
-                        <Input value={c.value ?? ''} onChange={(e) => updateCondition(idx, { value: e.target.value })} placeholder="Value" />
+                        <Input value={c.value ?? ''} onChange={(e) => updateCondition(idx, { value: e.target.value })} placeholder="Value" className="h-7 text-[10px] px-2" />
                         {ops.find(o => o.value === c.operator)?.needsTwo && (
-                          <Input value={c.value2 ?? ''} onChange={(e) => updateCondition(idx, { value2: e.target.value })} placeholder="and" />
+                          <Input value={c.value2 ?? ''} onChange={(e) => updateCondition(idx, { value2: e.target.value })} placeholder="and" className="h-7 text-[10px] px-2" />
                         )}
                       </>
                     )}
                   </div>
                   <div className="col-span-1 flex justify-end">
-                    <Button size="icon" variant="ghost" onClick={() => removeCondition(idx)}><Trash2 className="w-4 h-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeCondition(idx)}><Trash2 className="w-3 h-3 text-muted-foreground" /></Button>
                   </div>
                 </div>
               );
@@ -958,36 +963,36 @@ export function NodeConfigEditor({
         {/* Sort and Limit (simplified) */}
         <div className="space-y-3">
           <div className="space-y-2">
-            <Label className="text-sm">Sort</Label>
+            <Label className="text-xs font-medium text-muted-foreground">Sort</Label>
             {sortRows.length === 0 && (
-              <div className="text-xs text-muted-foreground">No sorting. Click Add to sort.</div>
+              <div className="text-[10px] text-muted-foreground">No sorting. Click Add to sort.</div>
             )}
             <div className="space-y-2">
               {sortRows.map((row, idx) => (
-                <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                <div key={idx} className="grid grid-cols-12 gap-1 items-center">
                   <div className="col-span-7">
                     <Select value={row.field} onValueChange={(v) => updateSortRow(idx, { field: v })}>
-                      <SelectTrigger><SelectValue placeholder="Field" /></SelectTrigger>
+                      <SelectTrigger className="h-7 text-[10px] px-2"><SelectValue placeholder="Field" /></SelectTrigger>
                       <SelectContent>
-                        {fields.map(f => (<SelectItem key={f.value} value={f.value}>{f.label}</SelectItem>))}
+                        {fields.map(f => (<SelectItem key={f.value} value={f.value} className="text-xs">{f.label}</SelectItem>))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="col-span-3">
-                    <Select value={row.dir} onValueChange={(v) => updateSortRow(idx, { dir: (v as 'asc'|'desc') })}>
-                      <SelectTrigger><SelectValue placeholder="Direction" /></SelectTrigger>
+                    <Select value={row.dir} onValueChange={(v) => updateSortRow(idx, { dir: (v as 'asc' | 'desc') })}>
+                      <SelectTrigger className="h-7 text-[10px] px-2"><SelectValue placeholder="Dir" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="desc">Desc</SelectItem>
-                        <SelectItem value="asc">Asc</SelectItem>
+                        <SelectItem value="desc" className="text-xs">Desc</SelectItem>
+                        <SelectItem value="asc" className="text-xs">Asc</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="col-span-2 flex justify-end">
-                    <Button size="icon" variant="ghost" onClick={() => removeSortRow(idx)}><Trash2 className="w-4 h-4" /></Button>
+                    <Button size="icon" variant="ghost" className="h-6 w-6" onClick={() => removeSortRow(idx)}><Trash2 className="w-3 h-3 text-muted-foreground" /></Button>
                   </div>
                 </div>
               ))}
-              <Button size="sm" variant="outline" onClick={() => addSortRow(fields[0]?.value)}>Add sort</Button>
+              <Button size="sm" variant="outline" className="h-6 text-[10px] px-2" onClick={() => addSortRow(fields[0]?.value)}>Add sort</Button>
             </div>
           </div>
 
@@ -996,7 +1001,7 @@ export function NodeConfigEditor({
             <Select value={String(localConfig.limit ?? 50)} onValueChange={(v) => handleConfigChange('limit', Number(v))}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
-                {[10,25,50,100,200,500].map(n => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}
+                {[10, 25, 50, 100, 200, 500].map(n => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}
               </SelectContent>
             </Select>
           </div>
@@ -1064,146 +1069,126 @@ export function NodeConfigEditor({
   };
 
   return (
-    <Card>
-      <CardHeader>
+    <Card className="border-none shadow-none bg-transparent h-full flex flex-col">
+      <CardHeader className="px-0 pt-0 pb-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Settings className="w-4 h-4" />
-            <CardTitle className="text-lg">Node Configuration</CardTitle>
+            <Settings className="w-4 h-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Configuration</CardTitle>
           </div>
-          <Button
-            size="icon"
-            variant="ghost"
-            onClick={() => onDeleteNode(nodeId)}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onClick={() => onDeleteNode(nodeId)}
+            >
+              <Trash2 className="w-3 h-3" />
+            </Button>
+          </div>
         </div>
       </CardHeader>
 
-      <CardContent className="space-y-4">
-        {/* Node Info */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{nodeDefinition.icon}</span>
-            <div>
-              <h4 className="font-medium">{nodeDefinition.label}</h4>
-              <Badge 
-                variant="outline" 
-                className={`text-xs ${categoryColors[nodeDefinition.category]}`}
-              >
-                {nodeDefinition.category}
-              </Badge>
+      <CardContent className="p-0 flex-1 overflow-y-auto pr-1">
+        <div className="space-y-4">
+          {/* Node Info */}
+          <div className="rounded-md border bg-muted/30 p-2">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-lg">{nodeDefinition.icon}</span>
+              <div>
+                <h3 className="font-medium text-xs">{nodeDefinition.label}</h3>
+                <Badge
+                  variant="outline"
+                  className={`text-[9px] px-1 py-0 h-4 ${categoryColors[nodeDefinition.category]}`}
+                >
+                  {nodeDefinition.category}
+                </Badge>
+              </div>
+            </div>
+            <p className="text-[10px] text-muted-foreground leading-tight">
+              {nodeDefinition.description}
+            </p>
+            <div className="mt-2 text-[9px] text-muted-foreground font-mono">
+              ID: {nodeId}
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {nodeDefinition.description}
-          </p>
-          <div className="text-xs text-muted-foreground">
-            <strong>ID:</strong> {nodeId}
-          </div>
-        </div>
 
-        {/* Configuration Fields */}
-        {nodeType === 'pb.find' ? (
-          renderFindRecordsBuilder()
-        ) : nodeDefinition.config.length > 0 ? (
-          <div className="space-y-4">
-            <h5 className="font-medium text-sm">Configuration</h5>
-            {nodeDefinition.config.map((field) => (
-              <div key={field.key} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <Label htmlFor={`${nodeId}-${field.key}`} className="text-sm font-medium">
-                    {field.label}
-                    {field.required && <span className="text-red-500 ml-1">*</span>}
-                  </Label>
-                  {field.type === 'boolean' && renderConfigField(field)}
-                </div>
-                
-                {field.type !== 'boolean' && (
-                  <div>
+          {/* Configuration Fields */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs font-semibold">Settings</Label>
+            </div>
+
+            {nodeType === 'pb.find' ? (
+              renderFindRecordsBuilder()
+            ) : (
+              <>
+                {nodeDefinition.config.map((field) => (
+                  <div key={field.key} className="space-y-1">
+                    <Label className="text-[10px] font-medium text-muted-foreground">
+                      {field.label}
+                      {field.required && <span className="text-destructive ml-0.5">*</span>}
+                    </Label>
                     {renderConfigField(field)}
+                    {field.description && (
+                      <p className="text-[9px] text-muted-foreground">{field.description}</p>
+                    )}
                   </div>
-                )}
-                {field.key === 'subscriptionId' && webhookLoading && (
-                  <div className="flex items-center text-xs text-muted-foreground gap-2">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Loading saved webhooks...
-                  </div>
-                )}
-                
-                {field.description && (
-                  <p className="text-xs text-muted-foreground">
-                    {field.description}
+                ))}
+
+                {nodeDefinition.config.length === 0 && (
+                  <p className="text-xs text-muted-foreground italic">
+                    No configuration options available for this node.
                   </p>
                 )}
-              </div>
-            ))}
+              </>
+            )}
           </div>
-        ) : (
-          <div className="text-sm text-muted-foreground">
-            This node has no configuration options.
-          </div>
-        )}
 
-        {/* Node Testing */}
-        <div className="space-y-3 pt-4 border-t">
-          <h5 className="font-medium text-sm">Test Node</h5>
-          <div className="space-y-3">
-            <div>
-              <Label htmlFor="test-input" className="text-xs">Test Input (JSON)</Label>
+          {/* Test Section */}
+          <div className="pt-2 border-t">
+            <div className="flex items-center justify-between mb-2">
+              <Label className="text-xs font-semibold">Test Node</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 text-[10px] px-2"
+                onClick={handleTestNode}
+                disabled={testing}
+              >
+                {testing ? <Loader2 className="w-3 h-3 animate-spin" /> : <Play className="w-3 h-3 mr-1" />}
+                Run
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-[10px] text-muted-foreground">Test Input (JSON)</Label>
               <Textarea
-                id="test-input"
                 value={testInput}
                 onChange={(e) => setTestInput(e.target.value)}
-                placeholder='{"test": true, "user_id": "123"}'
-                className="font-mono text-xs"
-                rows={3}
+                className="font-mono text-[10px] min-h-[60px]"
+                placeholder="{}"
               />
             </div>
-            
-            <Button 
-              onClick={handleTestNode} 
-              disabled={testing}
-              size="sm"
-              className="w-full"
-            >
-              {testing ? (
-                <>
-                  <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin mr-2" />
-                  Testing...
-                </>
-              ) : (
-                <>
-                  <Play className="w-3 h-3 mr-2" />
-                  Test Node
-                </>
-              )}
-            </Button>
 
-            {/* Test Results */}
             {testResult && (
-              <div className={`p-3 rounded-md border ${
-                testResult.success 
-                  ? 'bg-green-50 border-green-200' 
-                  : 'bg-red-50 border-red-200'
-              }`}>
-                <div className="flex items-center gap-2 mb-2">
+              <div className={`mt-2 rounded-md border p-2 text-[10px] ${testResult.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                }`}>
+                <div className="flex items-center gap-1 mb-1 font-medium">
                   {testResult.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <CheckCircle2 className="w-3 h-3 text-green-600" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-red-600" />
+                    <AlertCircle className="w-3 h-3 text-red-600" />
                   )}
-                  <span className={`text-sm font-medium ${
-                    testResult.success ? 'text-green-800' : 'text-red-800'
-                  }`}>
+                  <span className={`text-sm font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'
+                    }`}>
                     {testResult.success ? 'Test Successful' : 'Test Failed'}
                   </span>
                   <span className="text-xs text-muted-foreground ml-auto">
                     {testResult.timestamp.toLocaleTimeString()}
                   </span>
                 </div>
-                
+
                 {testResult.success && testResult.output && (
                   <div>
                     <p className="text-xs font-medium text-green-700 mb-1">Output:</p>
@@ -1212,7 +1197,7 @@ export function NodeConfigEditor({
                     </pre>
                   </div>
                 )}
-                
+
                 {!testResult.success && testResult.error && (
                   <div>
                     <p className="text-xs font-medium text-red-700 mb-1">Error:</p>
@@ -1235,8 +1220,8 @@ export function NodeConfigEditor({
               {nodeDefinition.inputs && nodeDefinition.inputs.length > 0 ? (
                 nodeDefinition.inputs.map((input) => (
                   <div key={input.id} className="flex items-center gap-1">
-                    <div 
-                      className="w-2 h-2 rounded-full" 
+                    <div
+                      className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: input.type === 'control' ? '#ff6b6b' : '#4dabf7' }}
                     />
                     <span>{input.label}</span>
@@ -1251,8 +1236,8 @@ export function NodeConfigEditor({
               {nodeDefinition.outputs && nodeDefinition.outputs.length > 0 ? (
                 nodeDefinition.outputs.map((output) => (
                   <div key={output.id} className="flex items-center gap-1">
-                    <div 
-                      className="w-2 h-2 rounded-full" 
+                    <div
+                      className="w-2 h-2 rounded-full"
                       style={{ backgroundColor: output.type === 'control' ? '#ff6b6b' : '#4dabf7' }}
                     />
                     <span>{output.label}</span>

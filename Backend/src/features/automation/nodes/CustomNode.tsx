@@ -15,24 +15,24 @@ interface CustomNodeData {
 
 export function CustomNode({ data, selected }: NodeProps) {
   const nodeData = data as CustomNodeData;
-  
+
   if (!nodeData || !nodeData.type) {
     return (
-      <Card className="min-w-[200px] border-red-500">
-        <CardContent className="p-3">
-          <div className="text-red-500 text-sm">Missing node data or type</div>
+      <Card className="min-w-[160px] border-red-500">
+        <CardContent className="p-2">
+          <div className="text-red-500 text-xs">Missing node data</div>
         </CardContent>
       </Card>
     );
   }
-  
+
   const nodeDefinition = getNodeDefinition(nodeData.type);
-  
+
   if (!nodeDefinition) {
     return (
-      <Card className="min-w-[200px] border-red-500">
-        <CardContent className="p-3">
-          <div className="text-red-500 text-sm">Unknown node type: {nodeData.type}</div>
+      <Card className="min-w-[160px] border-red-500">
+        <CardContent className="p-2">
+          <div className="text-red-500 text-xs">Unknown: {nodeData.type}</div>
         </CardContent>
       </Card>
     );
@@ -48,25 +48,25 @@ export function CustomNode({ data, selected }: NodeProps) {
   };
 
   const getCardClassName = () => {
-    let className = 'min-w-[200px] max-w-[250px] transition-all duration-300';
-    
+    let className = 'min-w-[160px] max-w-[200px] transition-all duration-300 shadow-sm';
+
     if (selected) {
-      className += ' ring-2 ring-primary ring-offset-2';
+      className += ' ring-1 ring-primary ring-offset-1';
     }
-    
+
     if (nodeData.isRunning) {
-      className += ' animate-pulse ring-2 ring-blue-400 ring-offset-2 shadow-lg shadow-blue-200';
+      className += ' animate-pulse ring-1 ring-blue-400 ring-offset-1 shadow-md shadow-blue-200';
     }
-    
+
     if (nodeData.hasError) {
-      className += ' ring-2 ring-red-400 ring-offset-2 shadow-lg shadow-red-200';
+      className += ' ring-1 ring-red-400 ring-offset-1 shadow-md shadow-red-200';
     }
-    
+
     return className;
   };
 
   return (
-    <Card 
+    <Card
       className={getCardClassName()}
       style={{ borderColor: nodeDefinition.color }}
     >
@@ -80,19 +80,21 @@ export function CustomNode({ data, selected }: NodeProps) {
           style={{
             top: `${((index + 1) * 100) / (nodeDefinition.inputs!.length + 1)}%`,
             background: input.type === 'control' ? '#ff6b6b' : '#4dabf7',
+            width: '8px',
+            height: '8px',
           }}
-          className="w-3 h-3"
+          className="border-2 border-background"
         />
       ))}
 
-      <CardHeader className="pb-2">
+      <CardHeader className="p-2">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{nodeDefinition.icon}</span>
+          <span className="text-base">{nodeDefinition.icon}</span>
           <div className="flex-1 min-w-0">
-            <div className="font-medium text-sm truncate">{nodeDefinition.label}</div>
-            <Badge 
-              variant="outline" 
-              className={`text-xs ${categoryColors[nodeDefinition.category]}`}
+            <div className="font-medium text-xs truncate">{nodeDefinition.label}</div>
+            <Badge
+              variant="outline"
+              className={`text-[9px] px-1 py-0 h-4 ${categoryColors[nodeDefinition.category]}`}
             >
               {nodeDefinition.category}
             </Badge>
@@ -112,8 +114,10 @@ export function CustomNode({ data, selected }: NodeProps) {
           style={{
             top: `${((index + 1) * 100) / (nodeDefinition.outputs!.length + 1)}%`,
             background: output.type === 'control' ? '#ff6b6b' : '#4dabf7',
+            width: '8px',
+            height: '8px',
           }}
-          className="w-3 h-3"
+          className="border-2 border-background"
         />
       ))}
     </Card>

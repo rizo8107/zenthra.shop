@@ -8,6 +8,7 @@ import webhooksRouter from './webhooks.js';
 import messagingRouter from './messaging.js';
 import aiRouter from './ai.js';
 import customerJourneyRoutes from '../api/customerJourney.js';
+import { initScheduler, stopScheduler } from './cronScheduler.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
@@ -113,6 +114,24 @@ app.post('/notifications/send', (req, res) => {
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
+});
+
+// Initialize cron scheduler
+initScheduler().catch((error) => {
+  console.error('Failed to initialize cron scheduler:', error);
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received, stopping scheduler...');
+  stopScheduler();
+  process.exit(0);
+});
+
+process.on('SIGINT', () => {
+  console.log('SIGINT received, stopping scheduler...');
+  stopScheduler();
+  process.exit(0);
 });
 
  

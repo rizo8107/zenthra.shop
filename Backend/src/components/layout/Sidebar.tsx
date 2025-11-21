@@ -1,17 +1,17 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Users, 
-  AlertTriangle, 
-  Package, 
-  FileText, 
-  Palette, 
-  Puzzle, 
-  Settings, 
-  ChevronLeft, 
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Users,
+  AlertTriangle,
+  Package,
+  FileText,
+  Palette,
+  Puzzle,
+  Settings,
+  ChevronLeft,
   ChevronRight,
   MessageSquare,
   Mail,
@@ -33,22 +33,22 @@ interface SidebarItemProps {
   badge?: string;
 }
 
-const SidebarItem: React.FC<SidebarItemProps> = ({ 
-  icon: Icon, 
-  title, 
-  path, 
-  active, 
+const SidebarItem: React.FC<SidebarItemProps> = ({
+  icon: Icon,
+  title,
+  path,
+  active,
   collapsed,
   onNavigate,
   badge
 }) => {
   return (
-    <Link 
-      to={path} 
+    <Link
+      to={path}
       className={cn(
         "flex items-center py-3 px-4 text-sm rounded-md transition-colors",
-        active 
-          ? "bg-primary text-primary-foreground" 
+        active
+          ? "bg-primary text-primary-foreground"
           : "text-muted-foreground hover:bg-secondary hover:text-secondary-foreground",
         collapsed && "justify-center"
       )}
@@ -94,7 +94,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   ];
 
   return (
-    <div 
+    <div
       className={cn(
         "bg-card h-full border-r flex flex-col transition-all duration-300",
         collapsed ? "w-16" : "w-64",
@@ -117,9 +117,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
           />
         </Link>
         {!isMobile && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={() => setCollapsed(!collapsed)}
             className="text-muted-foreground"
           >
@@ -127,7 +127,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
           </Button>
         )}
       </div>
-      
+
       {/* Navigation items */}
       <nav className="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
         {items.map((item) => (

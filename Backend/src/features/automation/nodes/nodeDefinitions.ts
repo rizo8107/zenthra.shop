@@ -77,8 +77,17 @@ export const nodeDefinitions: NodeDefinition[] = [
         required: true,
         defaultValue: '15m',
         options: [
+          { value: '5s', label: 'Every 5 seconds' },
+          { value: '10s', label: 'Every 10 seconds' },
+          { value: '20s', label: 'Every 20 seconds' },
+          { value: '30s', label: 'Every 30 seconds' },
+          { value: '1m', label: 'Every minute' },
+          { value: '2m', label: 'Every 2 minutes' },
           { value: '5m', label: 'Every 5 minutes' },
+          { value: '10m', label: 'Every 10 minutes' },
           { value: '15m', label: 'Every 15 minutes' },
+          { value: '20m', label: 'Every 20 minutes' },
+          { value: '30m', label: 'Every 30 minutes' },
           { value: '1h', label: 'Every hour' },
           { value: '6h', label: 'Every 6 hours' },
           { value: '1d', label: 'Every day (9 AM)' }
