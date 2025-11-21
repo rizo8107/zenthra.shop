@@ -8,6 +8,15 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/server/**/*", "src/types/**/*", "src/features/**/*", "src/lib/**/*", "src/env.d.ts"],
-  "exclude": ["node_modules", "dist"]
+  "include": [
+    "src/server/**/*",
+    "src/types/**/*",
+    "src/features/automation/flowExecutor.ts",
+    "src/features/automation/api.ts",
+    "src/features/automation/types.ts",
+    "src/lib/pocketbase.ts",
+    "src/lib/types.ts",
+    "src/env.d.ts"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.tsx"]
 }
