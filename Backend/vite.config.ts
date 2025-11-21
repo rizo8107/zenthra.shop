@@ -71,6 +71,9 @@ export default defineConfig(({ mode }) => {
       VitePWA({
         registerType: 'prompt',
         includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+        workbox: {
+          maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MB
+        },
         manifest: {
           name: 'Zenthra Shop',
           short_name: 'Zenthra',
