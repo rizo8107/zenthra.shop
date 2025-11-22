@@ -109,9 +109,16 @@ RUN npm run build
 # ---------- Runtime: single Nginx serving both ----------
 FROM nginx:alpine AS runner
 
-# Copy builds
+# Copy built files
 COPY --from=frontend-builder /app/frontend/dist /usr/share/nginx/html
 COPY --from=backend-builder  /app/backend/dist   /usr/share/nginx/html-cms
+
+# Copy logo files to both directories
+COPY --from=frontend-builder /app/frontend/public/karigai-logo.webp /usr/share/nginx/html/
+COPY --from=frontend-builder /app/frontend/public/karigai-logo-white.webp /usr/share/nginx/html/
+COPY --from=backend-builder /app/backend/public/karigai-logo.webp /usr/share/nginx/html-cms/
+COPY --from=backend-builder /app/backend/public/karigai-logo-white.webp /usr/share/nginx/html-cms/
+COPY --from=backend-builder /app/backend/public/logo.svg /usr/share/nginx/html-cms/
 
 # Copy combined nginx config
 COPY nginx.multi.conf /etc/nginx/conf.d/default.conf
