@@ -19,11 +19,47 @@ const Root = {
   fields: {
     title: { type: "text" as const },
     description: { type: "textarea" as const },
+    pageBackground: {
+      type: "custom" as const,
+      label: "Page Background",
+      render: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => {
+        const strValue = typeof value === "string" ? value : "";
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={strValue !== "" ? strValue : "#f5f5f5"}
+              onChange={(e) => onChange(e.target.value)}
+              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+              aria-label="Page background color"
+            />
+            <input
+              type="text"
+              value={strValue}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#f5f5f5"
+              className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+            />
+          </div>
+        );
+      },
+    },
   },
-  render: ({ children, title }: { children: React.ReactNode; title?: string }) => (
+  render: ({
+    children,
+    title,
+    pageBackground,
+  }: {
+    children: React.ReactNode;
+    title?: string;
+    pageBackground?: string;
+  }) => (
     <div>
       {title && <title>{title}</title>}
-      <div className="min-h-screen bg-background">
+      <div
+        className="min-h-screen bg-background"
+        style={pageBackground ? { backgroundColor: pageBackground } : undefined}
+      >
         {children}
       </div>
     </div>

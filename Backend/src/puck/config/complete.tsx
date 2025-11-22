@@ -34,6 +34,32 @@ const Root = {
     title: { type: "text" as const, label: "Page Title" },
     description: { type: "textarea" as const, label: "Page Description" },
     thumbnail: ImageSelector,
+    // Simple page background picker (hex/color), on top of theme controls
+    backgroundColor: {
+      type: "custom" as const,
+      label: "Background Color",
+      render: ({ value, onChange }: { value: unknown; onChange: (v: unknown) => void }) => {
+        const strValue = typeof value === "string" ? value : "";
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={strValue !== "" ? strValue : "#f5f5f5"}
+              onChange={(e) => onChange(e.target.value)}
+              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+              aria-label="Page background color"
+            />
+            <input
+              type="text"
+              value={strValue}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#f5f5f5"
+              className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+            />
+          </div>
+        );
+      },
+    },
     // Theme controls
     useTheme: { type: "radio" as const, label: "Override Theme", options: [
       { label: "No", value: false },
@@ -73,6 +99,11 @@ const Root = {
       ['--foreground' as any]: hsl(props.foregroundH, props.foregroundS, props.foregroundL, '20 10% 5%'),
       ['--radius' as any]: typeof props.radiusRem === 'number' ? `${props.radiusRem}rem` : undefined,
     } : {};
+
+    // If a plain backgroundColor is provided, apply it directly to the wrapper
+    if (props?.backgroundColor) {
+      (styleVars as any).backgroundColor = props.backgroundColor;
+    }
 
     return (
       <div>

@@ -15,6 +15,7 @@ export interface ProductGridProps {
   description?: string;
   category?: string;
   limit?: number;
+  backgroundColor?: string;
   // grid mode columns
   columnsDesktop?: 2 | 3 | 4;
   columnsTablet?: 1 | 2 | 3 | 4;
@@ -28,9 +29,14 @@ export interface ProductGridProps {
   cardShowDescription?: boolean;
   cardTitleSize?: "sm" | "md" | "lg";
   cardDescSize?: "sm" | "md" | "lg";
+  cardCorner?: "rounded" | "square" | "pill";
+  imageCorner?: "rounded" | "square" | "pill";
   cardCtaLabel?: string;
   cardImageRatio?: "portrait" | "square" | "wide";
   cardSpacing?: "compact" | "comfortable";
+  cardGapPx?: number;
+  imagePadding?: number;
+  cardLayout?: "band" | "simple" | "split";
 }
 
 const ProductGridContent = ({
@@ -38,6 +44,7 @@ const ProductGridContent = ({
   description,
   category,
   limit,
+  backgroundColor,
   columnsDesktop,
   columnsTablet,
   columnsMobile,
@@ -49,9 +56,14 @@ const ProductGridContent = ({
   cardShowDescription,
   cardTitleSize,
   cardDescSize,
+  cardCorner,
+  imageCorner,
   cardCtaLabel,
   cardImageRatio,
   cardSpacing,
+  cardGapPx,
+  imagePadding,
+  cardLayout,
 }: ProductGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,6 +160,8 @@ const ProductGridContent = ({
     return [`grid-cols-${m}`, `sm:grid-cols-${t}`, `lg:grid-cols-${d}`].join(" ");
   }, [columnsMobile, columnsTablet, columnsDesktop]);
 
+  const gapPx = typeof cardGapPx === "number" && cardGapPx >= 0 ? cardGapPx : 20;
+
   const currentCols =
     device === "desktop"
       ? columnsDesktop || 4
@@ -171,17 +185,25 @@ const ProductGridContent = ({
       showDescription: cardShowDescription,
       titleSize: cardTitleSize,
       descSize: cardDescSize,
+      corner: cardCorner,
+      imageCorner,
       ctaLabel: cardCtaLabel,
       imageRatio: cardImageRatio,
       spacing: cardSpacing,
+      imagePadding,
+      layout: cardLayout,
     }),
     [
       cardShowDescription,
       cardTitleSize,
       cardDescSize,
+      cardCorner,
+      imageCorner,
       cardCtaLabel,
       cardImageRatio,
       cardSpacing,
+      imagePadding,
+      cardLayout,
     ]
   );
 
@@ -218,7 +240,10 @@ const ProductGridContent = ({
   };
 
   const SectionShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <section className="py-10 md:py-12 bg-background">
+    <section
+      className="py-10 md:py-12"
+      style={backgroundColor ? { backgroundColor } : undefined}
+    >
       <div ref={containerRef} className="konipai-container">
         {(title || description) && (
           <header className="mb-6 md:mb-8 text-center flex flex-col items-center gap-2">
@@ -243,7 +268,10 @@ const ProductGridContent = ({
   if (loading) {
     return (
       <SectionShell>
-        <div className={cn("grid gap-5 md:gap-6", gridCols)}>
+        <div
+          className={cn("grid", gridCols)}
+          style={{ gap: gapPx }}
+        >
           {Array.from({ length: limit || 8 }).map((_, i) => (
             <div
               key={i}
@@ -304,7 +332,10 @@ const ProductGridContent = ({
   if (mode !== "carousel") {
     return (
       <SectionShell>
-        <div className={cn("grid gap-5 md:gap-6", gridCols)}>
+        <div
+          className={cn("grid", gridCols)}
+          style={{ gap: gapPx }}
+        >
           {products.map((product, index) => (
             <ProductCard
               key={product.id}
@@ -354,10 +385,11 @@ const ProductGridContent = ({
             {pages.map((group, gi) => (
               <div key={gi} className="shrink-0 w-full px-1 sm:px-2">
                 <div
-                  className={cn("grid gap-5 md:gap-6", `grid-cols-${currentCols}`)}
+                  className={cn("grid", `grid-cols-${currentCols}`)}
                   style={{
                     gridAutoRows: "1fr",
                     minHeight: "360px",
+                    gap: gapPx,
                   }}
                 >
                   {group.map((product, index) => (
@@ -402,6 +434,51 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
     description: { type: "textarea", label: "Description (optional)" },
     category: { type: "text", label: "Category Filter" },
     limit: { type: "number", label: "Number of Products", min: 1, max: 40 },
+    backgroundColor: {
+      type: "custom",
+      label: "Background Color",
+      render: ({ value, onChange }) => (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={
+                typeof value === "string" && value !== "" && value !== "transparent"
+                  ? value
+                  : "#f5f5f5"
+              }
+              onChange={(e) => onChange(e.target.value)}
+              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+              aria-label="Section background color"
+              disabled={value === "transparent"}
+            />
+            <input
+              type="text"
+              value={value || ""}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#f5f5f5 or transparent"
+              className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+            />
+          </div>
+          <button
+            type="button"
+            className="self-start text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            onClick={() => onChange("transparent")}
+          >
+            Use transparent background
+          </button>
+        </div>
+      ),
+    },
+    cardCorner: {
+      type: "select",
+      label: "Card: Corner Radius",
+      options: [
+        { label: "Rounded", value: "rounded" },
+        { label: "Square", value: "square" },
+        { label: "Pill", value: "pill" },
+      ],
+    },
     mode: {
       type: "select",
       label: "Display Mode",
@@ -514,6 +591,34 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
         { label: "Comfortable", value: "comfortable" },
       ],
     },
+    imageCorner: {
+      type: "select",
+      label: "Image: Corner Radius",
+      options: [
+        { label: "Rounded", value: "rounded" },
+        { label: "Square", value: "square" },
+        { label: "Pill", value: "pill" },
+      ],
+    },
+    cardGapPx: {
+      type: "number",
+      label: "Card Gap (px)",
+      min: 0,
+    },
+    imagePadding: {
+      type: "number",
+      label: "Image Padding (px)",
+      min: 0,
+    },
+    cardLayout: {
+      type: "select",
+      label: "Card Layout",
+      options: [
+        { label: "Band (price + button)", value: "band" },
+        { label: "Simple (stacked)", value: "simple" },
+        { label: "Split (row, no band)", value: "split" },
+      ],
+    },
   },
   defaultProps: {
     title: "Featured Products",
@@ -528,9 +633,12 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
     showArrows: true,
     showDots: true,
     cardShowDescription: true,
+    cardGapPx: 16,
+    imagePadding: 0,
+    cardLayout: "band",
+    cardCtaLabel: "Add to Cart",
   },
   render: (props) => <ProductGridContent {...props} />,
 };
 
 export const KarigaiProductGrid: ComponentConfig<ProductGridProps> = ProductGrid;
-export const poructgrind: ComponentConfig<ProductGridProps> = ProductGrid;
