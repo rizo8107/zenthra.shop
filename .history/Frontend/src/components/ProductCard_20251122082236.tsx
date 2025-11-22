@@ -160,17 +160,27 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
         <div>
           <h3
             className={cn(
-              'font-semibold mb-1 text-foreground group-hover:text-foreground transition-colors line-clamp-2',
+              'font-semibold mb-1 text-primary group-hover:text-primary/90 transition-colors line-clamp-2',
               titleSizeCls
             )}
           >
             {product.name}
           </h3>
+          {pc.showDescription && product.description && (
+            <p
+              className={cn(
+                'text-muted-foreground line-clamp-2 mb-1',
+                descSizeCls
+              )}
+            >
+              {product.description}
+            </p>
+          )}
         </div>
 
         <div className="mt-2 flex items-center justify-between gap-3" style={ctaVars}>
-          <div className="inline-flex items-center">
-            <span className="text-sm font-semibold text-foreground">
+          <div className="inline-flex items-center rounded-full bg-muted px-3 py-1 shadow-sm">
+            <span className="text-sm font-semibold">
               ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
             </span>
             {product.original_price && product.original_price > product.price && (
