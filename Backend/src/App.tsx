@@ -17,7 +17,9 @@ import LoginPage from "./pages/LoginPage";
 import NotFound from "./pages/NotFound";
 import PwaUpdateNotification from "./components/PwaUpdateNotification";
 import ZenthraPagesManager from "./pages/admin/ZenthraPagesManager";
+import PagesManagerBackend from "./pages/admin/PagesManagerBackend";
 import ZenthraPageEditor from "./pages/admin/ZenthraPageEditor";
+import GrapesJSEditor from "./pages/GrapesJSEditor";
 import ZenthraThemes from "./pages/admin/ZenthraThemes";
 import ZenthraPlugins from "./pages/admin/ZenthraPlugins";
 import AutomationFlowsPage from "./pages/admin/AutomationFlowsPage";
@@ -79,8 +81,10 @@ const App = () => {
               <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
               <Route path="/admin/coupons" element={<ProtectedRoute><CouponsPage /></ProtectedRoute>} />
               <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
-              <Route path="/admin/pages" element={<ProtectedRoute><ZenthraPagesManager /></ProtectedRoute>} />
+              <Route path="/admin/pages" element={<ProtectedRoute><PagesManagerBackend /></ProtectedRoute>} />
+              <Route path="/admin/pages-old" element={<ProtectedRoute><ZenthraPagesManager /></ProtectedRoute>} />
               <Route path="/admin/pages/:pageId/edit" element={<ProtectedRoute><ZenthraPageEditor /></ProtectedRoute>} />
+              <Route path="/admin/pages/:pageId/edit-grapesjs" element={<ProtectedRoute><GrapesJSEditor /></ProtectedRoute>} />
               <Route path="/admin/themes" element={<ProtectedRoute><ZenthraThemes /></ProtectedRoute>} />
               <Route path="/admin/plugins" element={<ProtectedRoute><ZenthraPlugins /></ProtectedRoute>} />
               <Route path="/admin/navbar" element={<ProtectedRoute><NavbarSettingsPage /></ProtectedRoute>} />

@@ -1,0 +1,371 @@
+/* GrapesJS Dark Theme */
+
+/* Main editor colors */
+.grapesjs-editor-wrapper .gjs-cv-canvas {
+  background: #1a1a1a;
+}
+
+/* Top toolbar dark theme */
+.grapesjs-editor-wrapper .panel__basic-actions,
+.grapesjs-editor-wrapper .panel__devices {
+  background: #2d2d2d;
+  border-radius: 6px;
+  padding: 4px;
+}
+
+/* Sidebar backgrounds */
+.grapesjs-editor-wrapper .blocks-container,
+.grapesjs-editor-wrapper .layers-container,
+.grapesjs-editor-wrapper .styles-container,
+.grapesjs-editor-wrapper .traits-container,
+.grapesjs-editor-wrapper .selectors-container {
+  background: #1e1e1e;
+  color: #e0e0e0;
+}
+
+/* Block items */
+.grapesjs-editor-wrapper .gjs-block {
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  color: #e0e0e0;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.grapesjs-editor-wrapper .gjs-block:hover {
+  background: #3d3d3d;
+  border-color: #4d4d4d;
+  transform: translateY(-2px);
+}
+
+.grapesjs-editor-wrapper .gjs-block-label {
+  color: #e0e0e0;
+}
+
+.grapesjs-editor-wrapper .gjs-block svg {
+  fill: #e0e0e0;
+}
+
+/* Category headers */
+.grapesjs-editor-wrapper .gjs-block-category .gjs-title {
+  background: #2d2d2d;
+  border-bottom: 1px solid #3d3d3d;
+  color: #e0e0e0;
+  font-weight: 600;
+}
+
+/* Layers panel */
+.grapesjs-editor-wrapper .gjs-layer {
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  color: #e0e0e0;
+  margin-bottom: 2px;
+  border-radius: 3px;
+}
+
+.grapesjs-editor-wrapper .gjs-layer:hover {
+  background: #3d3d3d;
+}
+
+.grapesjs-editor-wrapper .gjs-layer.gjs-selected {
+  background: #4a5568;
+  border-color: #667eea;
+}
+
+.grapesjs-editor-wrapper .gjs-layer__icon {
+  color: #e0e0e0;
+}
+
+/* Style manager */
+.grapesjs-editor-wrapper .gjs-sm-sector {
+  background: #1e1e1e;
+  border-bottom: 1px solid #3d3d3d;
+}
+
+.grapesjs-editor-wrapper .gjs-sm-sector .gjs-sm-title {
+  background: #2d2d2d;
+  color: #e0e0e0;
+  border-bottom: 1px solid #3d3d3d;
+  font-weight: 600;
+}
+
+.grapesjs-editor-wrapper .gjs-sm-property {
+  background: #2d2d2d;
+  border-bottom: 1px solid #3d3d3d;
+  color: #e0e0e0;
+}
+
+.grapesjs-editor-wrapper .gjs-sm-label {
+  color: #a0a0a0;
+}
+
+/* Input fields */
+.grapesjs-editor-wrapper .gjs-field,
+.grapesjs-editor-wrapper .gjs-field input,
+.grapesjs-editor-wrapper .gjs-field select,
+.grapesjs-editor-wrapper .gjs-field textarea {
+  background: #1a1a1a;
+  border: 1px solid #3d3d3d;
+  color: #e0e0e0;
+  border-radius: 3px;
+}
+
+.grapesjs-editor-wrapper .gjs-field:focus,
+.grapesjs-editor-wrapper .gjs-field input:focus,
+.grapesjs-editor-wrapper .gjs-field select:focus {
+  border-color: #667eea;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+}
+
+/* Buttons */
+.grapesjs-editor-wrapper .gjs-btn-prim {
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 16px;
+  transition: all 0.2s;
+}
+
+.grapesjs-editor-wrapper .gjs-btn-prim:hover {
+  background: #5568d3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+}
+
+/* Toolbar buttons */
+.grapesjs-editor-wrapper .gjs-toolbar {
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+}
+
+.grapesjs-editor-wrapper .gjs-toolbar-item {
+  color: #e0e0e0;
+  background: transparent;
+  border-right: 1px solid #3d3d3d;
+  min-width: 32px;
+  min-height: 32px;
+  font-size: 16px;
+}
+
+.grapesjs-editor-wrapper .gjs-toolbar-item:hover {
+  background: #3d3d3d;
+}
+
+.grapesjs-editor-wrapper .gjs-toolbar-item i,
+.grapesjs-editor-wrapper .gjs-toolbar-item svg {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+}
+
+/* Panel switcher */
+.grapesjs-editor-wrapper .panel__switcher {
+  background: #2d2d2d;
+  border-bottom: 1px solid #3d3d3d;
+  display: flex;
+}
+
+.grapesjs-editor-wrapper .panel__switcher:not(:empty) {
+  display: flex; 
+}
+
+.grapesjs-editor-wrapper .panel__switcher button {
+  background: transparent;
+  color: #a0a0a0;
+  border: none;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.grapesjs-editor-wrapper .panel__switcher button:hover {
+  background: #3d3d3d;
+  color: #e0e0e0;
+}
+
+.grapesjs-editor-wrapper .panel__switcher button.active {
+  background: #667eea;
+  color: white;
+}
+
+/* Canvas frame */
+.grapesjs-editor-wrapper .gjs-frame {
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+}
+
+/* Traits panel */
+.grapesjs-editor-wrapper .gjs-trt-trait {
+  background: #2d2d2d;
+  border-bottom: 1px solid #3d3d3d;
+  padding: 8px;
+}
+
+.grapesjs-editor-wrapper .gjs-trt-trait__wrp {
+  color: #e0e0e0;
+}
+
+.grapesjs-editor-wrapper .gjs-label {
+  color: #a0a0a0;
+}
+
+/* Selector manager */
+.grapesjs-editor-wrapper .gjs-sm-selector {
+  background: #2d2d2d;
+  border: 1px solid #3d3d3d;
+  color: #e0e0e0;
+  border-radius: 3px;
+  margin: 2px;
+  padding: 4px 8px;
+}
+
+.grapesjs-editor-wrapper .gjs-sm-selector:hover {
+  background: #3d3d3d;
+}
+
+.grapesjs-editor-wrapper .gjs-sm-selector.gjs-selected {
+  background: #667eea;
+  border-color: #667eea;
+}
+
+/* Device buttons */
+.grapesjs-editor-wrapper .gjs-pn-btn {
+  background: transparent;
+  color: #e0e0e0;
+  border: 1px solid #3d3d3d;
+  margin: 2px;
+  border-radius: 4px;
+  padding: 10px 16px;
+  transition: all 0.2s;
+  font-size: 18px;
+  min-width: 42px;
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grapesjs-editor-wrapper .gjs-pn-btn:hover {
+  background: #3d3d3d;
+  border-color: #4d4d4d;
+}
+
+.grapesjs-editor-wrapper .gjs-pn-btn.gjs-pn-active {
+  background: #667eea;
+  border-color: #667eea;
+  color: white;
+}
+
+.grapesjs-editor-wrapper .gjs-pn-btn i,
+.grapesjs-editor-wrapper .gjs-pn-btn svg {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+}
+
+/* Scrollbars */
+.grapesjs-editor-wrapper ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.grapesjs-editor-wrapper ::-webkit-scrollbar-track {
+  background: #1a1a1a;
+}
+
+.grapesjs-editor-wrapper ::-webkit-scrollbar-thumb {
+  background: #3d3d3d;
+  border-radius: 4px;
+}
+
+.grapesjs-editor-wrapper ::-webkit-scrollbar-thumb:hover {
+  background: #4d4d4d;
+}
+
+/* Modal dialogs */
+.grapesjs-editor-wrapper .gjs-mdl-dialog {
+  background: #2d2d2d;
+  color: #e0e0e0;
+  border: 1px solid #3d3d3d;
+  border-radius: 8px;
+}
+
+.grapesjs-editor-wrapper .gjs-mdl-header {
+  background: #1e1e1e;
+  border-bottom: 1px solid #3d3d3d;
+  color: #e0e0e0;
+}
+
+.grapesjs-editor-wrapper .gjs-mdl-content {
+  background: #2d2d2d;
+  color: #e0e0e0;
+}
+
+/* Code editor (custom code plugin) */
+.grapesjs-editor-wrapper .CodeMirror {
+  background: #1a1a1a;
+  color: #e0e0e0;
+  border: 1px solid #3d3d3d;
+  border-radius: 4px;
+}
+
+.grapesjs-editor-wrapper .CodeMirror-gutters {
+  background: #2d2d2d;
+  border-right: 1px solid #3d3d3d;
+}
+
+.grapesjs-editor-wrapper .CodeMirror-linenumber {
+  color: #6d6d6d;
+}
+
+/* Resizer */
+.grapesjs-editor-wrapper .gjs-resizer-h,
+.grapesjs-editor-wrapper .gjs-resizer-v {
+  background: #667eea;
+}
+
+/* Badges */
+.grapesjs-editor-wrapper .gjs-badge {
+  background: #667eea;
+  color: white;
+  border-radius: 3px;
+}
+
+/* Fix right sidebar white space */
+.grapesjs-editor-wrapper .styles-container,
+.grapesjs-editor-wrapper .traits-container,
+.grapesjs-editor-wrapper .selectors-container {
+  min-height: 200px;
+}
+
+/* Category icons */
+.grapesjs-editor-wrapper .gjs-block-category .fa,
+.grapesjs-editor-wrapper .gjs-block-category .gjs-icon {
+  color: #e0e0e0;
+}
+
+/* Hover effects for interactivity */
+.grapesjs-editor-wrapper .gjs-sm-property:hover {
+  background: #3d3d3d;
+}
+
+.grapesjs-editor-wrapper .gjs-trt-trait:hover {
+  background: #3d3d3d;
+}
+
+/* Selected component highlight */
+.grapesjs-editor-wrapper .gjs-selected {
+  outline: 2px solid #667eea !important;
+}
+
+/* Component badges */
+.grapesjs-editor-wrapper .gjs-comp-badge {
+  background: #667eea;
+  color: white;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-size: 11px;
+}
