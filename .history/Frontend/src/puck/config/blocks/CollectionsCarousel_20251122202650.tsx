@@ -14,12 +14,6 @@ export interface CollectionsCarouselProps {
   title?: string;
   description?: string;
   backgroundColor?: string;
-  // Section padding (px)
-  paddingTop?: number;
-  paddingRight?: number;
-  paddingBottom?: number;
-  paddingLeft?: number;
-  itemGap?: number;
   mode?: "grid" | "carousel";
   size?: "sm" | "md" | "lg";
   desktopCount?: number;
@@ -54,11 +48,6 @@ const CollectionsCarouselView = (props: CollectionsCarouselProps) => {
     title,
     description,
     backgroundColor,
-    paddingTop,
-    paddingRight,
-    paddingBottom,
-    paddingLeft,
-    itemGap = 24,
     mode = "grid",
     size = "md",
     desktopCount = 6,
@@ -179,13 +168,7 @@ const CollectionsCarouselView = (props: CollectionsCarouselProps) => {
       <section
         ref={containerRef}
         className="py-10"
-        style={{
-          ...(backgroundColor ? { backgroundColor } : {}),
-          ...(typeof paddingTop === "number" ? { paddingTop } : {}),
-          ...(typeof paddingRight === "number" ? { paddingRight } : {}),
-          ...(typeof paddingBottom === "number" ? { paddingBottom } : {}),
-          ...(typeof paddingLeft === "number" ? { paddingLeft } : {}),
-        }}
+        style={backgroundColor ? { backgroundColor } : undefined}
       >
         {(title || description) && (
           <div className="text-center mb-6">
@@ -193,15 +176,7 @@ const CollectionsCarouselView = (props: CollectionsCarouselProps) => {
             {description && <p className="text-muted-foreground max-w-2xl mx-auto mt-1">{description}</p>}
           </div>
         )}
-        <div
-          className={cn(
-            "grid",
-            `grid-cols-${Math.max(1, mobileCount)}`,
-            `sm:grid-cols-${Math.max(1, tabletCount)}`,
-            `lg:grid-cols-${Math.max(1, desktopCount)}`
-          )}
-          style={{ gap: `${itemGap}px` }}
-        >
+        <div className={cn("grid gap-6", `grid-cols-${Math.max(1, mobileCount)}`, `sm:grid-cols-${Math.max(1, tabletCount)}`, `lg:grid-cols-${Math.max(1, desktopCount)}`)}>
           {data.map((it, i) => (
             <Item key={i} {...it} />)
           )}
@@ -214,13 +189,7 @@ const CollectionsCarouselView = (props: CollectionsCarouselProps) => {
     <section
       ref={containerRef}
       className="py-10 overflow-x-hidden"
-      style={{
-        ...(backgroundColor ? { backgroundColor } : {}),
-        ...(typeof paddingTop === "number" ? { paddingTop } : {}),
-        ...(typeof paddingRight === "number" ? { paddingRight } : {}),
-        ...(typeof paddingBottom === "number" ? { paddingBottom } : {}),
-        ...(typeof paddingLeft === "number" ? { paddingLeft } : {}),
-      }}
+      style={backgroundColor ? { backgroundColor } : undefined}
     >
       {(title || description) && (
         <div className="text-center mb-6">
@@ -239,10 +208,7 @@ const CollectionsCarouselView = (props: CollectionsCarouselProps) => {
           <div className="flex transition-transform duration-300 will-change-transform" style={{ transform: `translate3d(-${page * 100}%, 0, 0)` }}>
             {pages.map((group, gi) => (
               <div key={gi} className="shrink-0 w-full">
-                <div
-                  className={cn("grid", `grid-cols-${perRow}`)}
-                  style={{ gap: `${itemGap}px` }}
-                >
+                <div className={cn("grid gap-6", `grid-cols-${perRow}`)}>
                   {group.map((it, i) => (
                     <Item key={`${gi}-${i}`} {...it} />
                   ))}
@@ -270,64 +236,38 @@ export const CollectionsCarousel: ComponentConfig<CollectionsCarouselProps> = {
     backgroundColor: {
       type: "custom",
       label: "Background Color",
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      render: ({ value, onChange }: any) => {
-        const strValue = typeof value === "string" ? value : "";
-        const isTransparent = strValue === "transparent";
-        return (
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2">
-              <input
-                type="color"
-                value={strValue && !isTransparent ? strValue : "#f5f5f5"}
-                onChange={(e) => onChange(e.target.value)}
-                className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
-                aria-label="Section background color"
-                disabled={isTransparent}
-              />
-              <input
-                type="text"
-                value={strValue}
-                onChange={(e) => onChange(e.target.value)}
-                placeholder="#f5f5f5 or transparent"
-                className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
-              />
-            </div>
-            <button
-              type="button"
-              className="self-start text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
-              onClick={() => onChange("transparent")}
-            >
-              Use transparent background
-            </button>
+      render: ({ value, onChange }) => (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={
+                typeof value === "string" && value !== "" && value !== "transparent"
+                  ? value
+                  : "#f5f5f5"
+              }
+              onChange={(e) => onChange(e.target.value)}
+              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+              aria-label="Section background color"
+              disabled={value === "transparent"}
+            />
+            <input
+              type="text"
+              value={value || ""}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#f5f5f5 or transparent"
+              className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+            />
           </div>
-        );
-      },
-    },
-    paddingTop: {
-      type: "number",
-      label: "Section Padding Top (px)",
-      min: 0,
-    },
-    paddingBottom: {
-      type: "number",
-      label: "Section Padding Bottom (px)",
-      min: 0,
-    },
-    paddingLeft: {
-      type: "number",
-      label: "Section Padding Left (px)",
-      min: 0,
-    },
-    paddingRight: {
-      type: "number",
-      label: "Section Padding Right (px)",
-      min: 0,
-    },
-    itemGap: {
-      type: "number",
-      label: "Item Gap (px)",
-      min: 0,
+          <button
+            type="button"
+            className="self-start text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
+            onClick={() => onChange("transparent")}
+          >
+            Use transparent background
+          </button>
+        </div>
+      ),
     },
     mode: { type: "select", label: "Display Mode", options: [
       { label: "Grid", value: "grid" },
