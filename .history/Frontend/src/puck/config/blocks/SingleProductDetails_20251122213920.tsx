@@ -7,17 +7,9 @@ import { cn } from "@/lib/utils";
 
 export interface SingleProductProps {
   productId?: string;
-  showGallery?: boolean;
-  showPrice?: boolean;
-  showFeatures?: boolean;
-  showCTA?: boolean;
-  align?: "left" | "right"; // image side
-  ribbonText?: string;
-  theme?: "brand" | "green" | "neutral";
-  ctaLabel?: string;
 }
 
-function SingleProductClient({ productId, puck, showGallery, showPrice, showFeatures, showCTA, align, ribbonText, theme, ctaLabel }: SingleProductProps & { puck?: { isEditing?: boolean } }) {
+function SingleProductClient({ productId, puck }: SingleProductProps & { puck?: { isEditing?: boolean } }) {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -64,17 +56,10 @@ function SingleProductClient({ productId, puck, showGallery, showPrice, showFeat
       <ProductDetailHeroEmbedded
         product={product as Product}
         disabled={!!puck?.isEditing}
-        showGallery={showGallery}
-        showPrice={showPrice}
-        showCTA={showCTA}
-        align={align}
-        ctaLabel={ctaLabel}
       />
-      {showFeatures !== false && (
-        <div className="mt-10">
-          <LazyProductDetails product={product as Product} />
-        </div>
-      )}
+      <div className="mt-10">
+        <LazyProductDetails product={product as Product} />
+      </div>
     </section>
   );
 }

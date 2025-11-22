@@ -64,17 +64,10 @@ function SingleProductClient({ productId, puck, showGallery, showPrice, showFeat
       <ProductDetailHeroEmbedded
         product={product as Product}
         disabled={!!puck?.isEditing}
-        showGallery={showGallery}
-        showPrice={showPrice}
-        showCTA={showCTA}
-        align={align}
-        ctaLabel={ctaLabel}
       />
-      {showFeatures !== false && (
-        <div className="mt-10">
-          <LazyProductDetails product={product as Product} />
-        </div>
-      )}
+      <div className="mt-10">
+        <LazyProductDetails product={product as Product} />
+      </div>
     </section>
   );
 }

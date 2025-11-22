@@ -70,11 +70,9 @@ function SingleProductClient({ productId, puck, showGallery, showPrice, showFeat
         align={align}
         ctaLabel={ctaLabel}
       />
-      {showFeatures !== false && (
-        <div className="mt-10">
-          <LazyProductDetails product={product as Product} />
-        </div>
-      )}
+      <div className="mt-10">
+        <LazyProductDetails product={product as Product} />
+      </div>
     </section>
   );
 }

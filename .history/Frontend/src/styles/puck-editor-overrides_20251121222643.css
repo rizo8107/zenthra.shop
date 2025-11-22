@@ -55,9 +55,6 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  /* Ensure there's always breathing room at the bottom so overlays/toolbars
-     near the last block aren't clipped by the viewport edge */
-  padding-bottom: 96px;
 }
 
 /* Frame-root specific fixes (as reported) */
@@ -66,8 +63,6 @@
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
-  /* Mirror preview bottom padding to avoid double scroll + clipping at page end */
-  padding-bottom: 96px;
 }
 .puck-editor-root #frame-root > div,
 .puck-editor-root #frame-root > div > div,
