@@ -197,16 +197,11 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
           >
             {product.name}
           </h3>
-          {pc.showDescription && product.description && (
-            <p className={cn('text-muted-foreground line-clamp-2', descSizeCls)}>
-              {product.description}
-            </p>
-          )}
         </div>
 
         {pc.layout === 'band' ? (
           <div
-            className="mt-3 rounded-2xl bg-primary/5 px-3 py-3 flex items-center justify-between gap-3"
+            className="mt-3 px-3 py-3 flex items-center justify-between gap-3"
             style={ctaVars}
           >
             <div className="inline-flex flex-col items-start">

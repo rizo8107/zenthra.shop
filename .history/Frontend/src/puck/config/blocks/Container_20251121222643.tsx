@@ -43,7 +43,7 @@ export const Container: ComponentConfig<ContainerProps> = {
   },
   defaultProps: {
     maxWidth: "xl",
-    padding: "sm",
+    padding: "md",
     background: "transparent",
   },
   render: ({ maxWidth, padding, background, puck: { renderDropZone } }) => {
