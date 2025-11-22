@@ -77,10 +77,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
   const titleSizeCls = pc.titleSize === 'lg' ? 'text-lg' : pc.titleSize === 'sm' ? 'text-sm' : 'text-base';
   const descSizeCls = pc.descSize === 'lg' ? 'text-base' : pc.descSize === 'sm' ? 'text-xs' : 'text-sm';
   const ctaSize: 'sm' | 'default' | 'lg' = pc.ctaSize === 'lg' ? 'lg' : pc.ctaSize === 'sm' ? 'sm' : 'default';
-  const bodyPadding =
-    pc.spacing === 'comfortable'
-      ? 'px-3 py-3 sm:px-4 sm:py-4'
-      : 'px-3 py-3 sm:px-3 sm:py-3';
+  const bodyPadding = pc.spacing === 'comfortable' ? 'p-4' : 'p-3';
   const imagePaddingStyle = pc.imagePadding ? { padding: pc.imagePadding } : undefined;
   const imageCornerCls = pc.imageCorner === 'pill'
     ? 'rounded-full'
@@ -117,10 +114,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
     >
       {/* Image area */}
       <div
-        className={cn(
-          'relative bg-white flex items-center justify-center px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4',
-          aspectCls
-        )}
+        className={cn('relative bg-white flex items-center justify-center px-5 pt-5 pb-4', aspectCls)}
         style={imagePaddingStyle}
       >
         <div className={cn('relative w-full h-full bg-background flex items-center justify-center overflow-hidden', imageCornerCls)}>
@@ -184,7 +178,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       </div>
 
       {/* Text + price + CTA */}
-      <div className={cn(bodyPadding, 'flex flex-col gap-3')}>
+      <div className={cn(bodyPadding, 'flex flex-col gap-3 pb-4')}>
         <div className="space-y-1">
           {product.brand && (
             <p className="text-xs font-medium text-primary">{String(product.brand)}</p>
