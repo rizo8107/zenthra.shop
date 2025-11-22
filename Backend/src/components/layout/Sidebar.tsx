@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  FileText, 
-  Users, 
-  AlertTriangle, 
-  Package, 
-  Workflow,
-  Menu,
+import { cn } from '@/lib/utils';
+import {
+  LayoutDashboard,
+  ShoppingCart,
+  Users,
+  AlertTriangle,
+  Package,
+  FileText,
   Palette,
   Puzzle,
   Settings,
@@ -16,13 +15,13 @@ import {
   ChevronRight,
   MessageSquare,
   Mail,
-  MapPin
+  MapPin,
+  Workflow,
+  Menu
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Logo } from '@/components/ui/Logo';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Badge } from '@/components/ui/badge';
 
 interface SidebarItemProps {
   icon: React.ElementType;
@@ -109,7 +108,14 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
         collapsed ? "justify-center" : "justify-between"
       )}>
         <Link to="/admin" className="flex items-center gap-2" onClick={onNavigate}>
-          <Logo collapsed={collapsed} />
+          <img
+            src="/logo.svg"
+            alt="Zenthra Shop"
+            className={cn(
+              "transition-all brightness-0 dark:invert",
+              collapsed ? "h-10 w-10" : "h-10 w-auto"
+            )}
+          />
         </Link>
         {!isMobile && (
           <Button
