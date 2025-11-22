@@ -68,6 +68,10 @@ RUN npm ci --legacy-peer-deps --no-audit --no-fund
 # Copy source
 COPY Backend/ ./
 
+# Copy logo files from Frontend to Backend public directory
+COPY Frontend/public/karigai-logo.webp ./public/
+COPY Frontend/public/karigai-logo-white.webp ./public/
+
 # Public build-time args (avoid secrets)
 ARG VITE_POCKETBASE_URL
 ARG VITE_SITE_TITLE
