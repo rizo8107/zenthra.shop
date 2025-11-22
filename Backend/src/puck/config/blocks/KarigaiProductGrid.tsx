@@ -9,6 +9,7 @@ export interface ProductGridProps {
   description?: string;
   category?: string;
   limit?: number;
+  backgroundColor?: string;
   // grid mode columns
   columnsDesktop?: 2 | 3 | 4;
   columnsTablet?: 1 | 2 | 3 | 4;
@@ -21,7 +22,21 @@ export interface ProductGridProps {
 }
 
 // Wrapper component that can use hooks
-const ProductGridContent = ({ title, description, category, limit, columnsDesktop, columnsTablet, columnsMobile, showFeatured, mode, carouselRows = 1, showArrows = true, showDots = true }: ProductGridProps) => {
+const ProductGridContent = ({
+  title,
+  description,
+  category,
+  limit,
+  backgroundColor,
+  columnsDesktop,
+  columnsTablet,
+  columnsMobile,
+  showFeatured,
+  mode,
+  carouselRows = 1,
+  showArrows = true,
+  showDots = true,
+}: ProductGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -157,7 +172,11 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
 
   if (loading) {
     return (
-      <section className="py-12 overflow-x-hidden" ref={containerRef}>
+      <section
+        className="py-12 overflow-x-hidden"
+        ref={containerRef}
+        style={backgroundColor ? { backgroundColor } : undefined}
+      >
         {title && (
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold">{title}</h2>
@@ -217,7 +236,11 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
   // Grid mode
   if (mode !== "carousel") {
     return (
-      <section className="py-12" ref={containerRef}>
+      <section
+        className="py-12"
+        ref={containerRef}
+        style={backgroundColor ? { backgroundColor } : undefined}
+      >
         {title && (
           <div className="text-center mb-4">
             <h2 className="text-3xl font-bold">{title}</h2>
@@ -241,7 +264,11 @@ const ProductGridContent = ({ title, description, category, limit, columnsDeskto
 
   // Carousel mode
   return (
-    <section className="py-12 overflow-x-hidden" ref={containerRef}>
+    <section
+      className="py-12 overflow-x-hidden"
+      ref={containerRef}
+      style={backgroundColor ? { backgroundColor } : undefined}
+    >
       {title && (
         <div className="text-center mb-4">
           <h2 className="text-3xl font-bold">{title}</h2>
@@ -319,6 +346,31 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
     description: { type: "textarea", label: "Description (optional)" },
     category: { type: "text", label: "Category Filter" },
     limit: { type: "number", label: "Number of Products", min: 1, max: 40 },
+    backgroundColor: {
+      type: "custom",
+      label: "Background Color",
+      render: ({ value, onChange }) => {
+        const strValue = typeof value === "string" ? value : "";
+        return (
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={strValue !== "" ? strValue : "#f5f5f5"}
+              onChange={(e) => onChange(e.target.value)}
+              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+              aria-label="Section background color"
+            />
+            <input
+              type="text"
+              value={strValue}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#f5f5f5"
+              className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+            />
+          </div>
+        );
+      },
+    },
     mode: { type: "select", label: "Display Mode", options: [
       { label: "Grid", value: "grid" },
       { label: "Carousel", value: "carousel" },
