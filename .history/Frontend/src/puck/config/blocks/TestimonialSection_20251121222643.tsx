@@ -5,11 +5,6 @@ import { ImageSelector } from "@/puck/fields/ImageSelector";
 export interface TestimonialSectionProps {
   title?: string;
   subtitle?: string;
-  backgroundColor?: string;
-  paddingTop?: number;
-  paddingRight?: number;
-  paddingBottom?: number;
-  paddingLeft?: number;
   testimonials: {
     name: string;
     role?: string;
@@ -31,62 +26,6 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
     subtitle: {
       type: "textarea",
       label: "Section Subtitle",
-    },
-    backgroundColor: {
-      type: "custom",
-      label: "Background Color",
-      render: ({ value, onChange }) => (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <input
-              type="color"
-              value={
-                typeof value === "string" && value !== "" && value !== "transparent"
-                  ? value
-                  : "#f5f5f5"
-              }
-              onChange={(e) => onChange(e.target.value)}
-              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
-              aria-label="Section background color"
-              disabled={value === "transparent"}
-            />
-            <input
-              type="text"
-              value={value || ""}
-              onChange={(e) => onChange(e.target.value)}
-              placeholder="#f5f5f5 or transparent"
-              className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
-            />
-          </div>
-          <button
-            type="button"
-            className="self-start text-[11px] text-muted-foreground hover:text-foreground underline-offset-2 hover:underline"
-            onClick={() => onChange("transparent")}
-          >
-            Use transparent background
-          </button>
-        </div>
-      ),
-    },
-    paddingTop: {
-      type: "number",
-      label: "Section Padding Top (px)",
-      min: 0,
-    },
-    paddingBottom: {
-      type: "number",
-      label: "Section Padding Bottom (px)",
-      min: 0,
-    },
-    paddingLeft: {
-      type: "number",
-      label: "Section Padding Left (px)",
-      min: 0,
-    },
-    paddingRight: {
-      type: "number",
-      label: "Section Padding Right (px)",
-      min: 0,
     },
     columns: {
       type: "select",
@@ -156,7 +95,7 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
       },
     ],
   },
-  render: ({ title, subtitle, backgroundColor, paddingTop, paddingRight, paddingBottom, paddingLeft, testimonials, columns, showRating }) => {
+  render: ({ title, subtitle, testimonials, columns, showRating }) => {
     const columnClasses = {
       1: "grid-cols-1",
       2: "grid-cols-1 md:grid-cols-2",
@@ -178,16 +117,7 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
     };
 
     return (
-      <section
-        className="py-16"
-        style={{
-          ...(backgroundColor ? { backgroundColor } : {}),
-          ...(typeof paddingTop === "number" ? { paddingTop } : {}),
-          ...(typeof paddingRight === "number" ? { paddingRight } : {}),
-          ...(typeof paddingBottom === "number" ? { paddingBottom } : {}),
-          ...(typeof paddingLeft === "number" ? { paddingLeft } : {}),
-        }}
-      >
+      <section className="py-16 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {(title || subtitle) && (
             <div className="text-center mb-12">

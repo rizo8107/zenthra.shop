@@ -16,11 +16,6 @@ export interface ProductGridProps {
   category?: string;
   limit?: number;
   backgroundColor?: string;
-  // Section padding (px)
-  paddingTop?: number;
-  paddingRight?: number;
-  paddingBottom?: number;
-  paddingLeft?: number;
   // grid mode columns
   columnsDesktop?: 2 | 3 | 4;
   columnsTablet?: 1 | 2 | 3 | 4;
@@ -57,10 +52,6 @@ const ProductGridContent = ({
   category,
   limit,
   backgroundColor,
-  paddingTop,
-  paddingRight,
-  paddingBottom,
-  paddingLeft,
   columnsDesktop,
   columnsTablet,
   columnsMobile,
@@ -80,12 +71,6 @@ const ProductGridContent = ({
   cardGapPx,
   imagePadding,
   cardLayout,
-  cardLayoutMobile,
-  cardLayoutDesktop,
-  cardSpacingMobile,
-  cardSpacingDesktop,
-  cardGapPxMobile,
-  cardGapPxDesktop,
 }: ProductGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -284,13 +269,7 @@ const ProductGridContent = ({
   const SectionShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <section
       className="py-10 md:py-12"
-      style={{
-        ...(backgroundColor ? { backgroundColor } : {}),
-        ...(typeof paddingTop === "number" ? { paddingTop } : {}),
-        ...(typeof paddingRight === "number" ? { paddingRight } : {}),
-        ...(typeof paddingBottom === "number" ? { paddingBottom } : {}),
-        ...(typeof paddingLeft === "number" ? { paddingLeft } : {}),
-      }}
+      style={backgroundColor ? { backgroundColor } : undefined}
     >
       <div ref={containerRef} className="konipai-container">
         {(title || description) && (
@@ -517,26 +496,6 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
           </button>
         </div>
       ),
-    },
-    paddingTop: {
-      type: "number",
-      label: "Section Padding Top (px)",
-      min: 0,
-    },
-    paddingBottom: {
-      type: "number",
-      label: "Section Padding Bottom (px)",
-      min: 0,
-    },
-    paddingLeft: {
-      type: "number",
-      label: "Section Padding Left (px)",
-      min: 0,
-    },
-    paddingRight: {
-      type: "number",
-      label: "Section Padding Right (px)",
-      min: 0,
     },
     cardCorner: {
       type: "select",

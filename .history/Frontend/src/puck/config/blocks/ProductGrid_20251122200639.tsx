@@ -16,11 +16,6 @@ export interface ProductGridProps {
   category?: string;
   limit?: number;
   backgroundColor?: string;
-  // Section padding (px)
-  paddingTop?: number;
-  paddingRight?: number;
-  paddingBottom?: number;
-  paddingLeft?: number;
   // grid mode columns
   columnsDesktop?: 2 | 3 | 4;
   columnsTablet?: 1 | 2 | 3 | 4;
@@ -42,13 +37,6 @@ export interface ProductGridProps {
   cardGapPx?: number;
   imagePadding?: number;
   cardLayout?: "band" | "simple" | "split";
-  // Device-specific overrides
-  cardLayoutMobile?: "band" | "simple" | "split";
-  cardLayoutDesktop?: "band" | "simple" | "split";
-  cardSpacingMobile?: "compact" | "comfortable";
-  cardSpacingDesktop?: "compact" | "comfortable";
-  cardGapPxMobile?: number;
-  cardGapPxDesktop?: number;
 }
 
 const ProductGridContent = ({
@@ -57,10 +45,6 @@ const ProductGridContent = ({
   category,
   limit,
   backgroundColor,
-  paddingTop,
-  paddingRight,
-  paddingBottom,
-  paddingLeft,
   columnsDesktop,
   columnsTablet,
   columnsMobile,
@@ -80,12 +64,6 @@ const ProductGridContent = ({
   cardGapPx,
   imagePadding,
   cardLayout,
-  cardLayoutMobile,
-  cardLayoutDesktop,
-  cardSpacingMobile,
-  cardSpacingDesktop,
-  cardGapPxMobile,
-  cardGapPxDesktop,
 }: ProductGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -182,17 +160,7 @@ const ProductGridContent = ({
     return [`grid-cols-${m}`, `sm:grid-cols-${t}`, `lg:grid-cols-${d}`].join(" ");
   }, [columnsMobile, columnsTablet, columnsDesktop]);
 
-  const baseGapPx =
-    typeof cardGapPx === "number" && cardGapPx >= 0 ? cardGapPx : 20;
-
-  const gapPx =
-    device === "mobile"
-      ? typeof cardGapPxMobile === "number" && cardGapPxMobile >= 0
-        ? cardGapPxMobile
-        : baseGapPx
-      : typeof cardGapPxDesktop === "number" && cardGapPxDesktop >= 0
-      ? cardGapPxDesktop
-      : baseGapPx;
+  const gapPx = typeof cardGapPx === "number" && cardGapPx >= 0 ? cardGapPx : 20;
 
   const currentCols =
     device === "desktop"
@@ -212,16 +180,6 @@ const ProductGridContent = ({
     return chunks;
   }, [products, itemsPerPage, mode]);
 
-  const effectiveCardLayout =
-    device === "mobile"
-      ? cardLayoutMobile || cardLayout
-      : cardLayoutDesktop || cardLayout;
-
-  const effectiveCardSpacing =
-    device === "mobile"
-      ? cardSpacingMobile || cardSpacing
-      : cardSpacingDesktop || cardSpacing;
-
   const cardOverrides = useMemo(
     () => ({
       showDescription: cardShowDescription,
@@ -231,9 +189,9 @@ const ProductGridContent = ({
       imageCorner,
       ctaLabel: cardCtaLabel,
       imageRatio: cardImageRatio,
-      spacing: effectiveCardSpacing,
+      spacing: cardSpacing,
       imagePadding,
-      layout: effectiveCardLayout,
+      layout: cardLayout,
     }),
     [
       cardShowDescription,
@@ -243,9 +201,9 @@ const ProductGridContent = ({
       imageCorner,
       cardCtaLabel,
       cardImageRatio,
+      cardSpacing,
       imagePadding,
-      effectiveCardLayout,
-      effectiveCardSpacing,
+      cardLayout,
     ]
   );
 
@@ -284,13 +242,7 @@ const ProductGridContent = ({
   const SectionShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <section
       className="py-10 md:py-12"
-      style={{
-        ...(backgroundColor ? { backgroundColor } : {}),
-        ...(typeof paddingTop === "number" ? { paddingTop } : {}),
-        ...(typeof paddingRight === "number" ? { paddingRight } : {}),
-        ...(typeof paddingBottom === "number" ? { paddingBottom } : {}),
-        ...(typeof paddingLeft === "number" ? { paddingLeft } : {}),
-      }}
+      style={backgroundColor ? { backgroundColor } : undefined}
     >
       <div ref={containerRef} className="konipai-container">
         {(title || description) && (
@@ -518,26 +470,6 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
         </div>
       ),
     },
-    paddingTop: {
-      type: "number",
-      label: "Section Padding Top (px)",
-      min: 0,
-    },
-    paddingBottom: {
-      type: "number",
-      label: "Section Padding Bottom (px)",
-      min: 0,
-    },
-    paddingLeft: {
-      type: "number",
-      label: "Section Padding Left (px)",
-      min: 0,
-    },
-    paddingRight: {
-      type: "number",
-      label: "Section Padding Right (px)",
-      min: 0,
-    },
     cardCorner: {
       type: "select",
       label: "Card: Corner Radius",
@@ -659,22 +591,6 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
         { label: "Comfortable", value: "comfortable" },
       ],
     },
-    cardSpacingMobile: {
-      type: "select",
-      label: "Card: Spacing (Mobile)",
-      options: [
-        { label: "Compact", value: "compact" },
-        { label: "Comfortable", value: "comfortable" },
-      ],
-    },
-    cardSpacingDesktop: {
-      type: "select",
-      label: "Card: Spacing (Desktop/Tablet)",
-      options: [
-        { label: "Compact", value: "compact" },
-        { label: "Comfortable", value: "comfortable" },
-      ],
-    },
     imageCorner: {
       type: "select",
       label: "Image: Corner Radius",
@@ -689,16 +605,6 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
       label: "Card Gap (px)",
       min: 0,
     },
-    cardGapPxMobile: {
-      type: "number",
-      label: "Card Gap (Mobile px)",
-      min: 0,
-    },
-    cardGapPxDesktop: {
-      type: "number",
-      label: "Card Gap (Desktop/Tablet px)",
-      min: 0,
-    },
     imagePadding: {
       type: "number",
       label: "Image Padding (px)",
@@ -707,24 +613,6 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
     cardLayout: {
       type: "select",
       label: "Card Layout",
-      options: [
-        { label: "Band (price + button)", value: "band" },
-        { label: "Simple (stacked)", value: "simple" },
-        { label: "Split (row, no band)", value: "split" },
-      ],
-    },
-    cardLayoutMobile: {
-      type: "select",
-      label: "Card Layout (Mobile)",
-      options: [
-        { label: "Band (price + button)", value: "band" },
-        { label: "Simple (stacked)", value: "simple" },
-        { label: "Split (row, no band)", value: "split" },
-      ],
-    },
-    cardLayoutDesktop: {
-      type: "select",
-      label: "Card Layout (Desktop/Tablet)",
       options: [
         { label: "Band (price + button)", value: "band" },
         { label: "Simple (stacked)", value: "simple" },
