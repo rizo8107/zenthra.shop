@@ -2,8 +2,24 @@ import { Link } from 'react-router-dom';
 import { Facebook, Instagram, Twitter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
+import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 
 const Footer = () => {
+  const { settings } = useSiteSettings();
+
+  const siteTitle =
+    settings?.siteTitle ||
+    import.meta.env.VITE_SITE_TITLE ||
+    'Karigai';
+
+  const aboutText =
+    settings?.aboutText ||
+    "Karigai was founded with a simple mission to create beautiful, nourishing handmade soaps that don't compromise on quality or sustainability.";
+
+  const copyright =
+    settings?.footerCopyright ||
+    `© ${new Date().getFullYear()} ${siteTitle}. All rights reserved.`;
+
   return (
     <footer className="bg-transparent">
       <div className="karigai-container py-10">
@@ -15,8 +31,7 @@ const Footer = () => {
               <Logo variant="light" className="h-8" />
             </Link>
             <p className="text-primary-foreground/80 mb-6">
-            Karigai was founded with a simple mission to create beautiful, nourishing handmade soaps 
-            that don't compromise on quality or sustainability.
+              {aboutText}
             </p>
             <div className="flex space-x-4">
               <Button variant="ghost" size="icon" className="text-primary-foreground hover:text-primary-foreground/80">
@@ -106,7 +121,7 @@ const Footer = () => {
           </div>
           <div className="border-t border-primary-foreground/10">
             <div className="px-6 md:px-10 py-6 flex flex-col md:flex-row justify-between items-center text-primary-foreground/60 text-sm">
-              <p>© {new Date().getFullYear()} Karigai. All rights reserved.</p>
+              <p>{copyright}</p>
               <div className="flex gap-4 mt-4 md:mt-0">
                 <Link to="/privacy-policy" className="hover:text-primary-foreground transition-colors">
                   Privacy

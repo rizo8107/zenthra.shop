@@ -15,6 +15,18 @@ export default defineConfig(({ mode }) => {
   const whatsAppApiUrl = env.WHATSAPP_API_URL || 'https://backend-whatsappapi.7za6uc.easypanel.host';
   const emailApiUrl = env.EMAIL_API_URL || 'https://backend-email.7za6uc.easypanel.host/api/email';
   
+  // Log PocketBase URL from env
+  console.log('='.repeat(60));
+  console.log('Environment Variables Check:');
+  console.log('VITE_POCKETBASE_URL from env:', env.VITE_POCKETBASE_URL);
+  console.log('All VITE_ variables:', Object.keys(env).filter(k => k.startsWith('VITE_')));
+  console.log('envDir:', path.resolve(__dirname, '..'));
+  console.log('='.repeat(60));
+  if (!env.VITE_POCKETBASE_URL) {
+    console.error('⚠️  WARNING: VITE_POCKETBASE_URL is not set in .env file!');
+    console.error('⚠️  Please ensure the .env file at the root has: VITE_POCKETBASE_URL=https://your-backend-url');
+  }
+  
   // Try to read port from port-info.json, fallback to env or default
   let serverPort = env.SERVER_PORT || '3001';
   const portInfoPath = path.resolve(__dirname, 'port-info.json');
@@ -56,6 +68,7 @@ export default defineConfig(({ mode }) => {
   // Base config
   const config: UserConfig = {
     envDir: path.resolve(__dirname, '..'), // Use root .env file
+    envPrefix: ['VITE_'], // Expose all VITE_ prefixed variables to the client
     // Allow overriding base via env var. Defaults:
     // - production: '/' (served on its own origin)
     // - development: '/'
@@ -111,7 +124,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     define: {
-      // Make API URLs available to the app
+      // Make API URLs available to the app (VITE_POCKETBASE_URL is auto-exposed via envPrefix)
       'import.meta.env.VITE_WHATSAPP_API_URL': JSON.stringify(
         useProxies ? '/whatsapp-api' : whatsAppApiUrl
       ),

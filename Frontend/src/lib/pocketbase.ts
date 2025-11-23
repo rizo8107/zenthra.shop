@@ -26,7 +26,8 @@ export enum Collections {
     CARTS = 'carts',
     ASSETS = 'assets',
     SLIDER_IMAGES = 'slider_images',
-    THEME_SETTINGS = 'theme_settings'
+    THEME_SETTINGS = 'theme_settings',
+    SITE_SETTINGS = 'site_settings'
 }
 
 // Type definitions for PocketBase records
@@ -722,6 +723,40 @@ export interface ThemeSettings extends RecordModel {
     dark_mode_accent_color_hsl?: string;
 }
 
+// Global site settings used for branding, contact details, and policy content
+export interface SiteSettings extends RecordModel {
+    theme_mode?: 'light' | 'dark' | 'system';
+    primary_color?: string;
+    secondary_color?: string;
+    accent_color?: string;
+    is_active?: boolean;
+    siteTitle?: string;
+    siteLogoUrl?: string;
+    siteFaviconUrl?: string;
+    siteDescription?: string;
+    ogImageUrl?: string;
+    contactEmail?: string;
+    contactPhone?: string;
+    contactAddress?: string;
+    socialFacebook?: string;
+    socialTwitter?: string;
+    socialInstagram?: string;
+    socialLinkedin?: string;
+    footerCopyright?: string;
+    analyticId?: string;
+    pixelId?: string;
+    clarityId?: string;
+    customHeaderScripts?: string;
+    customBodyScripts?: string;
+    // Optional rich text / HTML fields for policy and contact pages
+    privacyPolicyHtml?: string;
+    termsHtml?: string;
+    shippingPolicyHtml?: string;
+    cancellationsRefundsHtml?: string;
+    contactIntroHtml?: string;
+    aboutText?: string;
+}
+
 // Function to create a review
 export const createReview = async (
     productId: string,
@@ -982,6 +1017,36 @@ export const getActiveThemeData = async (): Promise<ThemeData | null> => {
             spacing: 'compact'
         }
     };
+};
+
+// Site settings helpers
+export const getSiteSettings = async (): Promise<SiteSettings | null> => {
+    try {
+        const result = await pocketbase.collection(Collections.SITE_SETTINGS).getList(1, 1, {
+            $autoCancel: false,
+        });
+
+        if (result.items.length > 0) {
+            return result.items[0] as unknown as SiteSettings;
+        }
+        return null;
+    } catch (error) {
+        console.error('Error fetching site settings:', error);
+        return null;
+    }
+};
+
+export const updateSiteSettings = async (
+    id: string,
+    data: Partial<SiteSettings>,
+): Promise<SiteSettings> => {
+    try {
+        const result = await pocketbase.collection(Collections.SITE_SETTINGS).update(id, data);
+        return result as unknown as SiteSettings;
+    } catch (error) {
+        console.error('Error updating site settings:', error);
+        throw new Error(error instanceof Error ? error.message : 'Failed to update site settings');
+    }
 };
 
 // Helper function to deactivate all themes

@@ -59,6 +59,7 @@ const PagesManager = lazy(() => import("./pages/PagesManager"))
 const PluginsManager = lazy(() => import("./pages/PluginsManager"))
 const ThemeManager = lazy(() => import("./pages/ThemeManager"))
 const Forbidden = lazy(() => import("./pages/Forbidden"))
+const SiteSettingsPage = lazy(() => import("./pages/SiteSettings"))
 
 // Import Builder.io initialization
 import "@/lib/builder"
@@ -194,6 +195,7 @@ export function Routes() {
                         <Route path="pages/:pageId/edit" element={<PuckEditor />} />
                         <Route path="plugins" element={<PluginsManager />} />
                         <Route path="themes" element={<ThemeManager />} />
+                        <Route path="settings" element={<SiteSettingsPage />} />
                       </Route>
                       <Route path="/403" element={<Forbidden />} />
                       

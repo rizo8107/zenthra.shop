@@ -20,13 +20,31 @@ const VITE_ENV = (() => {
 })();
 
 // Try multiple environment variable sources
-const POCKETBASE_URL = 
+let POCKETBASE_URL = 
   (VITE_ENV as any).VITE_POCKETBASE_URL ||
   (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
-  (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_POCKETBASE_URL) ||
-  'https://backend.karigaistore.in'; // Use your actual PocketBase URL
+  (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_POCKETBASE_URL);
 
-console.log('PocketBase URL:', POCKETBASE_URL);
+// Debug logging
+console.log('='.repeat(60));
+console.log('PocketBase Environment Check:');
+console.log('All import.meta.env keys:', Object.keys(VITE_ENV));
+console.log('import.meta.env.VITE_POCKETBASE_URL:', (VITE_ENV as any).VITE_POCKETBASE_URL);
+console.log('import.meta.env.MODE:', (VITE_ENV as any).MODE);
+console.log('import.meta.env.DEV:', (VITE_ENV as any).DEV);
+
+// TEMPORARY WORKAROUND: Hard-code as fallback if env is not working
+if (!POCKETBASE_URL) {
+  console.warn('⚠️  VITE_POCKETBASE_URL not found in environment!');
+  console.warn('⚠️  Using temporary fallback. Please fix your .env configuration!');
+  console.warn('⚠️  Add VITE_POCKETBASE_URL=https://backend.viruthigold.in to your .env file');
+  
+  // TEMPORARY: Remove this after fixing env
+  POCKETBASE_URL = 'https://backend.viruthigold.in';
+}
+
+console.log('✓ Final PocketBase URL:', POCKETBASE_URL);
+console.log('='.repeat(60));
 
 export const pb = new PocketBase(POCKETBASE_URL);
 
@@ -890,4 +908,76 @@ export const getImageUrl = (collectionId: string, recordId: string, fileName: st
   }
 
   return `${base.replace(/\/+$/, '')}/api/files/${collectionId}/${relativePath}`;
+};
+
+// Global site settings (branding, contact, policies) used by both frontend and backend
+export interface SiteSettingsRecord extends Record<string, unknown> {
+  id: string;
+  theme_mode?: 'light' | 'dark' | 'system';
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+  is_active?: boolean;
+  siteTitle?: string;
+  siteLogoUrl?: string;
+  siteFaviconUrl?: string;
+  siteDescription?: string;
+  ogImageUrl?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  contactAddress?: string;
+  socialFacebook?: string;
+  socialTwitter?: string;
+  socialInstagram?: string;
+  socialLinkedin?: string;
+  footerCopyright?: string;
+  analyticId?: string;
+  pixelId?: string;
+  clarityId?: string;
+  customHeaderScripts?: string;
+  customBodyScripts?: string;
+  privacyPolicyHtml?: string;
+  termsHtml?: string;
+  shippingPolicyHtml?: string;
+  cancellationsRefundsHtml?: string;
+  contactIntroHtml?: string;
+  aboutText?: string;
+}
+
+export const getSiteSettingsRecord = async (): Promise<SiteSettingsRecord | null> => {
+  await ensureAdminAuth();
+  const res = await pb.collection('site_settings').getList(1, 1, {
+    sort: '-created',
+  });
+  const rec = res.items?.[0];
+  return (rec as unknown as SiteSettingsRecord) ?? null;
+};
+
+export const createSiteSettingsRecord = async (
+  data: Partial<SiteSettingsRecord>,
+): Promise<SiteSettingsRecord> => {
+  await ensureAdminAuth();
+  const rec = await pb.collection('site_settings').create(data);
+  return rec as unknown as SiteSettingsRecord;
+};
+
+export const updateSiteSettingsRecord = async (
+  id: string,
+  data: Partial<SiteSettingsRecord>,
+): Promise<SiteSettingsRecord> => {
+  await ensureAdminAuth();
+  const rec = await pb.collection('site_settings').update(id, data);
+  return rec as unknown as SiteSettingsRecord;
+};
+
+export const uploadSiteSettingsImage = async (
+  id: string,
+  fieldName: string,
+  file: File,
+): Promise<SiteSettingsRecord> => {
+  await ensureAdminAuth();
+  const formData = new FormData();
+  formData.append(fieldName, file);
+  const rec = await pb.collection('site_settings').update(id, formData);
+  return rec as unknown as SiteSettingsRecord;
 };

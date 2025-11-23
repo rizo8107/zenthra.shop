@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 
 interface LogoProps {
   className?: string;
@@ -8,30 +9,51 @@ interface LogoProps {
 }
 
 export function Logo({ className, variant = 'default' }: LogoProps) {
-  // Use direct paths to the logo files in the public directory
-  const logoUrl = variant === 'light' 
-    ? '/karigai-logo-white.webp'
-    : '/karigai-logo.webp';
+  const { settings, loading } = useSiteSettings();
+
+  // Wait for settings to load before showing anything
+  if (loading) {
+    return (
+      <div className={cn("font-bold text-xl", variant === 'light' ? "text-white" : "", className)}>
+        Loading...
+      </div>
+    );
+  }
+
+  const siteTitle =
+    settings?.siteTitle ||
+    import.meta.env.VITE_SITE_TITLE ||
+    'Viruthi Gold';
+
+  const logoUrl =
+    settings?.siteLogoUrl ||
+    import.meta.env.VITE_SITE_LOGO ||
+    (variant === 'light' 
+      ? '/karigai-logo-white.webp'
+      : '/karigai-logo.webp');
 
   const [error, setError] = useState<boolean>(false);
-  const [loaded, setLoaded] = useState<boolean>(true);
 
   // Fallback handling if the logo fails to load
   const handleError = () => {
     console.error('Logo failed to load:', logoUrl);
     setError(true);
-    setLoaded(true);
   };
 
-  if (error) {
-    return <Loader2 className={cn("h-6 w-6 animate-spin", variant === 'light' ? "text-white" : "", className)} />;
+  // If logo fails to load or no logo URL, show site title as text
+  if (error || !logoUrl || logoUrl.includes('/karigai-logo')) {
+    return (
+      <div className={cn("font-bold text-xl", variant === 'light' ? "text-white" : "", className)}>
+        {siteTitle}
+      </div>
+    );
   }
 
   return (
     <div className={cn("relative", className)}>
       <img 
         src={logoUrl} 
-        alt="Karigai Logo" 
+        alt={siteTitle ? `${siteTitle} Logo` : 'Store Logo'} 
         className={cn("h-8 w-auto", "opacity-100", "transition-opacity")}
         width={144}
         height={56}
@@ -40,4 +62,4 @@ export function Logo({ className, variant = 'default' }: LogoProps) {
       />
     </div>
   );
-} 
+}

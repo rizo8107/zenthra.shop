@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useDynamicTheme } from "@/contexts/ThemeContext";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 /**
  * BrandingHead synchronizes favicon, logo-related meta tags, and default SEO
@@ -11,19 +12,31 @@ import { useDynamicTheme } from "@/contexts/ThemeContext";
  */
 export function BrandingHead() {
   const { themeData } = useDynamicTheme();
+  const { settings, loading } = useSiteSettings();
 
   useEffect(() => {
+    // Wait for settings to load before updating head tags
+    if (loading) return;
+
     const branding = themeData?.branding;
-    if (!branding) return;
 
-    const {
-      siteTitle,
-      siteDescription,
-      faviconUrl,
-      socialImageUrl,
-    } = branding;
+    const siteTitle =
+      settings?.siteTitle ||
+      branding?.siteTitle;
 
-    const safeTitle = siteTitle || document.title || "Karigai";
+    const siteDescription =
+      settings?.siteDescription ||
+      branding?.siteDescription;
+
+    const faviconUrl =
+      settings?.siteFaviconUrl ||
+      branding?.faviconUrl;
+
+    const socialImageUrl =
+      settings?.ogImageUrl ||
+      branding?.socialImageUrl;
+
+    const safeTitle = siteTitle || document.title || "Viruthi Gold";
     const safeDescription =
       siteDescription ||
       document
@@ -94,7 +107,7 @@ export function BrandingHead() {
       updateLink("icon");
       updateLink("apple-touch-icon");
     }
-  }, [themeData]);
+  }, [themeData, settings, loading]);
 
   return null;
 }

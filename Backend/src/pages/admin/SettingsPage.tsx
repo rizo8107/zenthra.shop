@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -13,6 +14,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import * as z from 'zod';
 import { requestNotificationPermission } from '@/lib/push-notifications';
+import { getSiteSettingsRecord, createSiteSettingsRecord, updateSiteSettingsRecord, type SiteSettingsRecord } from '@/lib/pocketbase';
 
 const generalFormSchema = z.object({
   storeName: z.string().min(2, {
@@ -63,6 +65,135 @@ const SettingsPage = () => {
       currency: "USD",
     },
   });
+
+  const [siteSettings, setSiteSettings] = useState<SiteSettingsRecord | null>(null);
+  const [siteLoading, setSiteLoading] = useState<boolean>(true);
+  const [siteSaving, setSiteSaving] = useState<boolean>(false);
+  const [siteForm, setSiteForm] = useState({
+    siteTitle: '',
+    siteLogoUrl: '',
+    siteFaviconUrl: '',
+    siteDescription: '',
+    ogImageUrl: '',
+    contactEmail: '',
+    contactPhone: '',
+    contactAddress: '',
+    aboutText: '',
+    privacyPolicyHtml: '',
+    termsHtml: '',
+    shippingPolicyHtml: '',
+    cancellationsRefundsHtml: '',
+    contactIntroHtml: '',
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setSiteLoading(true);
+        const rec = await getSiteSettingsRecord();
+        if (rec) {
+          setSiteSettings(rec);
+          setSiteForm({
+            siteTitle: (rec.siteTitle as string) || '',
+            siteLogoUrl: (rec.siteLogoUrl as string) || '',
+            siteFaviconUrl: (rec.siteFaviconUrl as string) || '',
+            siteDescription: (rec.siteDescription as string) || '',
+            ogImageUrl: (rec.ogImageUrl as string) || '',
+            contactEmail: (rec.contactEmail as string) || '',
+            contactPhone: (rec.contactPhone as string) || '',
+            contactAddress: (rec.contactAddress as string) || '',
+            aboutText: (rec.aboutText as string) || '',
+            privacyPolicyHtml: (rec.privacyPolicyHtml as string) || '',
+            termsHtml: (rec.termsHtml as string) || '',
+            shippingPolicyHtml: (rec.shippingPolicyHtml as string) || '',
+            cancellationsRefundsHtml: (rec.cancellationsRefundsHtml as string) || '',
+            contactIntroHtml: (rec.contactIntroHtml as string) || '',
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load site settings', e);
+      } finally {
+        setSiteLoading(false);
+      }
+    })();
+  }, []);
+
+  const onSiteChange = (field: keyof typeof siteForm) =>
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const value = e.target.value;
+      setSiteForm((prev) => ({ ...prev, [field]: value }));
+    };
+
+  const onSiteCreate = async () => {
+    try {
+      setSiteSaving(true);
+      const created = await createSiteSettingsRecord({
+        siteTitle: 'My Store',
+        siteLogoUrl: '',
+        siteFaviconUrl: '',
+        siteDescription: '',
+        ogImageUrl: '',
+        contactEmail: '',
+        contactPhone: '',
+        contactAddress: '',
+        aboutText: '',
+        privacyPolicyHtml: '',
+        termsHtml: '',
+        shippingPolicyHtml: '',
+        cancellationsRefundsHtml: '',
+        contactIntroHtml: '',
+      });
+      setSiteSettings(created);
+      setSiteForm({
+        siteTitle: (created.siteTitle as string) || '',
+        siteLogoUrl: (created.siteLogoUrl as string) || '',
+        siteFaviconUrl: (created.siteFaviconUrl as string) || '',
+        siteDescription: (created.siteDescription as string) || '',
+        ogImageUrl: (created.ogImageUrl as string) || '',
+        contactEmail: (created.contactEmail as string) || '',
+        contactPhone: (created.contactPhone as string) || '',
+        contactAddress: (created.contactAddress as string) || '',
+        aboutText: (created.aboutText as string) || '',
+        privacyPolicyHtml: (created.privacyPolicyHtml as string) || '',
+        termsHtml: (created.termsHtml as string) || '',
+        shippingPolicyHtml: (created.shippingPolicyHtml as string) || '',
+        cancellationsRefundsHtml: (created.cancellationsRefundsHtml as string) || '',
+        contactIntroHtml: (created.contactIntroHtml as string) || '',
+      });
+    } catch (e) {
+      console.error('Failed to create site settings', e);
+    } finally {
+      setSiteSaving(false);
+    }
+  };
+
+  const onSiteSave = async () => {
+    if (!siteSettings) return;
+    try {
+      setSiteSaving(true);
+      const updated = await updateSiteSettingsRecord(siteSettings.id, {
+        siteTitle: siteForm.siteTitle,
+        siteLogoUrl: siteForm.siteLogoUrl,
+        siteFaviconUrl: siteForm.siteFaviconUrl,
+        siteDescription: siteForm.siteDescription,
+        ogImageUrl: siteForm.ogImageUrl,
+        contactEmail: siteForm.contactEmail,
+        contactPhone: siteForm.contactPhone,
+        contactAddress: siteForm.contactAddress,
+        aboutText: siteForm.aboutText,
+        privacyPolicyHtml: siteForm.privacyPolicyHtml,
+        termsHtml: siteForm.termsHtml,
+        shippingPolicyHtml: siteForm.shippingPolicyHtml,
+        cancellationsRefundsHtml: siteForm.cancellationsRefundsHtml,
+        contactIntroHtml: siteForm.contactIntroHtml,
+      });
+      setSiteSettings(updated);
+    } catch (e) {
+      console.error('Failed to save site settings', e);
+    } finally {
+      setSiteSaving(false);
+    }
+  };
 
   const notificationForm = useForm<z.infer<typeof notificationFormSchema>>({
     resolver: zodResolver(notificationFormSchema),
@@ -348,6 +479,187 @@ const SettingsPage = () => {
                 </Form>
               </CardContent>
             </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Site Branding & Policies</CardTitle>
+                <CardDescription>
+                  Edit branding, contact information, and policy page content stored in the PocketBase site_settings collection.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {siteLoading && !siteSettings ? (
+                  <p className="text-sm text-muted-foreground">Loading site settings…</p>
+                ) : !siteSettings ? (
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">No site_settings record found. Create one to start managing your branding and policies.</p>
+                    <Button onClick={onSiteCreate} disabled={siteSaving}>
+                      {siteSaving ? 'Creating…' : 'Create Site Settings'}
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="siteTitle">Site Title</Label>
+                        <Input
+                          id="siteTitle"
+                          value={siteForm.siteTitle}
+                          onChange={onSiteChange('siteTitle')}
+                          placeholder="Storefront name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="siteLogoUrl">Logo URL</Label>
+                        <Input
+                          id="siteLogoUrl"
+                          value={siteForm.siteLogoUrl}
+                          onChange={onSiteChange('siteLogoUrl')}
+                          placeholder="https://.../logo.png"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="siteFaviconUrl">Favicon URL</Label>
+                        <Input
+                          id="siteFaviconUrl"
+                          value={siteForm.siteFaviconUrl}
+                          onChange={onSiteChange('siteFaviconUrl')}
+                          placeholder="https://.../favicon.ico"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="ogImageUrl">OG / Social Image URL</Label>
+                        <Input
+                          id="ogImageUrl"
+                          value={siteForm.ogImageUrl}
+                          onChange={onSiteChange('ogImageUrl')}
+                          placeholder="https://.../og-image.png"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="siteDescription">Meta Description</Label>
+                      <Textarea
+                        id="siteDescription"
+                        value={siteForm.siteDescription}
+                        onChange={onSiteChange('siteDescription')}
+                        rows={3}
+                        placeholder="Short description for SEO and social cards"
+                      />
+                    </div>
+
+                    <Separator />
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div>
+                        <Label htmlFor="contactEmail">Contact Email</Label>
+                        <Input
+                          id="contactEmail"
+                          value={siteForm.contactEmail}
+                          onChange={onSiteChange('contactEmail')}
+                          placeholder="support@example.com"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="contactPhone">Contact Phone</Label>
+                        <Input
+                          id="contactPhone"
+                          value={siteForm.contactPhone}
+                          onChange={onSiteChange('contactPhone')}
+                          placeholder="+91..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="contactAddress">Contact Address</Label>
+                      <Textarea
+                        id="contactAddress"
+                        value={siteForm.contactAddress}
+                        onChange={onSiteChange('contactAddress')}
+                        rows={3}
+                        placeholder="Address lines (use new lines)"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="aboutText">About Text (Footer)</Label>
+                      <Textarea
+                        id="aboutText"
+                        value={siteForm.aboutText}
+                        onChange={onSiteChange('aboutText')}
+                        rows={3}
+                        placeholder="Short paragraph about the brand shown in the storefront footer"
+                      />
+                    </div>
+
+                    <Separator />
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="privacyPolicyHtml">Privacy Policy (HTML)</Label>
+                        <Textarea
+                          id="privacyPolicyHtml"
+                          value={siteForm.privacyPolicyHtml}
+                          onChange={onSiteChange('privacyPolicyHtml')}
+                          rows={8}
+                          placeholder="HTML or text content for /privacy-policy"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="termsHtml">Terms & Conditions (HTML)</Label>
+                        <Textarea
+                          id="termsHtml"
+                          value={siteForm.termsHtml}
+                          onChange={onSiteChange('termsHtml')}
+                          rows={8}
+                          placeholder="HTML or text content for /terms-and-conditions"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="shippingPolicyHtml">Shipping Policy (HTML)</Label>
+                        <Textarea
+                          id="shippingPolicyHtml"
+                          value={siteForm.shippingPolicyHtml}
+                          onChange={onSiteChange('shippingPolicyHtml')}
+                          rows={8}
+                          placeholder="HTML or text content for /shipping-policy"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="cancellationsRefundsHtml">Cancellations & Refunds (HTML)</Label>
+                        <Textarea
+                          id="cancellationsRefundsHtml"
+                          value={siteForm.cancellationsRefundsHtml}
+                          onChange={onSiteChange('cancellationsRefundsHtml')}
+                          rows={8}
+                          placeholder="HTML or text content for /cancellations-refunds"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="contactIntroHtml">Contact Page Intro (HTML)</Label>
+                      <Textarea
+                        id="contactIntroHtml"
+                        value={siteForm.contactIntroHtml}
+                        onChange={onSiteChange('contactIntroHtml')}
+                        rows={4}
+                        placeholder="Optional rich text shown at top of Contact Us page"
+                      />
+                    </div>
+
+                    <Button type="button" onClick={onSiteSave} disabled={siteSaving}>
+                      {siteSaving ? 'Saving…' : 'Save Site Settings'}
+                    </Button>
+                  </>
+                )}
+              </CardContent>
+            </Card>
           </TabsContent>
           
           <TabsContent value="notifications" className="space-y-4 mt-4">
@@ -597,7 +909,7 @@ const SettingsPage = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button onClick={() => handleAddWebhook(selectedEvents)} disabled={!canSaveWebhook}>Save</Button>
+                    <Button onClick={handleAddWebhook} disabled={!canSaveWebhook}>Save</Button>
                     <Button variant="outline" onClick={handleGenerateSecret}>Generate Secret</Button>
                   </div>
                   <Separator />

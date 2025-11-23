@@ -1,8 +1,33 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Card } from "@/components/ui/card";
 import { AlertCircle } from "lucide-react";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 const TermsAndConditions = () => {
+  const { settings } = useSiteSettings();
+
+  const contactEmail = settings?.contactEmail || "karigaishree@gmail.com";
+  const contactPhone = settings?.contactPhone || "9486054899";
+  const contactAddress = settings?.contactAddress || "Old busstand, Salem, Tamil Nadu, India - 636001";
+  const html = settings?.termsHtml;
+
+  if (html) {
+    return (
+      <div className="konipai-container py-12">
+        <h1 className="text-4xl font-bold mb-8 text-center">Terms and Conditions</h1>
+
+        <div className="max-w-3xl mx-auto mb-8">
+          <Card className="p-6 space-y-6">
+            <div
+              className="prose prose-sm sm:prose base:text-foreground"
+              dangerouslySetInnerHTML={{ __html: html }}
+            />
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="konipai-container py-12">
       <h1 className="text-4xl font-bold mb-8 text-center">Terms and Conditions</h1>
@@ -98,9 +123,9 @@ const TermsAndConditions = () => {
               If you have any questions about our Terms and Conditions, please contact us at:
             </p>
             <ul className="list-none mt-2">
-              <li><strong>Email:</strong> karigaishree@gmail.com</li>
-              <li><strong>Phone:</strong> 9486054899</li>
-              <li><strong>Address:</strong> Old busstand, Salem, Tamil Nadu, India - 636001</li>
+              <li><strong>Email:</strong> {contactEmail}</li>
+              <li><strong>Phone:</strong> {contactPhone}</li>
+              <li><strong>Address:</strong> {contactAddress}</li>
             </ul>
           </div>
         </Card>
