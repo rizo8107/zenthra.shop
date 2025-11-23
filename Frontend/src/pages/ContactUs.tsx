@@ -6,8 +6,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useSiteSettings } from "@/contexts/SiteSettingsContext";
 
 const ContactUs = () => {
+  const { settings } = useSiteSettings();
+
+  const contactEmail = settings?.contactEmail || "karigaishree@gmail.com";
+  const contactPhone = settings?.contactPhone || "9486054899";
+  const contactAddress = settings?.contactAddress || "Old busstand\nSalem, Tamil Nadu\nIndia - 636001";
+  const introHtml = settings?.contactIntroHtml;
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -43,18 +51,28 @@ const ContactUs = () => {
       <div className="max-w-3xl mx-auto">
         <Card className="p-6 mb-8">
           <div className="space-y-4">
-            <p className="text-center mb-6">
-              You may contact us using the information below:
-            </p>
+            {introHtml ? (
+              <div
+                className="text-center mb-6 prose prose-sm mx-auto"
+                dangerouslySetInnerHTML={{ __html: introHtml }}
+              />
+            ) : (
+              <p className="text-center mb-6">
+                You may contact us using the information below:
+              </p>
+            )}
 
             <div className="flex items-start gap-3">
               <MapPin className="h-5 w-5 text-primary mt-1" />
               <div>
                 <h3 className="font-medium">Address</h3>
                 <address className="not-italic text-muted-foreground">
-                  Old busstand <br />
-                  Salem, Tamil Nadu <br />
-                  India - 636001
+                  {contactAddress.split("\n").map((line, idx) => (
+                    <span key={idx}>
+                      {line}
+                      <br />
+                    </span>
+                  ))}
                 </address>
               </div>
             </div>
@@ -63,7 +81,7 @@ const ContactUs = () => {
               <Phone className="h-5 w-5 text-primary mt-1" />
               <div>
                 <h3 className="font-medium">Phone</h3>
-                <p className="text-muted-foreground">9486054899</p>
+                <p className="text-muted-foreground">{contactPhone}</p>
               </div>
             </div>
 
@@ -71,7 +89,7 @@ const ContactUs = () => {
               <Mail className="h-5 w-5 text-primary mt-1" />
               <div>
                 <h3 className="font-medium">Email</h3>
-                <p className="text-muted-foreground">karigaishree@gmail.com</p>
+                <p className="text-muted-foreground">{contactEmail}</p>
               </div>
             </div>
           </div>

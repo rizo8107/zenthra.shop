@@ -89,6 +89,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { title: 'Checkout Flow', path: '/admin/checkout-flow', icon: Workflow },
     { title: 'Pages', path: '/admin/pages', icon: FileText },
     { title: 'Navbar', path: '/admin/navbar', icon: Menu },
+    { title: 'Branding', path: '/admin/branding', icon: Palette },
     { title: 'Themes', path: '/admin/themes', icon: Palette },
     { title: 'Plugins', path: '/admin/plugins', icon: Puzzle },
     { title: 'Settings', path: '/admin/settings', icon: Settings },
