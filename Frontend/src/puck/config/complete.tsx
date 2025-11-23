@@ -29,6 +29,7 @@ import { CollectionsCarousel } from "./blocks/CollectionsCarousel";
 import { Banner } from "./blocks/Banner";
 import { SingleProductDetails } from "./blocks/SingleProductDetails";
 import { CategoryCircles } from "./blocks/CategoryCircles";
+import { ProductCardV2Block } from "./blocks/ProductCardV2";
 
 // Root component configuration
 const Root = {

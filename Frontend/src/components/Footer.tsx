@@ -21,119 +21,152 @@ const Footer = () => {
     `© ${new Date().getFullYear()} ${siteTitle}. All rights reserved.`;
 
   return (
-    <footer className="bg-transparent">
-      <div className="karigai-container py-10">
-        <div className="rounded-3xl bg-primary text-primary-foreground shadow-lg overflow-hidden">
-          <div className="px-6 md:px-10 py-10">
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
-          <div className="md:col-span-5">
-            <Link to="/" className="inline-block mb-6">
+    <footer className="bg-[#0F6B35] text-white">
+      <div className="karigai-container py-8">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+          {/* Logo + about + socials */}
+          <div className="md:col-span-4">
+            <Link to="/" className="inline-block mb-4">
               <Logo variant="light" className="h-8" />
             </Link>
-            <p className="text-primary-foreground/80 mb-6">
+            <p className="text-white/80 mb-4 text-sm leading-relaxed">
               {aboutText}
             </p>
             <div className="flex space-x-4">
-              <Button variant="ghost" size="icon" className="text-primary-foreground hover:text-primary-foreground/80">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:text-white/80 hover:bg-white/10"
+              >
                 <Facebook className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-primary-foreground hover:text-primary-foreground/80">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-white hover:text-white/80 hover:bg:white/10"
+              >
                 <Instagram className="h-5 w-5" />
               </Button>
-              <Button variant="ghost" size="icon" className="text-primary-foreground hover:text-primary-foreground/80">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text:white hover:text-white/80 hover:bg-white/10"
+              >
                 <Twitter className="h-5 w-5" />
               </Button>
             </div>
           </div>
-          
-          <div className="md:col-span-3">
-            <h3 className="font-semibold mb-4 text-lg">Shop</h3>
-            <ul className="space-y-3">
+
+          {/* Shop */}
+          <div className="md:col-span-2">
+            <h3 className="font-semibold mb-4 text-[18px] leading-[24px]">Shop</h3>
+            <ul className="space-y-2">
               <li>
-                <Link to="/shop" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/shop"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   All Products
                 </Link>
               </li>
               <li>
-                <Link to="/bestsellers" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/bestsellers"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   Bestsellers
                 </Link>
               </li>
               <li>
-                <Link to="/new-arrivals" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/new-arrivals"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   New Arrivals
                 </Link>
               </li>
             </ul>
           </div>
-          
-          <div className="md:col-span-4">
-            <h3 className="font-semibold mb-4 text-lg">Policies</h3>
-            <ul className="space-y-3">
+
+          {/* Policies */}
+          <div className="md:col-span-3">
+            <h3 className="font-semibold mb-4 text-[18px] leading-[24px]">Policies</h3>
+            <ul className="space-y-2">
               <li>
-                <Link to="/privacy-policy" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/privacy-policy"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   Privacy Policy
                 </Link>
               </li>
               <li>
-                <Link to="/terms-and-conditions" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/terms-and-conditions"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   Terms & Conditions
                 </Link>
               </li>
               <li>
-                <Link to="/shipping-policy" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/shipping-policy"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   Shipping Policy
                 </Link>
               </li>
               <li>
-                <Link to="/cancellations-refunds" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/cancellations-refunds"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   Cancellations & Refunds
                 </Link>
               </li>
               <li>
-                <Link to="/contact-us" className="text-primary-foreground/80 hover:text-primary-foreground transition-colors">
+                <Link
+                  to="/contact-us"
+                  className="text-white/80 hover:text-white transition-colors text-sm"
+                >
                   Contact Us
                 </Link>
               </li>
             </ul>
           </div>
-              {/* Newsletter pill row */}
-              <div className="md:col-span-12 mt-6">
-                <div className="rounded-2xl bg-primary/20 p-5 md:flex md:items-center md:justify-between">
-                  <div className="mb-4 md:mb-0">
-                    <p className="text-xl md:text-2xl font-semibold">Subscribe our newsletter</p>
-                    <p className="text-sm text-primary-foreground/80 mt-1">Stay up to date with new products and offers.</p>
-                  </div>
-                  <form className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="flex items-center bg-white/10 rounded-full px-4 py-2 w-full md:w-80">
-                      <input
-                        type="email"
-                        placeholder="Enter your email"
-                        className="bg-transparent placeholder:text-primary-foreground/70 text-primary-foreground outline-none w-full text-sm"
-                        aria-label="Email"
-                      />
-                    </div>
-                    <Button type="submit" className="rounded-full px-5">Subscribe</Button>
-                  </form>
-                </div>
+
+          {/* Stay Connected / newsletter */}
+          <div className="md:col-span-3">
+            <h3 className="font-semibold mb-4 text-[18px] leading-[24px]">
+              Stay Connected
+            </h3>
+            <p className="text-white/80 text-sm mb-3">
+              Subscribe to our newsletter for exclusive offers and updates.
+            </p>
+            <form className="flex items-center gap-2 max-w-xs">
+              <div className="flex items-center bg-white/10 rounded-full px-4 py-2 w-full">
+                <input
+                  type="email"
+                  placeholder="Enter your email"
+                  className="bg-transparent placeholder:text-white/70 text-white outline-none w-full text-sm"
+                  aria-label="Email"
+                />
               </div>
-            </div>
+              <Button
+                type="submit"
+                size="icon"
+                className="rounded-full bg-white/20 hover:bg-white/30 text-white"
+                aria-label="Subscribe"
+              >
+                
+              </Button>
+            </form>
           </div>
-          <div className="border-t border-primary-foreground/10">
-            <div className="px-6 md:px-10 py-6 flex flex-col md:flex-row justify-between items-center text-primary-foreground/60 text-sm">
-              <p>{copyright}</p>
-              <div className="flex gap-4 mt-4 md:mt-0">
-                <Link to="/privacy-policy" className="hover:text-primary-foreground transition-colors">
-                  Privacy
-                </Link>
-                <Link to="/terms-and-conditions" className="hover:text-primary-foreground transition-colors">
-                  Terms
-                </Link>
-                <Link to="/cancellations-refunds" className="hover:text-primary-foreground transition-colors">
-                  Refunds
-                </Link>
-              </div>
-            </div>
+        </div>
+
+        <div className="border-t border-white/20 mt-6">
+          <div className="py-3 flex justify-center items-center text-white/80 text-xs text-center">
+            <p>{copyright}</p>
           </div>
         </div>
       </div>

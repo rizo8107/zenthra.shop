@@ -13,6 +13,7 @@ import { Container } from "./blocks/Container";
 import { Grid } from "./blocks/Grid";
 import { OfferBanner } from "./blocks/OfferBanner";
 import { BrandShowcase } from "./blocks/BrandShowcase";
+import { ProductCardV2Block } from "./blocks/ProductCardV2";
 
 // Root component configuration
 const Root = {
@@ -79,7 +80,14 @@ export const puckConfig: Config = {
     },
     ecommerce: {
       title: "E-commerce",
-      components: ["Hero", "ProductGrid", "CategorySection", "OfferBanner", "BrandShowcase"],
+      components: [
+        "Hero",
+        "ProductGrid",
+        "ProductCardV2Block",
+        "CategorySection",
+        "OfferBanner",
+        "BrandShowcase",
+      ],
     },
     marketing: {
       title: "Marketing",
@@ -100,6 +108,7 @@ export const puckConfig: Config = {
     // E-commerce Components
     Hero,
     ProductGrid,
+    ProductCardV2Block,
     CategorySection,
     OfferBanner,
     BrandShowcase,

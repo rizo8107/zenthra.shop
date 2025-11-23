@@ -34,7 +34,7 @@ type ProductCardProps = {
 };
 
 const ProductCard = ({ product, priority = false, overrides }: ProductCardProps) => {
-  const { addItem } = useCart();
+  const { addItem, getItem, updateQuantity } = useCart();
   const { themeData } = useDynamicTheme();
   const primaryColor = themeData?.primary?.hex;
   const primaryHover = themeData?.primary?.hoverHex ?? primaryColor;
@@ -69,24 +69,24 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
     layout: overrides?.layout ?? themeData?.productCard?.layout ?? 'band',
   }), [themeData, overrides]);
 
-  const cardRadius = pc.corner === 'pill' ? 'rounded-3xl' : pc.corner === 'square' ? 'rounded-md' : 'rounded-xl';
+  const cardRadius = pc.corner === 'pill' ? 'rounded-[24px]' : pc.corner === 'square' ? 'rounded-md' : 'rounded-[24px]';
   const shadowCls = pc.shadow === 'none' ? '' : pc.shadow === 'soft' ? 'shadow-sm' : pc.shadow === 'medium' ? 'shadow-md' : 'shadow-lg';
-  const ctaRounded = pc.ctaStyle === 'pill' ? 'rounded-full' : '';
+  const ctaRounded = pc.ctaStyle === 'pill' ? 'rounded-[24px]' : '';
   // Force a 1:1 aspect ratio for the product image area to match the desired card design
   const aspectCls = 'aspect-square';
-  const titleSizeCls = pc.titleSize === 'lg' ? 'text-lg' : pc.titleSize === 'sm' ? 'text-sm' : 'text-base';
-  const descSizeCls = pc.descSize === 'lg' ? 'text-base' : pc.descSize === 'sm' ? 'text-xs' : 'text-sm';
+  const titleSizeCls = pc.titleSize === 'lg' ? 'text-2xl' : pc.titleSize === 'sm' ? 'text-lg' : 'text-[24px] leading-[30px]';
+  const descSizeCls = pc.descSize === 'lg' ? 'text-lg' : pc.descSize === 'sm' ? 'text-sm' : 'text-[16px] leading-[20px]';
   const ctaSize: 'sm' | 'default' | 'lg' = pc.ctaSize === 'lg' ? 'lg' : pc.ctaSize === 'sm' ? 'sm' : 'default';
   const bodyPadding =
     pc.spacing === 'comfortable'
       ? 'px-3 py-3 sm:px-4 sm:py-4'
-      : 'px-3 py-3 sm:px-3 sm:py-3';
+      : 'p-[10px]'; // Default to 10px padding as per design
   const imagePaddingStyle = pc.imagePadding ? { padding: pc.imagePadding } : undefined;
   const imageCornerCls = pc.imageCorner === 'pill'
     ? 'rounded-full'
     : pc.imageCorner === 'square'
     ? ''
-    : 'rounded-xl';
+    : 'rounded-[17px]';
   
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -105,11 +105,30 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
     addItem(product, 1, colorOptions[0].value);
   };
 
+  const currentCartItem = getItem(product.id);
+  const currentQty = currentCartItem?.quantity ?? 0;
+
+  const handleIncrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    updateQuantity(product.id, currentQty + 1);
+  };
+
+  const handleDecrement = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (currentQty <= 1) {
+      updateQuantity(product.id, 0);
+    } else {
+      updateQuantity(product.id, currentQty - 1);
+    }
+  };
+
   return (
     <Link
       to={`/product/${product.id}`}
       className={cn(
-        'group block bg-card overflow-hidden transition-all duration-300 relative',
+        'group block bg-white overflow-hidden transition-all duration-300 relative flex flex-col gap-[10px] p-[10px]',
         cardRadius,
         shadowCls,
         'hover:shadow-xl'
@@ -118,16 +137,16 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       {/* Image area */}
       <div
         className={cn(
-          'relative bg-white flex items-center justify-center px-3 pt-4 pb-3 sm:px-5 sm:pt-5 sm:pb-4',
-          aspectCls
+          'relative bg-gray-50 flex items-center justify-center overflow-hidden',
+          aspectCls,
+          imageCornerCls
         )}
-        style={imagePaddingStyle}
       >
-        <div className={cn('relative w-full h-full bg-background flex items-center justify-center overflow-hidden', imageCornerCls)}>
+        <div className={cn('relative w-full h-full flex items-center justify-center overflow-hidden', imageCornerCls)}>
           <ProductImage
             url={product.images?.[0] || ''}
             alt={product.name}
-            className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105"
+            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             aspectRatio="square"
             priority={priority}
             size="small"
@@ -138,16 +157,16 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
         </div>
 
         {/* Tags / badges */}
-        <div className="absolute top-3 left-3 flex flex-wrap gap-2 z-10">
+        <div className="absolute top-[10px] left-[10px] flex flex-wrap gap-2 z-10">
           {product.bestseller && (
             <Badge
               variant="secondary"
-              className="bg-background/90 text-foreground border border-border rounded-full px-3 py-1 text-xs font-medium"
+              className="bg-[#928B6D] text-white border-none rounded-[24px] px-3 py-1 text-[12px] font-semibold hover:bg-[#928B6D]/90"
             >
-              Best Seller
+              Best seller
             </Badge>
           )}
-          {product.new && (
+          {product.new && !product.bestseller && (
             <Badge
               variant="secondary"
               className="bg-primary/90 text-primary-foreground rounded-full px-3 py-1 text-xs font-medium"
@@ -155,22 +174,12 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
               New
             </Badge>
           )}
-          {pc.showTags &&
-            Array.isArray(product.tags) &&
-            product.tags.slice(0, 2).map((t) => (
-              <span
-                key={String(t)}
-                className="px-2 py-0.5 rounded-full bg-background/90 text-foreground text-[10px] shadow-sm border border-border/60"
-              >
-                {String(t)}
-              </span>
-            ))}
         </div>
 
         {/* Wishlist */}
         {pc.showWishlist && (
           <button
-            className="absolute top-3 right-3 p-2 rounded-full bg-background/90 backdrop-blur-sm opacity-100 transition-all duration-300 hover:bg-background shadow-sm"
+            className="absolute top-3 right-3 p-2 rounded-full bg-white/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white shadow-sm"
             onClick={(e) => {
               e.preventDefault();
               e.stopPropagation();
@@ -184,21 +193,21 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       </div>
 
       {/* Text + price + CTA */}
-      <div className={cn(bodyPadding, 'flex flex-col gap-3')}>
-        <div className="space-y-1">
+      <div className="flex flex-col gap-[20px] px-0 pb-0">
+        <div className="flex flex-col items-start gap-1">
           {product.brand && (
-            <p className="text-xs font-medium text-primary">{String(product.brand)}</p>
+            <p className="text-xs font-medium text-primary mb-1">{String(product.brand)}</p>
           )}
           <h3
             className={cn(
-              'font-semibold text-foreground group-hover:text-foreground transition-colors line-clamp-2',
+              'font-bold text-black group-hover:text-primary transition-colors text-[5px]',
               titleSizeCls
             )}
           >
             {product.name}
           </h3>
           {pc.showDescription && product.description && (
-            <p className={cn('text-muted-foreground line-clamp-2', descSizeCls)}>
+            <p className={cn('text-black line-clamp-2 mt-1', descSizeCls)}>
               {product.description}
             </p>
           )}
@@ -206,97 +215,149 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
 
         {pc.layout === 'band' ? (
           <div
-            className="mt-3 rounded-2xl bg-primary/5 px-3 py-3 flex items-center justify-between gap-3"
+            className="mt-auto rounded-2xl bg-primary/5 px-3 py-3 flex items-center justify-between gap-3"
             style={ctaVars}
           >
             <div className="inline-flex flex-col items-start">
-              <span className="text-sm font-semibold text-foreground">
+              <span className="text-[22px] font-semibold text-black leading-[27px]">
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
               </span>
               {product.original_price && product.original_price > product.price && (
-                <span className="text-xs text-muted-foreground line-through">
+                <span className="text-[16px] text-[#5E5E5E] line-through leading-[20px]">
                   ₹{product.original_price.toFixed(2)}
                 </span>
               )}
             </div>
 
-            <Button
-              onClick={handleQuickAdd}
-              size={ctaSize}
-              className={cn(
-                'w-auto min-w-[7rem] justify-center',
-                ctaRounded || 'rounded-full',
-                pc.ctaStyle === 'outline'
-                  ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                  : undefined,
-                primaryColor
-                  ? '!bg-[var(--cta-color)] !text-[var(--cta-text)] hover:!bg-[var(--cta-hover)]'
-                  : null
-              )}
-            >
-              {pc.ctaLabel}
-            </Button>
+            {currentQty <= 0 ? (
+              <Button
+                onClick={handleQuickAdd}
+                size={ctaSize}
+                className={cn(
+                  'w-auto min-w-[7rem] justify-center h-[40px] font-bold text-[16px]',
+                  ctaRounded || 'rounded-[24px]',
+                  pc.ctaStyle === 'outline'
+                    ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                    : 'bg-[#15803D] text-white hover:bg-[#15803D]/90'
+                )}
+              >
+                {pc.ctaLabel}
+              </Button>
+            ) : (
+              <div className="flex items-center justify-center gap-0 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] relative">
+                <button
+                  onClick={handleDecrement}
+                  className="absolute left-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#6D8877] flex items-center justify-center text-white text-xl leading-none"
+                  aria-label="Decrease quantity"
+                >
+                  –
+                </button>
+                <span className="text-[16px] font-bold text-black">
+                  {currentQty}
+                </span>
+                <button
+                  onClick={handleIncrement}
+                  className="absolute right-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#15803D] flex items-center justify-center text-white text-xl leading-none"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+            )}
           </div>
         ) : pc.layout === 'simple' ? (
-          <div className="mt-3 flex flex-col gap-2" style={ctaVars}>
-            <div className="inline-flex flex-col items-start">
-              <span className="text-sm font-semibold text-foreground">
+           // Map simple to split-like stacked if needed, but let's keep simple stacked
+          <div className="mt-auto flex flex-col gap-2" style={ctaVars}>
+             <div className="inline-flex flex-col items-start">
+              <span className="text-[22px] font-semibold text-black leading-[27px]">
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
               </span>
-              {product.original_price && product.original_price > product.price && (
-                <span className="text-xs text-muted-foreground line-through">
-                  ₹{product.original_price.toFixed(2)}
-                </span>
-              )}
             </div>
-            <Button
-              onClick={handleQuickAdd}
-              size={ctaSize}
-              className={cn(
-                'w-full justify-center',
-                ctaRounded || 'rounded-full',
-                pc.ctaStyle === 'outline'
-                  ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                  : undefined,
-                primaryColor
-                  ? '!bg-[var(--cta-color)] !text-[var(--cta-text)] hover:!bg-[var(--cta-hover)]'
-                  : null
-              )}
-            >
-              {pc.ctaLabel}
-            </Button>
+            {currentQty <= 0 ? (
+              <Button
+                onClick={handleQuickAdd}
+                size={ctaSize}
+                className={cn(
+                  'w-full justify-center h-[40px] font-bold text-[16px]',
+                  ctaRounded || 'rounded-[24px]',
+                   'bg-[#15803D] text-white hover:bg-[#15803D]/90'
+                )}
+              >
+                {pc.ctaLabel}
+              </Button>
+            ) : (
+              <div className="flex items-center justify-center gap-0 w-full h-[40px] border-2 border-[#829F8D] rounded-[24px] relative">
+                <button
+                  onClick={handleDecrement}
+                  className="absolute left-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#6D8877] flex items-center justify-center text-white text-xl leading-none"
+                  aria-label="Decrease quantity"
+                >
+                  –
+                </button>
+                <span className="text-[16px] font-bold text-black">
+                  {currentQty}
+                </span>
+                <button
+                  onClick={handleIncrement}
+                  className="absolute right-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#15803D] flex items-center justify-center text-white text-xl leading-none"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+            )}
           </div>
         ) : (
+          // Split layout (matches Frame 2)
           <div
-            className="mt-3 flex items-center justify-between gap-3"
+            className="mt-auto flex items-center justify-between gap-3"
             style={ctaVars}
           >
             <div className="inline-flex flex-col items-start">
-              <span className="text-sm font-semibold text-foreground">
+              <span className="text-[22px] font-semibold text-black leading-[27px]">
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
               </span>
               {product.original_price && product.original_price > product.price && (
-                <span className="text-xs text-muted-foreground line-through">
+                <span className="text-[16px] text-[#5E5E5E] line-through leading-[20px]">
                   ₹{product.original_price.toFixed(2)}
                 </span>
               )}
             </div>
-            <Button
-              onClick={handleQuickAdd}
-              size={ctaSize}
-              className={cn(
-                'w-auto min-w-[7rem] justify-center',
-                ctaRounded || 'rounded-full',
-                pc.ctaStyle === 'outline'
-                  ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                  : undefined,
-                primaryColor
-                  ? '!bg-[var(--cta-color)] !text-[var(--cta-text)] hover:!bg-[var(--cta-hover)]'
-                  : null
-              )}
-            >
-              {pc.ctaLabel}
-            </Button>
+            {currentQty <= 0 ? (
+              <Button
+                onClick={handleQuickAdd}
+                size={ctaSize}
+                className={cn(
+                  'w-auto min-w-[139px] justify-center h-[40px] font-bold text-[16px] px-6',
+                  ctaRounded || 'rounded-[24px]',
+                  pc.ctaStyle === 'outline'
+                    ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                    : 'bg-[#15803D] text-white hover:bg-[#15803D]/90'
+                )}
+              >
+                {pc.ctaLabel}
+              </Button>
+            ) : (
+              <div className="flex items-center justify-center gap-0 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] relative">
+                <button
+                  onClick={handleDecrement}
+                  className="absolute left-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#6D8877] flex items-center justify-center text-white text-xl leading-none"
+                  aria-label="Decrease quantity"
+                >
+                  –
+                </button>
+                <span className="text-[16px] font-bold text-black">
+                  {currentQty}
+                </span>
+                <button
+                  onClick={handleIncrement}
+                  className="absolute right-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#15803D] flex items-center justify-center text-white text-xl leading-none"
+                  aria-label="Increase quantity"
+                >
+                  +
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

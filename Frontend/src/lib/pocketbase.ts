@@ -686,6 +686,9 @@ export interface ProductCardSettings {
     descSize?: 'sm' | 'md' | 'lg';
     ctaSize?: 'sm' | 'md' | 'lg';
     spacing?: 'compact' | 'comfortable';
+    imagePadding?: number;
+    imageCorner?: 'rounded' | 'square' | 'pill';
+    layout?: 'band' | 'simple' | 'split';
 }
 
 export interface ThemeData {
