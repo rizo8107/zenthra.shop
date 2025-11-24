@@ -22,7 +22,7 @@ const Footer = () => {
 
   return (
     <footer className="bg-[#0F6B35] text-white">
-      <div className="karigai-container py-8">
+      <div className="karigai-container py-8 px-6 lg:px-30 md:py-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           {/* Logo + about + socials */}
           <div className="md:col-span-4">

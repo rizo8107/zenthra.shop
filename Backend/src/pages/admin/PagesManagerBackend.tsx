@@ -54,7 +54,20 @@ export default function PagesManagerBackend() {
   };
 
   const handleCreateNew = () => {
+    // For a brand new page we still go through the embedded editor route,
+    // which will in turn open the external editor as needed.
     navigate('/admin/pages/new/edit');
+  };
+
+  const openExternalEditor = (pageId: string) => {
+    const baseEnv = import.meta.env.VITE_ZENTHRA_FRONTEND_URL as string | undefined;
+    const base = baseEnv && baseEnv.trim().length > 0
+      ? baseEnv.replace(/\/$/, '')
+      : window.location.origin.replace(/\/$/, '');
+
+    const path = `/admin/pages/${pageId}/edit`;
+    const url = `${base}${path}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   if (loading) {
@@ -139,7 +152,7 @@ export default function PagesManagerBackend() {
                         <Button
                           size="sm"
                           variant="default"
-                          onClick={() => navigate(`/admin/pages/${page.id}/edit`)}
+                          onClick={() => openExternalEditor(page.id)}
                           className="flex-1"
                         >
                           <Edit size={14} className="mr-1" />

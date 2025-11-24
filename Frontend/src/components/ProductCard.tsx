@@ -25,6 +25,11 @@ type ProductCardOverrides = {
   imagePadding?: number; // px
   imageCorner?: 'rounded' | 'square' | 'pill';
   layout?: 'band' | 'simple' | 'split';
+  // Optional px-based overrides (apply to all breakpoints when set)
+  titleSizePx?: number;
+  descSizePx?: number;
+  priceSizePx?: number;
+  originalPriceSizePx?: number;
 };
 
 type ProductCardProps = {
@@ -51,37 +56,59 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
   }, [primaryColor, primaryHover, primaryForeground]);
 
 
-  const pc = useMemo(() => ({
-    corner: overrides?.corner ?? themeData?.productCard?.corner ?? 'rounded',
-    shadow: overrides?.shadow ?? themeData?.productCard?.shadow ?? 'soft',
-    showWishlist: overrides?.showWishlist ?? themeData?.productCard?.showWishlist ?? true,
-    showTags: overrides?.showTags ?? themeData?.productCard?.showTags ?? true,
-    showDescription: overrides?.showDescription ?? themeData?.productCard?.showDescription ?? true,
-    ctaLabel: overrides?.ctaLabel ?? themeData?.productCard?.ctaLabel ?? 'Buy Now',
-    ctaStyle: overrides?.ctaStyle ?? themeData?.productCard?.ctaStyle ?? 'pill',
-    imageRatio: overrides?.imageRatio ?? themeData?.productCard?.imageRatio ?? 'portrait',
-    titleSize: overrides?.titleSize ?? themeData?.productCard?.titleSize ?? 'md',
-    descSize: overrides?.descSize ?? themeData?.productCard?.descSize ?? 'sm',
-    ctaSize: overrides?.ctaSize ?? themeData?.productCard?.ctaSize ?? 'md',
-    spacing: overrides?.spacing ?? themeData?.productCard?.spacing ?? 'compact',
-    imagePadding: overrides?.imagePadding ?? themeData?.productCard?.imagePadding,
-    imageCorner: overrides?.imageCorner ?? themeData?.productCard?.imageCorner,
-    layout: overrides?.layout ?? themeData?.productCard?.layout ?? 'band',
-  }), [themeData, overrides]);
+  const pc = useMemo(() => {
+    const productCardSettings = (themeData as any)?.productCard ?? {};
+    return {
+      corner: overrides?.corner ?? productCardSettings.corner ?? 'rounded',
+      shadow: overrides?.shadow ?? productCardSettings.shadow ?? 'soft',
+      showWishlist: overrides?.showWishlist ?? productCardSettings.showWishlist ?? true,
+      showTags: overrides?.showTags ?? productCardSettings.showTags ?? true,
+      showDescription: overrides?.showDescription ?? productCardSettings.showDescription ?? true,
+      ctaLabel: overrides?.ctaLabel ?? productCardSettings.ctaLabel ?? 'Buy Now',
+      ctaStyle: overrides?.ctaStyle ?? productCardSettings.ctaStyle ?? 'pill',
+      imageRatio: overrides?.imageRatio ?? productCardSettings.imageRatio ?? 'portrait',
+      titleSize: overrides?.titleSize ?? productCardSettings.titleSize ?? 'md',
+      descSize: overrides?.descSize ?? productCardSettings.descSize ?? 'sm',
+      ctaSize: overrides?.ctaSize ?? productCardSettings.ctaSize ?? 'md',
+      spacing: overrides?.spacing ?? productCardSettings.spacing ?? 'compact',
+      imagePadding: overrides?.imagePadding ?? productCardSettings.imagePadding,
+      imageCorner: overrides?.imageCorner ?? productCardSettings.imageCorner,
+      layout: overrides?.layout ?? productCardSettings.layout ?? 'band',
+      titleSizePx: overrides?.titleSizePx ?? productCardSettings.titleSizePx,
+      descSizePx: overrides?.descSizePx ?? productCardSettings.descSizePx,
+      priceSizePx: overrides?.priceSizePx ?? productCardSettings.priceSizePx,
+      originalPriceSizePx: overrides?.originalPriceSizePx ?? productCardSettings.originalPriceSizePx,
+    };
+  }, [themeData, overrides]);
 
   const cardRadius = pc.corner === 'pill' ? 'rounded-[24px]' : pc.corner === 'square' ? 'rounded-md' : 'rounded-[24px]';
   const shadowCls = pc.shadow === 'none' ? '' : pc.shadow === 'soft' ? 'shadow-sm' : pc.shadow === 'medium' ? 'shadow-md' : 'shadow-lg';
   const ctaRounded = pc.ctaStyle === 'pill' ? 'rounded-[24px]' : '';
   // Force a 1:1 aspect ratio for the product image area to match the desired card design
   const aspectCls = 'aspect-square';
-  const titleSizeCls = pc.titleSize === 'lg' ? 'text-2xl' : pc.titleSize === 'sm' ? 'text-lg' : 'text-[24px] leading-[30px]';
-  const descSizeCls = pc.descSize === 'lg' ? 'text-lg' : pc.descSize === 'sm' ? 'text-sm' : 'text-[16px] leading-[20px]';
+  // Make title and description text smaller on mobile while preserving existing sizes on larger screens
+  const titleSizeCls =
+    pc.titleSize === 'lg'
+      ? 'text-lg md:text-2xl'
+      : pc.titleSize === 'sm'
+      ? 'text-sm md:text-lg'
+      : 'text-sm md:text-[24px] md:leading-[30px]';
+  const descSizeCls =
+    pc.descSize === 'lg'
+      ? 'text-sm md:text-lg'
+      : pc.descSize === 'sm'
+      ? 'text-xs md:text-sm'
+      : 'text-xs md:text-[14px] md:leading-[20px]';
   const ctaSize: 'sm' | 'default' | 'lg' = pc.ctaSize === 'lg' ? 'lg' : pc.ctaSize === 'sm' ? 'sm' : 'default';
   const bodyPadding =
     pc.spacing === 'comfortable'
       ? 'px-3 py-3 sm:px-4 sm:py-4'
       : 'p-[10px]'; // Default to 10px padding as per design
   const imagePaddingStyle = pc.imagePadding ? { padding: pc.imagePadding } : undefined;
+  const titleStyle = pc.titleSizePx ? { fontSize: `${pc.titleSizePx}px` } : undefined;
+  const descStyle = pc.descSizePx ? { fontSize: `${pc.descSizePx}px` } : undefined;
+  const priceStyle = pc.priceSizePx ? { fontSize: `${pc.priceSizePx}px` } : undefined;
+  const originalPriceStyle = pc.originalPriceSizePx ? { fontSize: `${pc.originalPriceSizePx}px` } : undefined;
   const imageCornerCls = pc.imageCorner === 'pill'
     ? 'rounded-full'
     : pc.imageCorner === 'square'
@@ -200,14 +227,18 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
           )}
           <h3
             className={cn(
-              'font-bold text-black group-hover:text-primary transition-colors text-[5px]',
+              'font-bold text-black group-hover:text-primary transition-colors text-[4px]',
               titleSizeCls
             )}
+            style={titleStyle}
           >
             {product.name}
           </h3>
           {pc.showDescription && product.description && (
-            <p className={cn('text-black line-clamp-2 mt-1', descSizeCls)}>
+            <p
+              className={cn('text-black line-clamp-2 mt-1', descSizeCls)}
+              style={descStyle}
+            >
               {product.description}
             </p>
           )}
@@ -219,11 +250,17 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
             style={ctaVars}
           >
             <div className="inline-flex flex-col items-start">
-              <span className="text-[22px] font-semibold text-black leading-[27px]">
+              <span
+                className="text-base md:text-[22px] font-semibold text-black leading-[22px] md:leading-[27px]"
+                style={priceStyle}
+              >
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
               </span>
               {product.original_price && product.original_price > product.price && (
-                <span className="text-[16px] text-[#5E5E5E] line-through leading-[20px]">
+                <span
+                  className="text-xs md:text-[16px] text-[#5E5E5E] line-through leading-[16px] md:leading-[20px]"
+                  style={originalPriceStyle}
+                >
                   ₹{product.original_price.toFixed(2)}
                 </span>
               )}
@@ -269,7 +306,10 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
            // Map simple to split-like stacked if needed, but let's keep simple stacked
           <div className="mt-auto flex flex-col gap-2" style={ctaVars}>
              <div className="inline-flex flex-col items-start">
-              <span className="text-[22px] font-semibold text-black leading-[27px]">
+              <span
+                className="text-[22px] font-semibold text-black leading-[27px]"
+                style={priceStyle}
+              >
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
               </span>
             </div>
@@ -314,11 +354,17 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
             style={ctaVars}
           >
             <div className="inline-flex flex-col items-start">
-              <span className="text-[22px] font-semibold text-black leading-[27px]">
+              <span
+                className="text-[22px] font-semibold text-black leading-[27px]"
+                style={priceStyle}
+              >
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
               </span>
               {product.original_price && product.original_price > product.price && (
-                <span className="text-[16px] text-[#5E5E5E] line-through leading-[20px]">
+                <span
+                  className="text-[16px] text-[#5E5E5E] line-through leading-[20px]"
+                  style={originalPriceStyle}
+                >
                   ₹{product.original_price.toFixed(2)}
                 </span>
               )}

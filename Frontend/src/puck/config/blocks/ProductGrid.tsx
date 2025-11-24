@@ -42,6 +42,11 @@ export interface ProductGridProps {
   cardGapPx?: number;
   imagePadding?: number;
   cardLayout?: "band" | "simple" | "split";
+  // Typography overrides in px
+  cardTitleSizePx?: number;
+  cardDescSizePx?: number;
+  cardPriceSizePx?: number;
+  cardOriginalPriceSizePx?: number;
   // Device-specific overrides
   cardLayoutMobile?: "band" | "simple" | "split";
   cardLayoutDesktop?: "band" | "simple" | "split";
@@ -86,6 +91,10 @@ const ProductGridContent = ({
   cardSpacingDesktop,
   cardGapPxMobile,
   cardGapPxDesktop,
+  cardTitleSizePx,
+  cardDescSizePx,
+  cardPriceSizePx,
+  cardOriginalPriceSizePx,
 }: ProductGridProps) => {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -234,6 +243,10 @@ const ProductGridContent = ({
       spacing: effectiveCardSpacing,
       imagePadding,
       layout: effectiveCardLayout,
+      titleSizePx: cardTitleSizePx,
+      descSizePx: cardDescSizePx,
+      priceSizePx: cardPriceSizePx,
+      originalPriceSizePx: cardOriginalPriceSizePx,
     }),
     [
       cardShowDescription,
@@ -246,6 +259,10 @@ const ProductGridContent = ({
       imagePadding,
       effectiveCardLayout,
       effectiveCardSpacing,
+      cardTitleSizePx,
+      cardDescSizePx,
+      cardPriceSizePx,
+      cardOriginalPriceSizePx,
     ]
   );
 
@@ -640,6 +657,30 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
         { label: "Medium", value: "md" },
         { label: "Large", value: "lg" },
       ],
+    },
+    cardTitleSizePx: {
+      type: "number",
+      label: "Card: Title Size (px)",
+      min: 8,
+      max: 64,
+    },
+    cardDescSizePx: {
+      type: "number",
+      label: "Card: Description Size (px)",
+      min: 8,
+      max: 48,
+    },
+    cardPriceSizePx: {
+      type: "number",
+      label: "Card: Price Size (px)",
+      min: 8,
+      max: 48,
+    },
+    cardOriginalPriceSizePx: {
+      type: "number",
+      label: "Card: Original Price Size (px)",
+      min: 8,
+      max: 48,
     },
     cardCtaLabel: { type: "text", label: "Card: CTA Label" },
     cardImageRatio: {

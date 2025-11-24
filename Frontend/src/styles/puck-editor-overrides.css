@@ -78,3 +78,66 @@
   overflow: visible; /* avoid nested scroll areas */
   position: relative; /* anchor selection overlays */
 }
+
+/* Components drawer: keep default pills, add subtle blue icon, hide drag dots */
+.puck-editor-root [data-puck-drawer-item] {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* Remove outer blue border/outline from the Hero drawer item only */
+.puck-editor-root [data-puck-component="Hero"][data-puck-drawer-item] {
+  border: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  flex-direction: row !important;
+}
+
+/* Hide the inner pill/placeholder box above the Hero label */
+.puck-editor-root [data-puck-component="Hero"][data-puck-drawer-item] > div:first-child {
+  display: none;
+}
+
+/* Components drawer: show items as card tiles in a responsive grid */
+.puck-editor-root [data-puck-drawer-list] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.5rem;
+}
+
+.puck-editor-root [data-puck-drawer-item] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0.75rem 0.5rem;
+  border-radius: 0.75rem;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  cursor: grab;
+  gap: 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #0f172a;
+  transition: background-color 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease, transform 0.08s ease;
+}
+
+.puck-editor-root [data-puck-drawer-item]:hover {
+  background-color: #f8fafc;
+  border-color: rgba(59, 130, 246, 0.6);
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.puck-editor-root [data-puck-drawer-item]::before {
+  content: "⬚";
+  display: block;
+  font-size: 1.4rem;
+  line-height: 1;
+  color: #2563eb;
+}

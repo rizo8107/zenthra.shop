@@ -519,7 +519,8 @@ export default function PuckEditor() {
     return () => clearTimeout(t);
   }, [data]);
 
-  // Normalize preview wrappers (frame-root) to eliminate nested scroll and overlay drift
+  // Normalize preview wrappers (frame-root + internal iframe) to eliminate
+  // nested scroll and blue-overlay glitches when content is taller than viewport
   useEffect(() => {
     const apply = () => {
       try {
@@ -539,6 +540,50 @@ export default function PuckEditor() {
               node.style.transform = 'none';
             }
             node = (node.firstElementChild as HTMLElement) || null;
+          }
+        }
+
+        // Puck's AutoFrame uses an internal iframe; when the page is tall the
+        // default sizing can cause the preview to "float" with a tinted
+        // background. We coerce it into a normal full-size, white-backed frame.
+        const editorRoot = document.querySelector<HTMLElement>('.puck-editor-root');
+        const iframe = editorRoot?.querySelector<HTMLIFrameElement>('iframe');
+        if (iframe) {
+          iframe.style.width = '100%';
+          iframe.style.display = 'block';
+          iframe.style.border = '0';
+          iframe.style.transform = 'none';
+          iframe.style.maxHeight = 'none';
+
+          try {
+            const doc = iframe.contentDocument || (iframe as any).contentWindow?.document;
+            if (doc) {
+              const html = doc.documentElement as HTMLElement;
+              const body = doc.body as HTMLElement;
+              if (html) {
+                html.style.height = 'auto';
+                html.style.minHeight = '100%';
+                html.style.overflowX = 'hidden';
+              }
+              if (body) {
+                body.style.margin = '0';
+                body.style.background = '#ffffff';
+              }
+
+              // Explicitly size iframe to the content height to avoid cropping
+              const scrollHeight = Math.max(
+                body?.scrollHeight || 0,
+                html?.scrollHeight || 0,
+              );
+              if (scrollHeight > 0) {
+                iframe.style.height = scrollHeight + 'px';
+              } else {
+                // Fallback: ensure at least full viewport height
+                iframe.style.height = '100vh';
+              }
+            }
+          } catch {
+            // Cross-origin guard; if iframe is not same-origin we silently skip
           }
         }
       } catch {/* ignore */}
@@ -710,7 +755,7 @@ export default function PuckEditor() {
   }
 
   return (
-    <div className="puck-editor-root h-screen">
+    <div className="puck-editor-root min-h-screen">
       <Puck
         key={puckKey}
         config={puckConfig}
