@@ -56,6 +56,8 @@ export interface Product extends BaseRecord {
   videoUrl?: string;
   videoThumbnail?: string;
   videoDescription?: string;
+  // Optional JSON string for a custom information table (e.g., nutrition facts, size chart)
+  info_table?: string;
 }
 
 export interface Coupon extends BaseRecord {
@@ -186,6 +188,7 @@ export type CreateProductData = {
   videoUrl?: string;
   videoThumbnail?: string;
   videoDescription?: string;
+  info_table?: string;
 };
 
 export type CreateOrderData = {

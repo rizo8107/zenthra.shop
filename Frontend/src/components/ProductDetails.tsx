@@ -361,7 +361,33 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
     ? product.usage_guidelines.pro_tips.filter((item) => typeof item === 'string' && item.trim().length > 0)
     : [];
 
+  // Parse info_table JSON field
+  let infoTableTitle: string | null = null;
+  let infoTableRows: { label: string; value: string }[] = [];
+  try {
+    const rawInfo = (product as any).info_table;
+    if (rawInfo) {
+      const parsed = typeof rawInfo === 'string' ? JSON.parse(rawInfo) : rawInfo;
+      if (parsed && typeof parsed === 'object') {
+        if (typeof parsed.title === 'string') {
+          infoTableTitle = parsed.title.trim() || null;
+        }
+        if (Array.isArray(parsed.rows)) {
+          infoTableRows = parsed.rows
+            .map((r: any) => ({
+              label: String(r?.label ?? ''),
+              value: String(r?.value ?? ''),
+            }))
+            .filter((r) => r.label.trim().length > 0 || r.value.trim().length > 0);
+        }
+      }
+    }
+  } catch {
+    // ignore parse errors; table will simply not render
+  }
+
   const hasDescription = typeof product.description === 'string' && product.description.trim().length > 0;
+  const hasInfoTable = infoTableRows.length > 0;
   const hasSpecs = orderConfig?.showProductSpecifications !== false && specificationEntries.length > 0;
   const hasCare = orderConfig?.showCareInstructions !== false && (cleaningList.length > 0 || storageList.length > 0);
   const hasFeatures = orderConfig?.showFeaturesAndBenefits !== false && featureList.length > 0;
@@ -481,6 +507,36 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
               <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
                 {product.description}
               </p>
+            </CardContent>
+          </Card>
+        )}
+
+        {hasInfoTable && (
+          <Card className="border border-muted/40 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle>{infoTableTitle || 'Product Details'}</CardTitle>
+              <Separator className="bg-blue-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm text-left border border-muted/40 rounded-md overflow-hidden">
+                  <tbody>
+                    {infoTableRows.map((row, index) => (
+                      <tr
+                        key={`${row.label}-${row.value}-${index}`}
+                        className={index % 2 === 0 ? 'bg-background' : 'bg-muted/30'}
+                      >
+                        <td className="px-4 py-2 font-medium text-muted-foreground border-b border-muted/40 w-1/2">
+                          {row.label}
+                        </td>
+                        <td className="px-4 py-2 text-foreground border-b border-muted/40 w-1/2">
+                          {row.value}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </CardContent>
           </Card>
         )}

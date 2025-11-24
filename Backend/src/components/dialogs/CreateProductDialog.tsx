@@ -22,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
@@ -87,6 +88,7 @@ type ProductFormValues = {
   videoDescription?: string;
   tn_shipping_enabled?: boolean;
   free_shipping?: boolean;
+  info_table?: string;
 };
 
 export type ProductDialogMode = 'create' | 'edit' | 'view';
@@ -168,6 +170,7 @@ export function CreateProductDialog({
     videoDescription: z.string().optional(),
     tn_shipping_enabled: z.boolean().default(true),
     free_shipping: z.boolean().default(false),
+    info_table: z.string().optional(),
   });
 
 
@@ -555,6 +558,7 @@ Only return the JSON, no explanations.`;
       videoDescription: '',
       tn_shipping_enabled: true,
       free_shipping: false,
+      info_table: '',
     },
   });
 
@@ -594,6 +598,7 @@ Only return the JSON, no explanations.`;
         videoDescription: '',
         tn_shipping_enabled: true,
         free_shipping: false,
+        info_table: '',
       });
       setExistingImages([]);
       setSizeRows([]);
@@ -623,9 +628,22 @@ Only return the JSON, no explanations.`;
           colors: product.colors || '',
           tags: product.tags || '',
           care: product.care || '',
-          specifications: product.specifications || '',
-          care_instructions: product.care_instructions || '',
-          usage_guidelines: product.usage_guidelines || '',
+          // Specifications may be stored as a JSON object in PocketBase;
+          // always convert objects to pretty JSON strings for the textarea.
+          specifications:
+            product.specifications && typeof product.specifications === 'object'
+              ? JSON.stringify(product.specifications, null, 2)
+              : (product.specifications || ''),
+          // Care instructions and usage guidelines are JSON objects in PocketBase;
+          // stringify them for editing.
+          care_instructions:
+            product.care_instructions && typeof product.care_instructions === 'object'
+              ? JSON.stringify(product.care_instructions, null, 2)
+              : (product.care_instructions || ''),
+          usage_guidelines:
+            product.usage_guidelines && typeof product.usage_guidelines === 'object'
+              ? JSON.stringify(product.usage_guidelines, null, 2)
+              : (product.usage_guidelines || ''),
           bestseller: product.bestseller || false,
           new: product.new || false,
           inStock: product.inStock !== false,
@@ -635,13 +653,25 @@ Only return the JSON, no explanations.`;
           qikink_sku: product.qikink_sku || '',
           print_type_id: product.print_type_id,
           product_type: product.product_type || '',
-          available_colors: product.available_colors || '',
-          available_sizes: product.available_sizes || '',
+          // available_colors / available_sizes may be stored as JSON arrays;
+          // stringify them when they are objects/arrays so the textarea shows valid JSON.
+          available_colors:
+            product.available_colors && typeof product.available_colors === 'object'
+              ? JSON.stringify(product.available_colors, null, 2)
+              : (product.available_colors || ''),
+          available_sizes:
+            product.available_sizes && typeof product.available_sizes === 'object'
+              ? JSON.stringify(product.available_sizes, null, 2)
+              : (product.available_sizes || ''),
           videoUrl: product.videoUrl || '',
           videoThumbnail: product.videoThumbnail || '',
           videoDescription: product.videoDescription || '',
           tn_shipping_enabled: product.tn_shipping_enabled !== false,
           free_shipping: product.free_shipping || false,
+          info_table:
+            (product as any).info_table && typeof (product as any).info_table === 'object'
+              ? JSON.stringify((product as any).info_table, null, 2)
+              : ((product as any).info_table || ''),
        });
 
        const existing = Array.isArray(product.images)
@@ -1036,7 +1066,7 @@ Only return the JSON, no explanations.`;
       });
       
       // Process object fields with typed keys
-      const objectFields = ['variants', 'colors', 'specifications', 'care_instructions', 'usage_guidelines'] as const;
+      const objectFields = ['variants', 'colors', 'specifications', 'care_instructions', 'usage_guidelines', 'info_table'] as const;
       objectFields.forEach((field) => {
         const value = processedValues[field];
         if (value) {
@@ -1086,6 +1116,10 @@ Only return the JSON, no explanations.`;
 
       if (processedValues.usage_guidelines) {
         productData.usage_guidelines = processedValues.usage_guidelines;
+      }
+
+      if (processedValues.info_table) {
+        productData.info_table = processedValues.info_table;
       }
 
       // Handle stock
@@ -1554,62 +1588,489 @@ Only return the JSON, no explanations.`;
 
                           <FormField
                             control={form.control}
+                            name="info_table"
+                            render={({ field }) => {
+                              const raw = (field.value as string) || '';
+                              let title = '';
+                              let rows: { label: string; value: string }[] = [];
+                              if (raw && raw.trim()) {
+                                try {
+                                  const obj = JSON.parse(raw);
+                                  if (obj && typeof obj === 'object') {
+                                    if (typeof (obj as any).title === 'string') {
+                                      title = (obj as any).title;
+                                    }
+                                    if (Array.isArray((obj as any).rows)) {
+                                      rows = (obj as any).rows
+                                        .map((r: any) => ({
+                                          label: String(r?.label ?? ''),
+                                          value: String(r?.value ?? ''),
+                                        }));
+                                      // Don't filter out empty rows - keep them so user can edit
+                                    }
+                                  }
+                                } catch {
+                                  rows = [{ label: '', value: raw }];
+                                }
+                              }
+
+                              const commitTable = (nextTitle: string, nextRows: { label: string; value: string }[]) => {
+                                const payload: any = {};
+                                // Keep the title as-is (with spaces), only check if it has content
+                                if (nextTitle.trim().length > 0) payload.title = nextTitle;
+                                // Keep all rows (even empty) so newly added ones stay visible for editing
+                                if (nextRows.length) payload.rows = nextRows;
+                                const json = Object.keys(payload).length ? JSON.stringify(payload, null, 2) : '';
+                                field.onChange(json);
+                              };
+
+                              return (
+                                <FormItem>
+                                  <FormLabel>Info Table (optional)</FormLabel>
+                                  <div className="space-y-3">
+                                    <div className="space-y-2">
+                                      <Label className="text-xs text-muted-foreground">Table title</Label>
+                                      <Input
+                                        value={title}
+                                        onChange={(e) => commitTable(e.target.value, rows)}
+                                        placeholder="e.g., Nutrition Facts, Size Chart"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                        <span>Rows</span>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => commitTable(title, [...rows, { label: '', value: '' }])}
+                                        >
+                                          + Add row
+                                        </Button>
+                                      </div>
+                                      <div className="space-y-2">
+                                        {rows.length === 0 && (
+                                          <p className="text-[11px] text-muted-foreground">
+                                            No rows yet. Click "+ Add row" to add table entries.
+                                          </p>
+                                        )}
+                                        {rows.map((row, index) => (
+                                          <div key={index} className="grid grid-cols-2 gap-2 items-start">
+                                            <Input
+                                              value={row.label}
+                                              onChange={(e) => {
+                                                const next = [...rows];
+                                                next[index] = { ...next[index], label: e.target.value };
+                                                commitTable(title, next);
+                                              }}
+                                              placeholder="Label (e.g., Energy, Size)"
+                                              className="text-sm"
+                                            />
+                                            <div className="flex gap-2">
+                                              <Input
+                                                value={row.value}
+                                                onChange={(e) => {
+                                                  const next = [...rows];
+                                                  next[index] = { ...next[index], value: e.target.value };
+                                                  commitTable(title, next);
+                                                }}
+                                                placeholder="Value (e.g., 120 kcal, 500 ml)"
+                                                className="text-sm flex-1"
+                                              />
+                                              <Button
+                                                type="button"
+                                                size="icon"
+                                                variant="ghost"
+                                                onClick={() => {
+                                                  const next = rows.filter((_, i) => i !== index);
+                                                  commitTable(title, next);
+                                                }}
+                                                aria-label={`Remove row ${index + 1}`}
+                                              >
+                                                <X className="h-3 w-3" />
+                                              </Button>
+                                            </div>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <FormDescription>Optional table for nutrition facts, size charts, or other details.</FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+
+                          <FormField
+                            control={form.control}
                             name="specifications"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Specifications</FormLabel>
-                                <Textarea
-                                  {...field}
-                                  className={`min-h-[120px] ${highlightedFields.has('specifications') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
-                                  placeholder='Enter as JSON object or use the format described below'
-                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
-                                />
-                                <FormDescription>
-                                  Enter product specifications as a JSON object with key-value pairs
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
+                            render={({ field }) => {
+                              // Parse the current JSON string into a friendly shape
+                              const raw = (field.value as string) || '';
+                              let primary = '';
+                              let available: string[] = [];
+                              if (raw && raw.trim()) {
+                                try {
+                                  const obj = JSON.parse(raw);
+                                  if (obj && typeof obj === 'object') {
+                                    if (typeof (obj as any).primary === 'string') {
+                                      primary = (obj as any).primary;
+                                    }
+                                    if (Array.isArray((obj as any).available)) {
+                                      available = (obj as any).available.map((v: unknown) => String(v ?? ''));
+                                    }
+                                  } else {
+                                    primary = raw;
+                                  }
+                                } catch {
+                                  // If invalid JSON, treat whole value as primary text so user can fix it
+                                  primary = raw;
+                                }
+                              }
+
+                              const commitSpecs = (nextPrimary: string, nextAvailable: string[]) => {
+                                const cleanedPrimary = nextPrimary.trim();
+                                const payload: any = {};
+                                if (cleanedPrimary) payload.primary = cleanedPrimary;
+                                // Preserve all points, even empty ones, so new rows stay visible
+                                if (nextAvailable.length) payload.available = nextAvailable;
+                                const json = Object.keys(payload).length ? JSON.stringify(payload, null, 2) : '';
+                                field.onChange(json);
+                              };
+
+                              return (
+                                <FormItem>
+                                  <FormLabel>Specifications</FormLabel>
+                                  <div className={highlightedFields.has('specifications') ? 'space-y-3 ring-2 ring-purple-500 animate-pulse rounded-md p-2' : 'space-y-3'}>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs text-muted-foreground">Primary description</Label>
+                                      <Textarea
+                                        value={primary}
+                                        onChange={(e) => commitSpecs(e.target.value, available)}
+                                        placeholder="Main specification or summary text"
+                                        className="min-h-[80px]"
+                                      />
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label className="text-xs text-muted-foreground flex items-center justify-between">
+                                        <span>Bullet points (available)</span>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => commitSpecs(primary, [...available, ''])}
+                                        >
+                                          + Add point
+                                        </Button>
+                                      </Label>
+                                      <div className="space-y-2">
+                                        {available.length === 0 && (
+                                          <p className="text-[11px] text-muted-foreground">
+                                            No bullet points yet. Click "+ Add point" to add your first specification.
+                                          </p>
+                                        )}
+                                        {available.map((item, index) => (
+                                          <div key={index} className="flex gap-2">
+                                            <Textarea
+                                              value={item}
+                                              onChange={(e) => {
+                                                const next = [...available];
+                                                next[index] = e.target.value;
+                                                commitSpecs(primary, next);
+                                              }}
+                                              className="min-h-[60px] flex-1 text-sm"
+                                              placeholder={`Specification ${index + 1}`}
+                                            />
+                                            <Button
+                                              type="button"
+                                              size="icon"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                const next = available.filter((_, i) => i !== index);
+                                                commitSpecs(primary, next);
+                                              }}
+                                              aria-label={`Remove specification ${index + 1}`}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <FormDescription>Specifications shown on the product page.</FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
                           />
 
                           <FormField
                             control={form.control}
                             name="care_instructions"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Care Instructions</FormLabel>
-                                <Textarea
-                                  {...field}
-                                  className={`min-h-[120px] ${highlightedFields.has('care_instructions') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
-                                  placeholder='Enter as JSON object or use the format described below'
-                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
-                                />
-                                <FormDescription>
-                                  Enter as JSON object with "cleaning" and "storage" arrays
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
+                            render={({ field }) => {
+                              const raw = (field.value as string) || '';
+                              let cleaning: string[] = [];
+                              let storage: string[] = [];
+                              if (raw && raw.trim()) {
+                                try {
+                                  const obj = JSON.parse(raw);
+                                  if (obj && typeof obj === 'object') {
+                                    if (Array.isArray((obj as any).cleaning)) {
+                                      cleaning = (obj as any).cleaning.map((v: unknown) => String(v ?? ''));
+                                    }
+                                    if (Array.isArray((obj as any).storage)) {
+                                      storage = (obj as any).storage.map((v: unknown) => String(v ?? ''));
+                                    }
+                                  }
+                                } catch {
+                                  // if invalid JSON, treat as a single cleaning note
+                                  cleaning = [raw];
+                                }
+                              }
+
+                              const commitCare = (nextCleaning: string[], nextStorage: string[]) => {
+                                const payload: any = {};
+                                if (nextCleaning.length) payload.cleaning = nextCleaning;
+                                if (nextStorage.length) payload.storage = nextStorage;
+                                const json = Object.keys(payload).length ? JSON.stringify(payload, null, 2) : '';
+                                field.onChange(json);
+                              };
+
+                              return (
+                                <FormItem>
+                                  <FormLabel>Care Instructions</FormLabel>
+                                  <div className={highlightedFields.has('care_instructions') ? 'space-y-3 ring-2 ring-purple-500 animate-pulse rounded-md p-2' : 'space-y-3'}>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs text-muted-foreground flex items-center justify-between">
+                                        <span>Cleaning</span>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => commitCare([...cleaning, ''], storage)}
+                                        >
+                                          + Add cleaning tip
+                                        </Button>
+                                      </Label>
+                                      <div className="space-y-2">
+                                        {cleaning.length === 0 && (
+                                          <p className="text-[11px] text-muted-foreground">No cleaning tips yet. Click "+ Add cleaning tip".</p>
+                                        )}
+                                        {cleaning.map((item, index) => (
+                                          <div key={index} className="flex gap-2">
+                                            <Textarea
+                                              value={item}
+                                              onChange={(e) => {
+                                                const next = [...cleaning];
+                                                next[index] = e.target.value;
+                                                commitCare(next, storage);
+                                              }}
+                                              className="min-h-[60px] flex-1 text-sm"
+                                              placeholder={`Cleaning tip ${index + 1}`}
+                                            />
+                                            <Button
+                                              type="button"
+                                              size="icon"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                const next = cleaning.filter((_, i) => i !== index);
+                                                commitCare(next, storage);
+                                              }}
+                                              aria-label={`Remove cleaning tip ${index + 1}`}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label className="text-xs text-muted-foreground flex items-center justify-between">
+                                        <span>Storage</span>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => commitCare(cleaning, [...storage, ''])}
+                                        >
+                                          + Add storage tip
+                                        </Button>
+                                      </Label>
+                                      <div className="space-y-2">
+                                        {storage.length === 0 && (
+                                          <p className="text-[11px] text-muted-foreground">No storage tips yet. Click "+ Add storage tip".</p>
+                                        )}
+                                        {storage.map((item, index) => (
+                                          <div key={index} className="flex gap-2">
+                                            <Textarea
+                                              value={item}
+                                              onChange={(e) => {
+                                                const next = [...storage];
+                                                next[index] = e.target.value;
+                                                commitCare(cleaning, next);
+                                              }}
+                                              className="min-h-[60px] flex-1 text-sm"
+                                              placeholder={`Storage tip ${index + 1}`}
+                                            />
+                                            <Button
+                                              type="button"
+                                              size="icon"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                const next = storage.filter((_, i) => i !== index);
+                                                commitCare(cleaning, next);
+                                              }}
+                                              aria-label={`Remove storage tip ${index + 1}`}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <FormDescription>Shown under "Care & Storage" on the product page.</FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
                           />
 
                           <FormField
                             control={form.control}
                             name="usage_guidelines"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Usage Guidelines</FormLabel>
-                                <Textarea
-                                  {...field}
-                                  className={`min-h-[120px] ${highlightedFields.has('usage_guidelines') ? 'ring-2 ring-purple-500 animate-pulse' : ''}`}
-                                  placeholder='Enter as JSON object or use the format described below'
-                                  onBlur={(e) => handleJsonFieldBlur(e, false)}
-                                />
-                                <FormDescription>
-                                  Enter as JSON object with "recommended_use" and "pro_tips" arrays
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
+                            render={({ field }) => {
+                              const raw = (field.value as string) || '';
+                              let recommended: string[] = [];
+                              let tips: string[] = [];
+                              if (raw && raw.trim()) {
+                                try {
+                                  const obj = JSON.parse(raw);
+                                  if (obj && typeof obj === 'object') {
+                                    if (Array.isArray((obj as any).recommended_use)) {
+                                      recommended = (obj as any).recommended_use.map((v: unknown) => String(v ?? ''));
+                                    }
+                                    if (Array.isArray((obj as any).pro_tips)) {
+                                      tips = (obj as any).pro_tips.map((v: unknown) => String(v ?? ''));
+                                    }
+                                  }
+                                } catch {
+                                  recommended = [raw];
+                                }
+                              }
+
+                              const commitUsage = (nextRecommended: string[], nextTips: string[]) => {
+                                const payload: any = {};
+                                if (nextRecommended.length) payload.recommended_use = nextRecommended;
+                                if (nextTips.length) payload.pro_tips = nextTips;
+                                const json = Object.keys(payload).length ? JSON.stringify(payload, null, 2) : '';
+                                field.onChange(json);
+                              };
+
+                              return (
+                                <FormItem>
+                                  <FormLabel>Usage Guidelines</FormLabel>
+                                  <div className={highlightedFields.has('usage_guidelines') ? 'space-y-3 ring-2 ring-purple-500 animate-pulse rounded-md p-2' : 'space-y-3'}>
+                                    <div className="space-y-2">
+                                      <Label className="text-xs text-muted-foreground flex items-center justify-between">
+                                        <span>Recommended Use</span>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => commitUsage([...recommended, ''], tips)}
+                                        >
+                                          + Add recommendation
+                                        </Button>
+                                      </Label>
+                                      <div className="space-y-2">
+                                        {recommended.length === 0 && (
+                                          <p className="text-[11px] text-muted-foreground">No recommendations yet. Click "+ Add recommendation".</p>
+                                        )}
+                                        {recommended.map((item, index) => (
+                                          <div key={index} className="flex gap-2">
+                                            <Textarea
+                                              value={item}
+                                              onChange={(e) => {
+                                                const next = [...recommended];
+                                                next[index] = e.target.value;
+                                                commitUsage(next, tips);
+                                              }}
+                                              className="min-h-[60px] flex-1 text-sm"
+                                              placeholder={`Recommendation ${index + 1}`}
+                                            />
+                                            <Button
+                                              type="button"
+                                              size="icon"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                const next = recommended.filter((_, i) => i !== index);
+                                                commitUsage(next, tips);
+                                              }}
+                                              aria-label={`Remove recommendation ${index + 1}`}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                      <Label className="text-xs text-muted-foreground flex items-center justify-between">
+                                        <span>Pro Tips</span>
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() => commitUsage(recommended, [...tips, ''])}
+                                        >
+                                          + Add tip
+                                        </Button>
+                                      </Label>
+                                      <div className="space-y-2">
+                                        {tips.length === 0 && (
+                                          <p className="text-[11px] text-muted-foreground">No pro tips yet. Click "+ Add tip".</p>
+                                        )}
+                                        {tips.map((item, index) => (
+                                          <div key={index} className="flex gap-2">
+                                            <Textarea
+                                              value={item}
+                                              onChange={(e) => {
+                                                const next = [...tips];
+                                                next[index] = e.target.value;
+                                                commitUsage(recommended, next);
+                                              }}
+                                              className="min-h-[60px] flex-1 text-sm"
+                                              placeholder={`Tip ${index + 1}`}
+                                            />
+                                            <Button
+                                              type="button"
+                                              size="icon"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                const next = tips.filter((_, i) => i !== index);
+                                                commitUsage(recommended, next);
+                                              }}
+                                              aria-label={`Remove tip ${index + 1}`}
+                                            >
+                                              <X className="h-3 w-3" />
+                                            </Button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <FormDescription>Shown under "Usage Guidelines" on the product page.</FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
                           />
                         </CardContent>
                       </Card>
@@ -2407,11 +2868,11 @@ Only return the JSON, no explanations.`;
                               <FormLabel>Tags</FormLabel>
                               <Textarea
                                 {...field}
-                                placeholder='Enter tags separated by commas or as JSON array'
+                                placeholder="comma separated, e.g. groundnut, cold pressed"
                                 onBlur={(e) => handleJsonFieldBlur(e, true)}
                               />
                               <FormDescription className="text-gray-500">
-                                Enter tags as comma-separated values or a JSON array of strings
+                                Used for search and filters.
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -2421,21 +2882,180 @@ Only return the JSON, no explanations.`;
                         <div className="grid grid-cols-2 gap-4">
                           <FormField
                             control={form.control}
+                            name="available_colors"
+                            render={({ field }) => {
+                              const raw = (field.value as string) || '';
+                              let items: string[] = [];
+                              if (raw && raw.trim()) {
+                                try {
+                                  const parsed = JSON.parse(raw);
+                                  if (Array.isArray(parsed)) {
+                                    items = parsed.map((v) => String(v ?? '')).filter((v) => v.trim().length > 0);
+                                  } else if (parsed && typeof parsed === 'object' && Array.isArray((parsed as any).available)) {
+                                    items = (parsed as any).available.map((v: unknown) => String(v ?? '')).filter((v: string) => v.trim().length > 0);
+                                  } else {
+                                    items = String(raw).split(',').map((v) => v.trim()).filter((v) => v.length > 0);
+                                  }
+                                } catch {
+                                  items = raw.split(',').map((v) => v.trim()).filter((v) => v.length > 0);
+                                }
+                              }
+
+                              const commitColors = (nextItems: string[]) => {
+                                if (!nextItems.length) {
+                                  field.onChange('');
+                                  return;
+                                }
+                                // Keep all items (even empty) so new rows stay visible
+                                const nonEmpty = nextItems.filter((v) => v.trim().length > 0);
+                                const payload = nonEmpty.length
+                                  ? { available: nonEmpty, primary: nonEmpty[0] }
+                                  : { available: nextItems };
+                                field.onChange(JSON.stringify(payload, null, 2));
+                              };
+
+                              return (
+                                <FormItem>
+                                  <FormLabel>Available Colors</FormLabel>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                      <span>Color names (used for filters and badges)</span>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => commitColors([...items, ''])}
+                                      >
+                                        + Add color
+                                      </Button>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {items.length === 0 && (
+                                        <p className="text-[11px] text-muted-foreground">
+                                          No colors yet. Click "+ Add color" to add one.
+                                        </p>
+                                      )}
+                                      {items.map((item, index) => (
+                                        <div key={index} className="flex gap-2">
+                                          <Input
+                                            value={item}
+                                            onChange={(e) => {
+                                              const next = [...items];
+                                              next[index] = e.target.value;
+                                              commitColors(next);
+                                            }}
+                                            placeholder={`Color ${index + 1}`}
+                                            className="text-sm"
+                                          />
+                                          <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              const next = items.filter((_, i) => i !== index);
+                                              commitColors(next);
+                                            }}
+                                            aria-label={`Remove color ${index + 1}`}
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <FormDescription className="text-gray-500">
+                                    Color labels used for filters and badges.
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
+                          />
+
+                          <FormField
+                            control={form.control}
                             name="available_sizes"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Available Sizes</FormLabel>
-                                <Textarea
-                                  {...field}
-                                  placeholder='Enter sizes separated by commas or as JSON array'
-                                  onBlur={(e) => handleJsonFieldBlur(e, true)}
-                                />
-                                <FormDescription className="text-gray-500">
-                                  Enter sizes as comma-separated values or a JSON array of strings
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
+                            render={({ field }) => {
+                              const raw = (field.value as string) || '';
+                              let items: string[] = [];
+                              if (raw && raw.trim()) {
+                                try {
+                                  const parsed = JSON.parse(raw);
+                                  if (Array.isArray(parsed)) {
+                                    items = parsed.map((v) => String(v ?? '')).filter((v) => v.trim().length > 0);
+                                  } else {
+                                    items = String(raw).split(',').map((v) => v.trim()).filter((v) => v.length > 0);
+                                  }
+                                } catch {
+                                  items = raw.split(',').map((v) => v.trim()).filter((v) => v.length > 0);
+                                }
+                              }
+
+                              const commitSizes = (nextItems: string[]) => {
+                                if (!nextItems.length) {
+                                  field.onChange('');
+                                  return;
+                                }
+                                // Keep all items so new rows stay visible
+                                field.onChange(JSON.stringify(nextItems, null, 2));
+                              };
+
+                              return (
+                                <FormItem>
+                                  <FormLabel>Available Sizes</FormLabel>
+                                  <div className="space-y-2">
+                                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                      <span>Size labels shown on product cards/filters</span>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => commitSizes([...items, ''])}
+                                      >
+                                        + Add size
+                                      </Button>
+                                    </div>
+                                    <div className="space-y-2">
+                                      {items.length === 0 && (
+                                        <p className="text-[11px] text-muted-foreground">
+                                          No sizes yet. Click "+ Add size" to add one.
+                                        </p>
+                                      )}
+                                      {items.map((item, index) => (
+                                        <div key={index} className="flex gap-2">
+                                          <Input
+                                            value={item}
+                                            onChange={(e) => {
+                                              const next = [...items];
+                                              next[index] = e.target.value;
+                                              commitSizes(next);
+                                            }}
+                                            placeholder={`Size ${index + 1}`}
+                                            className="text-sm"
+                                          />
+                                          <Button
+                                            type="button"
+                                            size="icon"
+                                            variant="ghost"
+                                            onClick={() => {
+                                              const next = items.filter((_, i) => i !== index);
+                                              commitSizes(next);
+                                            }}
+                                            aria-label={`Remove size ${index + 1}`}
+                                          >
+                                            <X className="h-3 w-3" />
+                                          </Button>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <FormDescription className="text-gray-500">
+                                    Size labels shown on product cards and filters.
+                                  </FormDescription>
+                                  <FormMessage />
+                                </FormItem>
+                              );
+                            }}
                           />
                         </div>
                       </CardContent>

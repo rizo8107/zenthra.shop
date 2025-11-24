@@ -73,7 +73,11 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const [review, setReview] = useState(product?.review !== undefined && product.review !== null ? String(product.review) : '');
   const [features, setFeatures] = useState(product?.features || '');
   const [tags, setTags] = useState(product?.tags || '');
-  const [specifications, setSpecifications] = useState(product?.specifications || '');
+  const [specifications, setSpecifications] = useState(
+    (typeof product?.specifications === 'object' && product?.specifications !== null)
+      ? JSON.stringify(product.specifications, null, 2)
+      : (product?.specifications || '')
+  );
   const [care, setCare] = useState(product?.care || '');
   const [careInstructions, setCareInstructions] = useState(product?.care_instructions || '');
   const [usageGuidelines, setUsageGuidelines] = useState(product?.usage_guidelines || '');
@@ -164,6 +168,21 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
   const renameFile = (file: File, newName: string) =>
     new File([file], newName, { type: file.type, lastModified: Date.now() });
 
+  // Ensure fields that might be stored as objects (e.g. from PocketBase JSON)
+  // are always shown as JSON strings inside textareas.
+  const toJsonLikeString = (value: unknown): string => {
+    if (value == null) return '';
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value, null, 2);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  };
+
   const slugify = (text: string) => {
     return text
       .toLowerCase()
@@ -249,7 +268,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
         setFeatures(result.features);
       }
       if (result.specifications) {
-        setSpecifications(result.specifications);
+        setSpecifications(toJsonLikeString(result.specifications));
       }
       if (result.tags) {
         setTags(result.tags);
@@ -299,7 +318,7 @@ export function EditProductDialog({ open, onOpenChange, product, onSubmit }: Edi
       setReview(product.review !== undefined && product.review !== null ? String(product.review) : '');
       setFeatures(product.features || '');
       setTags(product.tags || '');
-      setSpecifications(product.specifications || '');
+      setSpecifications(toJsonLikeString(product.specifications));
       setCare(product.care || '');
       setCareInstructions(product.care_instructions || '');
       setUsageGuidelines(product.usage_guidelines || '');
