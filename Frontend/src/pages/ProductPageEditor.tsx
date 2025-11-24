@@ -152,7 +152,6 @@ export default function ProductPageEditor() {
   }
 
   const productName = productPage.expand?.product_id?.name || 'Product';
-  const productId = productPage.expand?.product_id?.id || productPage.product_id;
 
   return (
     <div className="h-screen flex flex-col">
@@ -165,13 +164,13 @@ export default function ProductPageEditor() {
           </Button>
           <div>
             <h1 className="text-lg font-semibold">{productName}</h1>
-            <p className="text-xs text-muted-foreground">Custom Product Page Editor</p>
+            <p className="text-xs text-muted-foreground">Custom Product Page</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={handlePreview}>
             <Eye className="h-4 w-4 mr-2" />
-            Preview Live
+            Preview
           </Button>
           <Button size="sm" onClick={handleSave} disabled={saving}>
             <Save className="h-4 w-4 mr-2" />
@@ -180,36 +179,15 @@ export default function ProductPageEditor() {
         </div>
       </div>
 
-      {/* Main content: live product preview on top, Puck editor below (same column) */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Live product detail page inside the editor column */}
-        <div className="border-b bg-muted/30">
-          <div className="p-3 border-b bg-card">
-            <p className="text-sm font-medium">Live Product Page Preview</p>
-            <p className="text-xs text-muted-foreground">
-              This is the real product detail page for this product. Your custom content will be
-              rendered on it according to the position setting.
-            </p>
-          </div>
-          <div className="h-[420px] overflow-hidden">
-            <iframe
-              src={`/product/${productId}`}
-              className="w-full h-full border-0"
-              title="Product Preview"
-            />
-          </div>
-        </div>
-
-        {/* Puck editor taking the remaining space below */}
-        <div className="flex-1 overflow-auto">
-          <Puck
-            key={puckKey}
-            config={config}
-            data={data}
-            onPublish={handleSave}
-            onChange={setData}
-          />
-        </div>
+      {/* Puck Editor */}
+      <div className="flex-1 overflow-hidden">
+        <Puck
+          key={puckKey}
+          config={config}
+          data={data}
+          onPublish={handleSave}
+          onChange={setData}
+        />
       </div>
     </div>
   );

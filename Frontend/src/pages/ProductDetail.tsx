@@ -125,15 +125,23 @@ const ProductDetail = () => {
   // Puck editor state for edit mode
   const [puckData, setPuckData] = useState<Data>({ content: [], root: {} });
   const [saving, setSaving] = useState(false);
+  // Split view state: how much width the editor takes (0.2 - 0.8)
+  const [splitRatio, setSplitRatio] = useState(0.5);
+  const splitContainerRef = useRef<HTMLDivElement | null>(null);
+  const isDraggingSplit = useRef(false);
+  // Used to force reload of the iframe preview after save/publish
+  const [previewVersion, setPreviewVersion] = useState(0);
 
-  // Save Puck data
-  const handleSavePuck = async () => {
+  // Save Puck data (optionally with explicit data)
+  const handleSavePuck = async (overrideData?: Data) => {
     if (!editPageId) return;
+
+    const dataToSave = overrideData ?? puckData;
     
     try {
       setSaving(true);
       await pocketbase.collection('product_pages').update(editPageId, {
-        puck_content: puckData,
+        puck_content: dataToSave,
         // Ensure the page is enabled when editing from the designer
         enabled: true,
       });
@@ -145,6 +153,61 @@ const ProductDetail = () => {
       setSaving(false);
     }
   };
+
+  // When user clicks header Save button, persist and refresh iframe preview
+  const handleSaveAndRefresh = async () => {
+    await handleSavePuck();
+    setPreviewVersion((v) => v + 1);
+  };
+
+  // When user clicks Publish inside Puck, immediately refresh iframe,
+  // and save in the background
+  const handlePuckPublish = (data: Data) => {
+    setPuckData(data);
+    // Refresh preview first so user sees changes instantly
+    setPreviewVersion((v) => v + 1);
+    // Persist in the background (no await needed here)
+    void handleSavePuck(data);
+  };
+
+  const handleSplitMouseDown = (event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    isDraggingSplit.current = true;
+  };
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!isDraggingSplit.current) return;
+      const container = splitContainerRef.current;
+      if (!container) return;
+
+      const rect = container.getBoundingClientRect();
+      if (!rect || rect.width <= 0) return;
+
+      const rawRatio = (event.clientX - rect.left) / rect.width;
+      // Allow a bit more movement but prevent either pane from collapsing
+      const clamped = Math.min(0.85, Math.max(0.15, rawRatio));
+      setSplitRatio((prev) => {
+        // Skip tiny updates to avoid jitter and unnecessary re-renders
+        if (Math.abs(prev - clamped) < 0.01) return prev;
+        return clamped;
+      });
+    };
+
+    const handleMouseUp = () => {
+      if (isDraggingSplit.current) {
+        isDraggingSplit.current = false;
+      }
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const { addItem, items } = useCart();
   const [quantity, setQuantity] = useState(1);
@@ -1195,7 +1258,7 @@ const ProductDetail = () => {
             </Button>
             <Button 
               size="sm" 
-              onClick={handleSavePuck}
+              onClick={handleSaveAndRefresh}
               disabled={saving}
             >
               <Save className="h-4 w-4 mr-2" />
@@ -1205,19 +1268,37 @@ const ProductDetail = () => {
         </div>
 
         {/* Split view: Puck editor + Product page preview */}
-        <div className="flex-1 flex overflow-hidden">
+        <div
+          ref={splitContainerRef}
+          className="flex-1 flex overflow-hidden"
+        >
           {/* Left: Puck editor */}
-          <div className="w-1/2 border-r overflow-auto">
+          <div
+            className="border-r overflow-auto"
+            style={{ width: `${splitRatio * 100}%` }}
+          >
             <Puck
               config={config}
               data={puckData}
-              onPublish={handleSavePuck}
+              onPublish={(data) => {
+                console.log('Puck onPublish called with data', data);
+                void handlePuckPublish(data);
+              }}
               onChange={setPuckData}
             />
           </div>
 
+          {/* Splitter */}
+          <div
+            className="w-1 bg-border cursor-col-resize hover:bg-primary/40 transition-colors"
+            onMouseDown={handleSplitMouseDown}
+          />
+
           {/* Right: Product page preview in iframe */}
-          <div className="w-1/2 bg-muted/30 flex flex-col">
+          <div
+            className="bg-muted/30 flex flex-col"
+            style={{ width: `${(1 - splitRatio) * 100}%` }}
+          >
             <div className="p-3 border-b bg-card">
               <p className="text-sm font-medium">Live Product Page Preview</p>
               <p className="text-xs text-muted-foreground">
@@ -1226,7 +1307,7 @@ const ProductDetail = () => {
             </div>
             <div className="flex-1 overflow-hidden">
               <iframe
-                src={`/product/${id}`}
+                src={`/product/${id}?v=${previewVersion}&embed=1`}
                 className="w-full h-full border-0"
                 title="Product Preview"
               />

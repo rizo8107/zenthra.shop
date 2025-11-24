@@ -30,6 +30,7 @@ import { Banner } from "./blocks/Banner";
 import { SingleProductDetails } from "./blocks/SingleProductDetails";
 import { CategoryCircles } from "./blocks/CategoryCircles";
 import { ProductCardV2Block } from "./blocks/ProductCardV2";
+import { CustomHtml } from "./blocks/CustomHtml";
 
 // Root component configuration
 const Root = {
@@ -132,7 +133,7 @@ export const completePuckConfig: Config = {
     },
     content: {
       title: "Content",
-      components: ["Text", "Button", "Image", "Spacer", "CardGrid", "Magazine", "Banner"],
+      components: ["Text", "Button", "Image", "Spacer", "CardGrid", "Magazine", "Banner", "CustomHtml"],
     },
     layout: {
       title: "Layout",
@@ -166,6 +167,7 @@ export const completePuckConfig: Config = {
     CardGrid,
     Magazine,
     Banner,
+    CustomHtml,
     
     // Layout Components
     Container,

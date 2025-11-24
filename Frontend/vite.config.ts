@@ -32,6 +32,12 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
       },
+      // Proxy AI endpoints to the same backend origin
+      '/api/ai': {
+        target: webhookOrigin,
+        changeOrigin: true,
+        secure: false,
+      },
       '/api/razorpay': {
         target: 'http://localhost:3000',
         changeOrigin: true,

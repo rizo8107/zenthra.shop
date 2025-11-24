@@ -202,17 +202,17 @@ export default function PagesManagerBackend() {
     
     if (existingPage) {
       // Navigate to edit existing page
-      navigate(`/admin/product-pages/${existingPage.id}/edit`);
+      window.open(`/admin/product-pages/${existingPage.id}/edit`, '_blank');
     } else {
       // Create new product page
       try {
         const newPage = await pb.collection(PRODUCT_PAGES_COLLECTION).create({
           product_id: product.id,
           puck_content: { content: [], root: {} },
-          field: 'below',
+          position: 'below',
           enabled: true,
         });
-        navigate(`/admin/product-pages/${newPage.id}/edit`);
+        window.open(`/admin/product-pages/${newPage.id}/edit`, '_blank');
       } catch (error) {
         console.error('Error creating product page:', error);
         toast.error('Failed to create product page');
