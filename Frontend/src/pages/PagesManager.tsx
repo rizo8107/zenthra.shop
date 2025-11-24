@@ -188,6 +188,37 @@ export default function PagesManager() {
     });
   };
 
+  const getPageDisplayTitle = (page: Page): string => {
+    if (page.title && page.title.trim() && page.title !== "Untitled Page") {
+      return page.title;
+    }
+
+    try {
+      const raw = page.content_json;
+      let data = raw;
+      if (typeof raw === "string") {
+        data = JSON.parse(raw);
+      }
+      const rootTitle = data?.root?.title;
+      if (typeof rootTitle === "string" && rootTitle.trim()) {
+        return rootTitle;
+      }
+    } catch {
+      // ignore parse errors
+    }
+
+    if (page.slug) {
+      const pretty = page.slug
+        .replace(/[-_]+/g, " ")
+        .trim();
+      if (pretty) {
+        return pretty.charAt(0).toUpperCase() + pretty.slice(1);
+      }
+    }
+
+    return "Untitled Page";
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-8">
@@ -248,7 +279,7 @@ export default function PagesManager() {
                       const src = extractThumbnailFromPageData(page.content_json) ||
                         'https://via.placeholder.com/800x450?text=No+Thumbnail';
                       return (
-                        <img src={src} alt={page.title} className="w-full h-full object-cover" />
+                        <img src={src} alt={getPageDisplayTitle(page)} className="w-full h-full object-cover" />
                       );
                     } catch {
                       return (
@@ -261,7 +292,7 @@ export default function PagesManager() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-lg line-clamp-2">
-                    {page.title}
+                    {getPageDisplayTitle(page)}
                   </CardTitle>
                   <Badge
                     variant={page.status === "published" ? "default" : "secondary"}

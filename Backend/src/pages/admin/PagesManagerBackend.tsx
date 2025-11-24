@@ -6,6 +6,9 @@ import { useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 
 interface Page {
   id: string;
@@ -22,6 +25,10 @@ export default function PagesManagerBackend() {
   const navigate = useNavigate();
   const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newPageTitle, setNewPageTitle] = useState('');
+  const [newPageSlug, setNewPageSlug] = useState('');
+  const [creating, setCreating] = useState(false);
 
   useEffect(() => {
     loadPages();
@@ -41,6 +48,21 @@ export default function PagesManagerBackend() {
     }
   };
 
+  const generateSlug = (title: string): string => {
+    return title
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
+  const handleTitleChange = (title: string) => {
+    setNewPageTitle(title);
+    setNewPageSlug(generateSlug(title));
+  };
+
   const handleDelete = async (pageId: string) => {
     if (!confirm('Are you sure you want to delete this page?')) return;
 
@@ -54,9 +76,7 @@ export default function PagesManagerBackend() {
   };
 
   const handleCreateNew = () => {
-    // For a brand new page we still go through the embedded editor route,
-    // which will in turn open the external editor as needed.
-    navigate('/admin/pages/new/edit');
+    setShowCreateDialog(true);
   };
 
   const openExternalEditor = (pageId: string) => {
@@ -68,6 +88,42 @@ export default function PagesManagerBackend() {
     const path = `/admin/pages/${pageId}/edit`;
     const url = `${base}${path}`;
     window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCreateAndEdit = async () => {
+    if (!newPageTitle.trim()) {
+      alert('Please enter a page title');
+      return;
+    }
+    if (!newPageSlug.trim()) {
+      alert('Please enter a page slug');
+      return;
+    }
+
+    try {
+      setCreating(true);
+      const newPage = await pb.collection('pages').create({
+        title: newPageTitle,
+        slug: newPageSlug,
+        content_json: JSON.stringify({ content: [], root: { title: newPageTitle } }),
+        published: false,
+        status: 'draft',
+      });
+
+      // Refresh list and close dialog
+      await loadPages();
+      setShowCreateDialog(false);
+      setNewPageTitle('');
+      setNewPageSlug('');
+
+      // Open full editor in new tab (frontend app, non-embedded)
+      openExternalEditor(newPage.id);
+    } catch (error) {
+      console.error('Error creating page:', error);
+      alert('Error creating page. Please try again.');
+    } finally {
+      setCreating(false);
+    }
   };
 
   if (loading) {
@@ -193,6 +249,68 @@ export default function PagesManagerBackend() {
           </div>
         )}
       </div>
+
+      {/* Create Page Dialog */}
+      <Dialog open={showCreateDialog} onOpenChange={(open) => {
+        setShowCreateDialog(open);
+        if (!open) {
+          setNewPageTitle('');
+          setNewPageSlug('');
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Page</DialogTitle>
+            <DialogDescription>
+              Enter a name and slug for your new page. The slug will be used in the URL.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="title">Page Title</Label>
+              <Input
+                id="title"
+                placeholder="e.g., About Us"
+                value={newPageTitle}
+                onChange={(e) => handleTitleChange(e.target.value)}
+                disabled={creating}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="slug">Page Slug</Label>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">/page/</span>
+                <Input
+                  id="slug"
+                  placeholder="e.g., about-us"
+                  value={newPageSlug}
+                  onChange={(e) => setNewPageSlug(e.target.value)}
+                  disabled={creating}
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowCreateDialog(false);
+                setNewPageTitle('');
+                setNewPageSlug('');
+              }}
+              disabled={creating}
+            >
+              Cancel
+            </Button>
+            <Button onClick={handleCreateAndEdit} disabled={creating}>
+              {creating ? 'Creating...' : 'Create & Edit'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

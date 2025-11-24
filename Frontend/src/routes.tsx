@@ -121,16 +121,19 @@ export function Routes() {
         <TooltipProvider>
           <Sonner />
           {(() => {
-            const isEmbed = typeof window !== 'undefined' && (() => {
+            const flags = typeof window !== 'undefined' && (() => {
               const search = new URLSearchParams(window.location.search);
               const embedParam = search.get('embed') === '1';
               const path = window.location.pathname || '';
               const isPuckAdmin = path.startsWith('/admin/pages/');
-              return embedParam || isPuckAdmin;
+              return { isEmbed: embedParam, isPuckAdmin };
             })();
+            const isEmbed = !!(flags && (flags as any).isEmbed);
+            const isPuckAdmin = !!(flags && (flags as any).isPuckAdmin);
             return (
               <div className="flex flex-col min-h-screen">
-                {!isEmbed && <Navbar />}
+                {/* Hide Navbar on Puck admin editor pages and embed mode */}
+                {!isPuckAdmin && !isEmbed && <Navbar />}
                 {isEmbed && <EmbedBridge />}
                 <main className="flex-grow">
                   <Suspense fallback={<PageLoader />}>
@@ -215,7 +218,7 @@ export function Routes() {
                     </RouterRoutes>
                   </Suspense>
                 </main>
-                {!isEmbed && <Footer />}
+                {!isEmbed && !isPuckAdmin && <Footer />}
               </div>
             )
           })()}

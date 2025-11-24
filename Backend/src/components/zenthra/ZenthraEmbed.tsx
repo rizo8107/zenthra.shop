@@ -26,9 +26,18 @@ export const ZenthraEmbed: React.FC<ZenthraEmbedProps> = ({ path, title, iframeI
       if (!frameRef.current) return;
 
       if (d.type === 'ZENTHRA_EMBED_SIZE' && typeof d.height === 'number') {
-        const vhMax = Math.max(40, Math.min(100, maxHeightVh));
-        const maxPx = (typeof window !== 'undefined' ? window.innerHeight : 900) * (vhMax / 100);
-        const height = Math.min(Math.max(d.height, 400), Math.max(500, Math.floor(maxPx)));
+        // If maxHeightVh <= 0, do not clamp to viewport height at all; let the
+        // iframe grow to the full reported height so the outer page scrolls
+        // normally. Otherwise, respect the provided vh cap.
+        const hasClamp = maxHeightVh > 0;
+        let height = Math.max(d.height, 400);
+
+        if (hasClamp) {
+          const vhMax = Math.max(40, Math.min(100, maxHeightVh));
+          const maxPx = (typeof window !== 'undefined' ? window.innerHeight : 900) * (vhMax / 100);
+          height = Math.min(height, Math.max(500, Math.floor(maxPx)));
+        }
+
         frameRef.current.style.height = `${height}px`;
       }
 
@@ -46,7 +55,16 @@ export const ZenthraEmbed: React.FC<ZenthraEmbedProps> = ({ path, title, iframeI
         id={iframeId || 'zenthra-embed'}
         src={src}
         title={title || 'Zenthra'}
-        style={{ width: '100%', border: 0, height: `${Math.floor(((typeof window !== 'undefined' ? window.innerHeight : 900) * (maxHeightVh/100)) || 700)}px` }}
+        style={{
+          width: '100%',
+          border: 0,
+          // Initial height: if maxHeightVh <= 0, use a generous default; otherwise
+          // base it on the viewport percentage.
+          height:
+            maxHeightVh > 0
+              ? `${Math.floor(((typeof window !== 'undefined' ? window.innerHeight : 900) * (maxHeightVh / 100)) || 700)}px`
+              : `${Math.max(typeof window !== 'undefined' ? window.innerHeight : 900, 700)}px`,
+        }}
       />
     </div>
   );

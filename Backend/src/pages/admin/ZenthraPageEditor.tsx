@@ -14,7 +14,12 @@ const ZenthraPageEditor: React.FC = () => {
           <h1 className="text-2xl font-bold tracking-tight">Page Editor</h1>
           <p className="text-muted-foreground">Edit page {pageId}</p>
         </div>
-        <ZenthraEmbed path={path} title={`Zenthra Page Editor ${pageId || ''}`} iframeId="zenthra-editor" />
+        <ZenthraEmbed
+          path={path}
+          title={`Zenthra Page Editor ${pageId || ''}`}
+          iframeId="zenthra-editor"
+          maxHeightVh={0}
+        />
       </div>
     </AdminLayout>
   );

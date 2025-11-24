@@ -594,6 +594,46 @@ export default function PuckEditor() {
     return () => mo.disconnect();
   }, [puckKey]);
 
+  // When the editor is embedded inside an iframe (Backend uses ZenthraEmbed),
+  // report our height so the parent can resize the iframe and avoid nested
+  // scrollbars / clipped content.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    // If there is no parent (top-level window), nothing to report.
+    if (window.parent === window) return;
+
+    const sendHeight = () => {
+      try {
+        const root = document.querySelector<HTMLElement>('.puck-editor-root');
+        const rect = root?.getBoundingClientRect();
+        const height = rect?.height || document.documentElement.scrollHeight || document.body.scrollHeight || 0;
+        if (height > 0) {
+          window.parent.postMessage({ type: 'ZENTHRA_EMBED_SIZE', height }, '*');
+        }
+      } catch {
+        // best-effort only
+      }
+    };
+
+    // Initial send
+    sendHeight();
+
+    const ro = new ResizeObserver(() => {
+      sendHeight();
+    });
+    const root = document.querySelector<HTMLElement>('.puck-editor-root');
+    if (root) {
+      ro.observe(root);
+    }
+
+    window.addEventListener('resize', sendHeight);
+
+    return () => {
+      window.removeEventListener('resize', sendHeight);
+      ro.disconnect();
+    };
+  }, [puckKey]);
+
   const loadPageData = async () => {
     try {
       setLoading(true);
