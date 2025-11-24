@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, lazy, Suspense, type PointerEvent } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Minus,
@@ -11,6 +11,12 @@ import {
   ImageIcon,
   Loader2,
   ShoppingCart,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+  Eye,
+  Save,
 } from 'lucide-react';
 import {
   getProduct,
@@ -26,6 +32,7 @@ import { useCart } from '@/contexts/CartContext';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/components/ui/use-toast';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
@@ -41,10 +48,32 @@ import {
 import { Breadcrumbs, BreadcrumbItem } from '@/components/Breadcrumbs';
 import { DEFAULT_CONFIG, getOrderConfig } from '@/lib/order-config-service';
 import { getProductSettings } from '@/lib/config/product-settings';
+import { Render, Puck, type Data } from '@measured/puck';
+import config from '@/puck/config/complete';
+import '@measured/puck/puck.css';
+import '@/styles/puck-editor-overrides.css';
 
 // Lazy load heavy components that are below the fold
 const ProductReviews = lazy(() => import('@/components/ProductReviews').then(module => ({ default: module.ProductReviews })));
 const ProductDetails = lazy(() => import('@/components/ProductDetails').then(module => ({ default: module.ProductDetails })));
+
+interface ProductPage {
+  id: string;
+  product_id: string;
+  puck_content: Data;
+  // In PocketBase the field is named `position`
+  position?: 'above' | 'below' | 'replace';
+  // Backwards-compat: older data may still use `field`
+  field?: 'above' | 'below' | 'replace';
+  enabled: boolean;
+}
+
+const getProductPagePosition = (
+  page?: ProductPage | null,
+): 'above' | 'below' | 'replace' | null => {
+  if (!page) return null;
+  return page.position || page.field || null;
+};
 
 const stripPcsSuffix = (value?: string | null) => {
   if (!value) return '';
@@ -77,7 +106,14 @@ const normalizeSizeVariant = (size: any) => {
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isEditMode = searchParams.get('edit') === 'true';
+  const editPageId = searchParams.get('pageId');
+  
+  console.log('ProductDetail - Edit mode:', isEditMode, 'PageId:', editPageId);
+  
   const [product, setProduct] = useState<Product | null>(null);
+  const [productPage, setProductPage] = useState<ProductPage | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,6 +121,30 @@ const ProductDetail = () => {
   const [displayImages, setDisplayImages] = useState<string[]>([]);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [imagesPreloaded, setImagesPreloaded] = useState(false);
+  
+  // Puck editor state for edit mode
+  const [puckData, setPuckData] = useState<Data>({ content: [], root: {} });
+  const [saving, setSaving] = useState(false);
+
+  // Save Puck data
+  const handleSavePuck = async () => {
+    if (!editPageId) return;
+    
+    try {
+      setSaving(true);
+      await pocketbase.collection('product_pages').update(editPageId, {
+        puck_content: puckData,
+        // Ensure the page is enabled when editing from the designer
+        enabled: true,
+      });
+      toast.success('Product page saved successfully');
+    } catch (error) {
+      console.error('Error saving product page:', error);
+      toast.error('Failed to save product page');
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const { addItem, items } = useCart();
   const [quantity, setQuantity] = useState(1);
@@ -557,6 +617,40 @@ const ProductDetail = () => {
         setProduct(data);
         setOrderConfig(config);
         setProductSettings(productSettings);
+
+        // Load custom product page if exists
+        try {
+          // If in edit mode, load specific page by ID
+          if (isEditMode && editPageId) {
+            const page = await pocketbase.collection('product_pages').getOne<ProductPage>(editPageId);
+            setProductPage(page);
+            // Set Puck data for editing
+            if (page.puck_content) {
+              const puckContent = typeof page.puck_content === 'string' 
+                ? JSON.parse(page.puck_content) 
+                : page.puck_content;
+              setPuckData(puckContent);
+            } else {
+              // Initialize with empty content and helpful message
+              setPuckData({
+                content: [],
+                root: {
+                  title: `Custom Content for ${data.name}`,
+                },
+              });
+            }
+          } else {
+            // Normal view mode - load enabled page
+            const pages = await pocketbase.collection('product_pages').getFullList<ProductPage>({
+              filter: `product_id = "${id}" && enabled = true`,
+            });
+            if (pages.length > 0) {
+              setProductPage(pages[0]);
+            }
+          }
+        } catch (pageError) {
+          console.log('No custom product page found or error loading:', pageError);
+        }
 
         // Don't set images here - let the variant image logic handle it
         // This will be handled by the useEffect that manages variant images
@@ -1064,6 +1158,81 @@ const ProductDetail = () => {
             <ArrowLeft className="mr-2 h-4 w-4" /> Back to shop
           </Link>
         </Button>
+      </div>
+    );
+  }
+
+  // If in edit mode, show Puck editor with product page preview
+  if (isEditMode && product) {
+    console.log('Edit mode active, rendering Puck editor with data:', puckData);
+    
+    return (
+      <div className="h-screen flex flex-col">
+        {/* Header */}
+        <div className="border-b bg-card px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => navigate('/admin/pages')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Pages
+            </Button>
+            <div>
+              <h1 className="text-lg font-semibold">{product.name}</h1>
+              <p className="text-xs text-muted-foreground">Custom Product Page Editor</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => window.open(`/product/${id}`, '_blank')}
+            >
+              <Eye className="h-4 w-4 mr-2" />
+              Preview Live
+            </Button>
+            <Button 
+              size="sm" 
+              onClick={handleSavePuck}
+              disabled={saving}
+            >
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? 'Saving...' : 'Save'}
+            </Button>
+          </div>
+        </div>
+
+        {/* Split view: Puck editor + Product page preview */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* Left: Puck editor */}
+          <div className="w-1/2 border-r overflow-auto">
+            <Puck
+              config={config}
+              data={puckData}
+              onPublish={handleSavePuck}
+              onChange={setPuckData}
+            />
+          </div>
+
+          {/* Right: Product page preview in iframe */}
+          <div className="w-1/2 bg-muted/30 flex flex-col">
+            <div className="p-3 border-b bg-card">
+              <p className="text-sm font-medium">Live Product Page Preview</p>
+              <p className="text-xs text-muted-foreground">
+                Your custom content will appear {getProductPagePosition(productPage) || 'below'} this
+              </p>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <iframe
+                src={`/product/${id}`}
+                className="w-full h-full border-0"
+                title="Product Preview"
+              />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1841,9 +2010,17 @@ const ProductDetail = () => {
           </div>
         </div>
 
+        {/* Custom Puck content - Above */}
+        {productPage && productPage.enabled && getProductPagePosition(productPage) === 'above' && productPage.puck_content && (
+          <div className="mt-3 mb-6">
+            <Render config={config} data={productPage.puck_content} />
+          </div>
+        )}
+
         {/* description / reviews tabs - minimal underline style */}
-        <div className="mt-3 mb-20 md:mb-3 rounded-xl bg-white p-3 shadow-sm md:p-4">
-          <Tabs defaultValue="description" className="w-full">
+        {(!productPage || getProductPagePosition(productPage) !== 'replace') && (
+          <div className="mt-3 mb-20 md:mb-3 rounded-xl bg-white p-3 shadow-sm md:p-4">
+            <Tabs defaultValue="description" className="w-full">
             <TabsList className="inline-flex w-full items-center gap-6 border-b border-border bg-transparent px-1 text-sm">
               <TabsTrigger
                 value="description"
@@ -1901,6 +2078,21 @@ const ProductDetail = () => {
             </TabsContent>
           </Tabs>
         </div>
+        )}
+
+        {/* Custom Puck content - Below */}
+        {productPage && productPage.enabled && getProductPagePosition(productPage) === 'below' && productPage.puck_content && (
+          <div className="mt-6 mb-6">
+            <Render config={config} data={productPage.puck_content} />
+          </div>
+        )}
+
+        {/* Custom Puck content - Replace (full custom page) */}
+        {productPage && productPage.enabled && getProductPagePosition(productPage) === 'replace' && productPage.puck_content && (
+          <div className="mt-3 mb-20 md:mb-3">
+            <Render config={config} data={productPage.puck_content} />
+          </div>
+        )}
 
         {/* related products */}
         {relatedProducts.length > 0 && (
@@ -2021,6 +2213,18 @@ const ProductDetail = () => {
         {/* mobile bottom bar */}
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 py-2.5 shadow-[0_-6px_16px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
           <div className="konipai-container mx-auto max-w-7xl px-4 space-y-2">
+            {/* total price at top */}
+            <div className="flex flex-col items-start gap-0.5 text-xs text-muted-foreground">
+              <div className="text-sm font-semibold text-foreground">
+                ₹{stickyCartTotal.toFixed(2)}
+              </div>
+              {isInCart ? (
+                <span>Subtotal in cart</span>
+              ) : (
+                <span>Total for selected options</span>
+              )}
+            </div>
+
             {/* variant + qty + button row */}
             <div className="flex w-full items-center gap-2">
               <span className="inline-flex min-w-[96px] max-w-[40%] items-center truncate rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
@@ -2058,18 +2262,6 @@ const ProductDetail = () => {
                   <ShoppingCart className="mr-2 h-4 w-4" />
                   {product.inStock ? 'Add to cart' : 'Out of stock'}
                 </Button>
-              )}
-            </div>
-
-            {/* total + secondary actions */}
-            <div className="flex flex-col items-start gap-0.5 text-xs text-muted-foreground">
-              <div className="text-sm font-semibold text-foreground">
-                ₹{stickyCartTotal.toFixed(2)}
-              </div>
-              {isInCart ? (
-                <span>Subtotal in cart</span>
-              ) : (
-                <span>Total for selected options</span>
               )}
             </div>
 

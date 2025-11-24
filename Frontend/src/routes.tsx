@@ -56,6 +56,7 @@ const WebhookTest = lazy(() => import("./pages/WebhookTest"))
 const PuckEditor = lazy(() => import("./pages/PuckEditor"))
 const PuckRenderer = lazy(() => import("./pages/PuckRenderer"))
 const PagesManager = lazy(() => import("./pages/PagesManager"))
+const ProductPageEditor = lazy(() => import("./pages/ProductPageEditor"))
 const PluginsManager = lazy(() => import("./pages/PluginsManager"))
 const ThemeManager = lazy(() => import("./pages/ThemeManager"))
 const Forbidden = lazy(() => import("./pages/Forbidden"))
@@ -202,6 +203,7 @@ export function Routes() {
                       <Route path="/admin" element={<AdminRoute />}>
                         <Route path="pages" element={<PagesManager />} />
                         <Route path="pages/:pageId/edit" element={<PuckEditor />} />
+                        <Route path="product-pages/:pageId/edit" element={<ProductPageEditor />} />
                         <Route path="plugins" element={<PluginsManager />} />
                         <Route path="themes" element={<ThemeManager />} />
                         <Route path="settings" element={<SiteSettingsPage />} />

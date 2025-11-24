@@ -27,6 +27,7 @@ import AutomationFlowBuilderPage from "./pages/admin/AutomationFlowBuilderPage";
 import NavbarSettingsPage from "./pages/admin/NavbarSettingsPage";
 import CheckoutFlowPage from "./pages/admin/CheckoutFlowPage";
 import BrandingPage from "./pages/admin/BrandingPage";
+import ProductPageEditor from "./pages/admin/ProductPageEditor";
 
 // Set PocketBase URL from environment variable
 if (import.meta.env.VITE_POCKETBASE_URL) {
@@ -80,6 +81,7 @@ const App = () => {
               <Route path="/admin/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
               <Route path="/admin/abandoned-carts" element={<ProtectedRoute><AbandonedCartsPage /></ProtectedRoute>} />
               <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
+              <Route path="/admin/product-pages/:pageId/edit" element={<ProtectedRoute><ProductPageEditor /></ProtectedRoute>} />
               <Route path="/admin/coupons" element={<ProtectedRoute><CouponsPage /></ProtectedRoute>} />
               <Route path="/admin/settings" element={<ProtectedRoute><SettingsPage /></ProtectedRoute>} />
               <Route path="/admin/pages" element={<ProtectedRoute><PagesManagerBackend /></ProtectedRoute>} />

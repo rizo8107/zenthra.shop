@@ -3,12 +3,14 @@ import { AdminLayout } from '@/components/layout/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { pb } from '@/lib/pocketbase';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye, Search, Package } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
 
 interface Page {
   id: string;
@@ -21,6 +23,25 @@ interface Page {
   content_json?: any;
 }
 
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  images?: string[];
+  category?: string;
+  inStock?: boolean;
+}
+
+interface ProductPage {
+  id: string;
+  product_id: string;
+  puck_content: any;
+  field: 'above' | 'below' | 'replace';
+  enabled: boolean;
+}
+
+const PRODUCT_PAGES_COLLECTION = 'product_pages';
+
 export default function PagesManagerBackend() {
   const navigate = useNavigate();
   const [pages, setPages] = useState<Page[]>([]);
@@ -29,10 +50,20 @@ export default function PagesManagerBackend() {
   const [newPageTitle, setNewPageTitle] = useState('');
   const [newPageSlug, setNewPageSlug] = useState('');
   const [creating, setCreating] = useState(false);
+  
+  // Product Pages state
+  const [products, setProducts] = useState<Product[]>([]);
+  const [productPages, setProductPages] = useState<ProductPage[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [productsLoading, setProductsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('pages');
 
   useEffect(() => {
     loadPages();
-  }, []);
+    if (activeTab === 'product-pages') {
+      loadProductData();
+    }
+  }, [activeTab]);
 
   const loadPages = async () => {
     try {
@@ -45,6 +76,35 @@ export default function PagesManagerBackend() {
       console.error('Failed to load pages:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadProductData = async () => {
+    try {
+      setProductsLoading(true);
+      
+      // Load all products from products collection
+      const productsResult = await pb.collection('products').getList<Product>(1, 500, {
+        requestKey: null, // Disable auto-cancellation
+      });
+      setProducts(productsResult.items);
+
+      // Load existing product pages
+      try {
+        const pagesData = await pb.collection(PRODUCT_PAGES_COLLECTION).getFullList<ProductPage>({
+          requestKey: null,
+        });
+        setProductPages(pagesData);
+      } catch (pageError) {
+        console.log('No product pages found or error loading:', pageError);
+        setProductPages([]);
+      }
+    } catch (error) {
+      console.error('Error loading product data:', error);
+      toast.error('Failed to load products. Please check your database connection.');
+      setProducts([]);
+    } finally {
+      setProductsLoading(false);
     }
   };
 
@@ -126,6 +186,44 @@ export default function PagesManagerBackend() {
     }
   };
 
+  // Product Pages helper functions
+  const getProductImageUrl = (product: Product) => {
+    if (!product.images || product.images.length === 0) return null;
+    const firstImage = product.images[0];
+    return `${pb.baseUrl}/api/files/products/${product.id}/${firstImage}`;
+  };
+
+  const hasCustomPage = (productId: string) => {
+    return productPages.find(p => p.product_id === productId);
+  };
+
+  const handleEditProduct = async (product: Product) => {
+    const existingPage = hasCustomPage(product.id);
+    
+    if (existingPage) {
+      // Navigate to edit existing page
+      navigate(`/admin/product-pages/${existingPage.id}/edit`);
+    } else {
+      // Create new product page
+      try {
+        const newPage = await pb.collection(PRODUCT_PAGES_COLLECTION).create({
+          product_id: product.id,
+          puck_content: { content: [], root: {} },
+          field: 'below',
+          enabled: true,
+        });
+        navigate(`/admin/product-pages/${newPage.id}/edit`);
+      } catch (error) {
+        console.error('Error creating product page:', error);
+        toast.error('Failed to create product page');
+      }
+    }
+  };
+
+  const filteredProducts = products.filter(product =>
+    product.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   if (loading) {
     return (
       <AdminLayout>
@@ -146,14 +244,25 @@ export default function PagesManagerBackend() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Pages</h1>
             <p className="text-muted-foreground mt-1">
-              Manage your website pages with Puck editor
+              Manage your website pages and product pages
             </p>
           </div>
-          <Button onClick={handleCreateNew} className="flex items-center gap-2">
-            <Plus size={16} />
-            Create New Page
-          </Button>
         </div>
+
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="mb-6">
+            <TabsTrigger value="pages">Website Pages</TabsTrigger>
+            <TabsTrigger value="product-pages">Product Pages</TabsTrigger>
+          </TabsList>
+
+          {/* Website Pages Tab */}
+          <TabsContent value="pages">
+            <div className="flex justify-end mb-4">
+              <Button onClick={handleCreateNew} className="flex items-center gap-2">
+                <Plus size={16} />
+                Create New Page
+              </Button>
+            </div>
 
         {pages.length === 0 ? (
           <Card>
@@ -248,6 +357,99 @@ export default function PagesManagerBackend() {
             })}
           </div>
         )}
+          </TabsContent>
+
+          {/* Product Pages Tab */}
+          <TabsContent value="product-pages">
+            <div className="mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" size={18} />
+                <Input
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+
+            {productsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p>Loading products...</p>
+                </div>
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Package size={48} className="text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No products found</h3>
+                  <p className="text-muted-foreground">
+                    {searchQuery ? 'Try a different search term' : 'Add products to customize their pages'}
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredProducts.map((product) => {
+                  const customPage = hasCustomPage(product.id);
+                  const imageUrl = getProductImageUrl(product);
+
+                  return (
+                    <Card key={product.id} className="hover:shadow-lg transition-shadow">
+                      <CardHeader>
+                        <div className="flex gap-3">
+                          {imageUrl && (
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              className="w-16 h-16 object-cover rounded-md"
+                            />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <CardTitle className="text-lg truncate">
+                              {product.name}
+                            </CardTitle>
+                            <CardDescription className="mt-1">
+                              ₹{product.price}
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-col gap-2">
+                          {customPage && (
+                            <Badge variant="secondary" className="w-fit">
+                              Custom Page
+                            </Badge>
+                          )}
+                          <Button
+                            size="sm"
+                            onClick={() => handleEditProduct(product)}
+                            className="w-full"
+                          >
+                            <Edit size={14} className="mr-1" />
+                            {customPage ? 'Edit Page' : 'Create Page'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => window.open(`/product/${product.id}`, '_blank')}
+                            className="w-full"
+                          >
+                            <Eye size={14} className="mr-1" />
+                            Preview
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </div>
 
       {/* Create Page Dialog */}
