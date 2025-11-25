@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
-import { 
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -45,21 +45,25 @@ const AutomationFlowsPage: React.FC = () => {
   const [newFlowDescription, setNewFlowDescription] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<FlowSummary['status'] | 'all'>('all');
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [apiHealth, setApiHealth] = useState<{ status: 'online' | 'offline' | 'checking', url: string }>({
+    status: 'checking',
+    url: window.location.origin
+  });
 
   const filteredFlows = useMemo(() => {
     let filtered = flows;
-    
+
     if (searchTerm) {
       filtered = filtered.filter((flow) =>
         flow.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         flow.description?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
-    
+
     if (selectedStatus !== 'all') {
       filtered = filtered.filter((flow) => flow.status === selectedStatus);
     }
-    
+
     return filtered;
   }, [flows, searchTerm, selectedStatus]);
 
@@ -70,10 +74,10 @@ const AutomationFlowsPage: React.FC = () => {
       setFlows(response);
     } catch (error) {
       console.error('Failed to load flows', error);
-      toast({ 
-        title: 'Error', 
-        description: 'Unable to load automation flows.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: 'Unable to load automation flows.',
+        variant: 'destructive'
       });
     } finally {
       setLoading(false);
@@ -83,6 +87,45 @@ const AutomationFlowsPage: React.FC = () => {
   useEffect(() => {
     void fetchFlows();
   }, [fetchFlows]);
+
+  // API Health Check
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await fetch('/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+
+        if (response.ok) {
+          setApiHealth({
+            status: 'online',
+            url: window.location.origin
+          });
+        } else {
+          setApiHealth({
+            status: 'offline',
+            url: window.location.origin
+          });
+        }
+      } catch (error) {
+        setApiHealth({
+          status: 'offline',
+          url: window.location.origin
+        });
+      }
+    };
+
+    // Initial check
+    void checkHealth();
+
+    // Check every 30 seconds
+    const interval = setInterval(() => {
+      void checkHealth();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleCreateFlow = async () => {
     if (!newFlowName.trim()) {
@@ -102,24 +145,24 @@ const AutomationFlowsPage: React.FC = () => {
         canvasJson: EMPTY_CANVAS,
       });
 
-      toast({ 
-        title: 'Flow created', 
-        description: 'Redirecting you to the builder.' 
+      toast({
+        title: 'Flow created',
+        description: 'Redirecting you to the builder.'
       });
-      
+
       // Reset form
       setNewFlowName('');
       setNewFlowDescription('');
       setShowCreateDialog(false);
-      
+
       // Navigate to builder
       navigate(`/admin/automation/${flow.id}`);
     } catch (error) {
       console.error('Failed to create flow', error);
-      toast({ 
-        title: 'Error', 
-        description: 'Unable to create flow.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: 'Unable to create flow.',
+        variant: 'destructive'
       });
     } finally {
       setCreating(false);
@@ -192,19 +235,19 @@ const AutomationFlowsPage: React.FC = () => {
         canvasJson: normalizeTemplateCanvas(template.canvas),
       });
 
-      toast({ 
-        title: 'Template applied', 
-        description: `Created "${flow.name}" from template. Redirecting to builder.` 
+      toast({
+        title: 'Template applied',
+        description: `Created "${flow.name}" from template. Redirecting to builder.`
       });
-      
+
       // Navigate to builder
       navigate(`/admin/automation/${flow.id}`);
     } catch (error) {
       console.error('Failed to create flow from template', error);
-      toast({ 
-        title: 'Error', 
-        description: 'Unable to create flow from template.', 
-        variant: 'destructive' 
+      toast({
+        title: 'Error',
+        description: 'Unable to create flow from template.',
+        variant: 'destructive'
       });
     } finally {
       setCreating(false);
@@ -244,6 +287,26 @@ const AutomationFlowsPage: React.FC = () => {
             <p className="text-sm text-muted-foreground max-w-xl">
               Launch multi-step customer journeys by chaining triggers, logic, and actions powered by your integrations.
             </p>
+            {/* API Status Indicator */}
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex items-center gap-1.5 text-xs">
+                <div className={`w-2 h-2 rounded-full ${apiHealth.status === 'online' ? 'bg-green-500 animate-pulse' :
+                    apiHealth.status === 'offline' ? 'bg-red-500' :
+                      'bg-yellow-500 animate-pulse'
+                  }`} />
+                <span className="text-muted-foreground">API:</span>
+                <Badge
+                  variant={apiHealth.status === 'online' ? 'secondary' : 'destructive'}
+                  className="text-[10px] uppercase tracking-wide"
+                >
+                  {apiHealth.status}
+                </Badge>
+              </div>
+              <span className="text-xs text-muted-foreground">•</span>
+              <code className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                {apiHealth.url}
+              </code>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => void fetchFlows()} disabled={loading}>
@@ -266,8 +329,8 @@ const AutomationFlowsPage: React.FC = () => {
             <div>
               <h2 className="text-sm font-semibold uppercase text-muted-foreground mb-3">Quick filters</h2>
               <div className="space-y-2">
-                <Badge 
-                  variant={selectedStatus === 'all' ? 'default' : 'outline'} 
+                <Badge
+                  variant={selectedStatus === 'all' ? 'default' : 'outline'}
                   className="w-full justify-between px-3 py-2 text-sm font-normal cursor-pointer"
                   onClick={() => setSelectedStatus('all')}
                 >
@@ -275,9 +338,9 @@ const AutomationFlowsPage: React.FC = () => {
                   <span className="text-xs text-muted-foreground">{flows.length}</span>
                 </Badge>
                 {(['draft', 'active', 'archived'] as FlowSummary['status'][]).map((status) => (
-                  <Badge 
-                    key={status} 
-                    variant={selectedStatus === status ? 'default' : 'outline'} 
+                  <Badge
+                    key={status}
+                    variant={selectedStatus === status ? 'default' : 'outline'}
                     className="w-full justify-between px-3 py-2 text-sm font-normal cursor-pointer"
                     onClick={() => setSelectedStatus(status)}
                   >
@@ -363,33 +426,33 @@ const AutomationFlowsPage: React.FC = () => {
                           </div>
                         </div>
                         <div className="flex flex-wrap gap-2">
-                          <Button 
-                            size="sm" 
-                            className="flex-1" 
+                          <Button
+                            size="sm"
+                            className="flex-1"
                             onClick={() => navigate(`/admin/automation/${flow.id}`)}
                           >
                             <Edit className="w-4 h-4 mr-1" />
                             Edit
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => handleDuplicateFlow(flow.id, flow.name)}
                           >
                             <Copy className="w-4 h-4 mr-1" />
                             Duplicate
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => handleTestRun(flow.id, flow.name)}
                           >
                             <Play className="w-4 h-4 mr-1" />
                             Test
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
+                          <Button
+                            size="sm"
+                            variant="outline"
                             onClick={() => handleDeleteFlow(flow.id, flow.name)}
                             className="text-destructive hover:text-destructive"
                           >
@@ -414,7 +477,7 @@ const AutomationFlowsPage: React.FC = () => {
                 Enter a name and description for your new automation flow.
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label htmlFor="flow-name">Flow Name</Label>
@@ -426,7 +489,7 @@ const AutomationFlowsPage: React.FC = () => {
                   disabled={creating}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="flow-description">Description (Optional)</Label>
                 <Textarea
@@ -439,7 +502,7 @@ const AutomationFlowsPage: React.FC = () => {
                 />
               </div>
             </div>
-            
+
             <DialogFooter>
               <Button
                 variant="outline"

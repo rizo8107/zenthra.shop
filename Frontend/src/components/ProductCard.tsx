@@ -281,7 +281,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 onClick={handleQuickAdd}
                 size={ctaSize}
                 className={cn(
-                  'w-auto min-w-[7rem] justify-center h-[40px] font-bold text-[16px]',
+                  'w-auto min-w-[5.75rem] md:min-w-[7rem] justify-center h-[34px] md:h-[40px] font-semibold text-[14px] md:text-[16px]',
                   ctaRounded || 'rounded-[24px]',
                   pc.ctaStyle === 'outline'
                     ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
@@ -328,7 +328,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 onClick={handleQuickAdd}
                 size={ctaSize}
                 className={cn(
-                  'w-full justify-center h-[40px] font-bold text-[16px]',
+                  'w-full justify-center h-[34px] md:h-[40px] font-semibold text-[14px] md:text-[16px]',
                   ctaRounded || 'rounded-[24px]',
                   'bg-[#15803D] text-white hover:bg-[#15803D]/90'
                 )}
@@ -384,7 +384,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 onClick={handleQuickAdd}
                 size={ctaSize}
                 className={cn(
-                  'w-auto min-w-[139px] justify-center h-[40px] font-bold text-[16px] px-6',
+                  'w-auto min-w-[7.5rem] md:min-w-[8.75rem] justify-center h-[34px] md:h-[40px] font-semibold text-[14px] md:text-[16px] px-4 md:px-6',
                   ctaRounded || 'rounded-[24px]',
                   pc.ctaStyle === 'outline'
                     ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'

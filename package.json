@@ -6,9 +6,9 @@
   "scripts": {
     "verify": "node verify-setup.js",
     "install:all": "cd \"Backend\" && npm install && cd ../Frontend && npm install",
-    "dev": "concurrently --names \"FRONTEND,RAZORPAY,CMS,API\" -c \"blue,cyan,magenta,green\" \"npm run dev:frontend\" \"npm run dev:razorpay-server\" \"npm run dev:cms\" \"npm run dev:api\"",
+    "dev": "concurrently --names \"FRONTEND,RAZORPAY,CMS\" -c \"blue,cyan,magenta\" \"npm run dev:frontend\" \"npm run dev:razorpay-server\" \"npm run dev:cms\"",
     "dev:all": "npm run dev",
-    "dev:simple": "concurrently --names \"FRONTEND,CMS,API\" -c \"blue,magenta,green\" \"npm run dev:frontend\" \"npm run dev:cms\" \"npm run dev:api\"",
+    "dev:simple": "concurrently --names \"FRONTEND,CMS\" -c \"blue,magenta\" \"npm run dev:frontend\" \"npm run dev:cms\"",
     "dev:frontend": "cd Frontend && npm run dev",
     "dev:cms": "cd \"Backend\" && npm run dev",
     "dev:api": "cd \"Backend\" && npm run start:server",

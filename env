@@ -28,9 +28,8 @@ VITE_POCKETBASE_ADMIN_PASSWORD=1234@Rajathi
 
 # 🔗 Other
 VITE_BACKEND_URL=http://localhost:3003
-VITE_CRM_ORDER_ENDPOINT=https://crm-supabase.7za6uc.easypanel.host/functions/v1/create-order-karigai
-VITE_SITE_LOGO=https://konipai.in/assets/logo.png
-VITE_SITE_TITLE=Konipai
+VITE_CRM_ORDER_ENDPOINT=VITE_CRM_ORDER_ENDPOINT=https://crm-supabase.7za6uc.easypanel.host/functions/v1/create-order-viruthi
+
 # Razorpay Configuration
 VITE_RAZORPAY_KEY_ID=rzp_live_ReluTQKCAnR5id
 VITE_RAZORPAY_KEY_SECRET=FAsdv8cHERuTXUTG5Ih81N0g

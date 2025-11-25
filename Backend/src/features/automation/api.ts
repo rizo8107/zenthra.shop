@@ -139,7 +139,7 @@ export async function deleteFlow(flowId: string): Promise<void> {
 
 export async function duplicateFlow(flowId: string): Promise<FlowSummary> {
   const originalFlow = await getFlow(flowId);
-  
+
   const duplicatedFlow = await createFlow({
     name: `${originalFlow.name} (Copy)`,
     description: originalFlow.description,
@@ -172,6 +172,21 @@ export async function listRunSteps(runId: string): Promise<FlowRunStep[]> {
 }
 
 export async function triggerTestRun(flowId: string, input: Record<string, unknown>): Promise<FlowRun> {
+  // Validate flowId
+  if (!flowId || typeof flowId !== 'string' || flowId.trim().length === 0) {
+    throw new Error('Invalid flowId: must be a non-empty string');
+  }
+
+  // Validate flowId format (basic alphanumeric check)
+  if (!/^[a-zA-Z0-9_-]+$/.test(flowId)) {
+    throw new Error('Invalid flowId format');
+  }
+
+  // Validate input is an object
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    throw new Error('Invalid input: must be a non-null object');
+  }
+
   // Create the initial run record
   const record = await pb.collection(COLLECTIONS.runs).create<RunRecord>({
     flow_id: flowId,
@@ -188,6 +203,16 @@ export async function triggerTestRun(flowId: string, input: Record<string, unkno
       await simulateRunExecution(record.id, flowId, input);
     } catch (error) {
       console.error('Mock execution failed:', error);
+      // Update run record to failed status
+      try {
+        await pb.collection(COLLECTIONS.runs).update(record.id, {
+          status: 'failed',
+          finished_at: new Date().toISOString(),
+          error: error instanceof Error ? error.message : 'Unknown execution error',
+        });
+      } catch (updateError) {
+        console.error('Failed to update run status:', updateError);
+      }
     }
   }, 100);
 
@@ -205,9 +230,9 @@ async function simulateRunExecution(runId: string, flowId: string, input: Record
     // Get flow to simulate node execution
     const flow = await getFlow(flowId);
     const nodes = flow.canvasJson?.nodes || [];
-    
+
     // Find trigger nodes
-    const triggerNodes = nodes.filter(node => 
+    const triggerNodes = nodes.filter(node =>
       node.data?.type?.toString().startsWith('trigger.')
     );
 
@@ -223,7 +248,7 @@ async function simulateRunExecution(runId: string, flowId: string, input: Record
     for (let i = 0; i < Math.min(nodes.length, 5); i++) {
       const node = nodes[i];
       const stepStartTime = new Date().toISOString();
-      
+
       // Create run step
       const stepRecord = await pb.collection(COLLECTIONS.runSteps).create({
         run_id: runId,
@@ -239,7 +264,7 @@ async function simulateRunExecution(runId: string, flowId: string, input: Record
 
       // Random success/failure (90% success rate)
       const success = Math.random() > 0.1;
-      
+
       await pb.collection(COLLECTIONS.runSteps).update(stepRecord.id, {
         status: success ? 'success' : 'failed',
         finished_at: new Date().toISOString(),

@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { ShoppingBag, CheckCircle, Package, Receipt, Loader2, Copy, ShieldCheck } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { trackPurchase, trackPageView, trackDynamicConversion } from '@/lib/analytics';
+import { trackJourneyPurchase } from '@/utils/journeyTracking';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface OrderProduct {
@@ -128,6 +129,13 @@ export default function OrderConfirmation() {
               currency: 'INR',
               items,
               conversion_type: 'Purchase',
+            });
+            trackJourneyPurchase(orderData.id, {
+              total: orderData.total,
+              shipping: orderData.shipping_cost,
+              tax: orderData.tax,
+              coupon_code: orderData.coupon_code,
+              items,
             });
           } catch {}
         }

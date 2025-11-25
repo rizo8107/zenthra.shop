@@ -175,6 +175,60 @@ export const nodeDefinitions: NodeDefinition[] = [
       }
     ]
   },
+  {
+    type: 'trigger.journey',
+    category: 'trigger',
+    label: 'Customer Journey',
+    description: 'Trigger flow from customer journey events (page views, actions, milestones)',
+    icon: '🗺️',
+    color: '#10B981',
+    outputs: [
+      { id: 'out', label: 'Journey Event', type: 'data' },
+      { id: 'customer', label: 'Customer Data', type: 'data' }
+    ],
+    config: [
+      {
+        key: 'eventType',
+        label: 'Event Type',
+        type: 'select',
+        required: true,
+        options: [
+          { value: 'page_view', label: 'Page View' },
+          { value: 'product_view', label: 'Product View' },
+          { value: 'add_to_cart', label: 'Add to Cart' },
+          { value: 'checkout_start', label: 'Checkout Started' },
+          { value: 'purchase', label: 'Purchase Completed' },
+          { value: 'cart_abandon', label: 'Cart Abandoned' },
+          { value: 'milestone', label: 'Custom Milestone' },
+          { value: 'any', label: 'Any Event' }
+        ],
+        defaultValue: 'any',
+        description: 'Type of journey event to listen for'
+      },
+      {
+        key: 'filter',
+        label: 'Event Filter',
+        type: 'text',
+        placeholder: 'event.product_id="123" || event.category="electronics"',
+        description: 'Optional filter expression for journey events'
+      },
+      {
+        key: 'includeCustomerData',
+        label: 'Include Customer Data',
+        type: 'boolean',
+        defaultValue: true,
+        description: 'Fetch and include full customer profile data'
+      },
+      {
+        key: 'debounceMs',
+        label: 'Debounce (ms)',
+        type: 'number',
+        defaultValue: 0,
+        placeholder: '5000',
+        description: 'Delay in milliseconds to wait before triggering (prevents duplicate events)'
+      }
+    ]
+  },
 
   // 2) DATA (PocketBase)
   {

@@ -125,6 +125,7 @@ export function NodeConfigEditor({
           detail: item.description,
         }));
         setWebhookOptions(items);
+        // Only set default if no value is currently selected
         if (!localConfig.subscriptionId && items[0]) {
           const next = { ...localConfig, subscriptionId: items[0].value };
           setLocalConfig(next);
@@ -142,7 +143,7 @@ export function NodeConfigEditor({
     return () => {
       cancelled = true;
     };
-  }, [nodeType, localConfig, nodeId, onConfigChange]);
+  }, [nodeType, nodeId, onConfigChange]); // Removed localConfig from dependencies
 
   if (!nodeDefinition) {
     return (
@@ -183,12 +184,23 @@ export function NodeConfigEditor({
     setTestResult(null);
 
     try {
+      // Validate JSON size (max 10KB)
+      const MAX_JSON_SIZE = 10000;
+      if (testInput.length > MAX_JSON_SIZE) {
+        throw new Error(`Test input too large (max ${MAX_JSON_SIZE} characters)`);
+      }
+
       // Parse test input
       let parsedInput;
       try {
         parsedInput = JSON.parse(testInput);
       } catch (e) {
-        throw new Error('Invalid JSON in test input');
+        throw new Error('Invalid JSON in test input: ' + (e instanceof Error ? e.message : 'Parse error'));
+      }
+
+      // Validate parsed input is an object
+      if (typeof parsedInput !== 'object' || parsedInput === null) {
+        throw new Error('Test input must be a JSON object');
       }
 
       // Simulate node execution based on type
@@ -759,39 +771,87 @@ export function NodeConfigEditor({
     const collectionFields = getFieldsForCollection(getCollection());
     const findType = (f: string) => collectionFields.find(x => x.value === f)?.type || 'text';
     const parts: string[] = [];
+
+    // Sanitize field names to prevent injection
+    const sanitizeFieldName = (field: string): string => {
+      // Only allow alphanumeric, underscore, and dot (for relations)
+      if (!/^[a-zA-Z0-9_.]+$/.test(field)) {
+        throw new Error(`Invalid field name: ${field}`);
+      }
+      return field;
+    };
+
+    // Enhanced string escaping
+    const escapeString = (s: string): string => {
+      return s
+        .replace(/\\/g, '\\\\')  // Escape backslashes first
+        .replace(/"/g, '\\"')     // Escape quotes
+        .replace(/\n/g, '\\n')    // Escape newlines
+        .replace(/\r/g, '\\r')    // Escape carriage returns
+        .replace(/\t/g, '\\t');   // Escape tabs
+    };
+
+    const q = (s: string) => `"${escapeString(s)}"`;
+
+    // Validate number format
+    const validateNumber = (val: string): string => {
+      const num = parseFloat(val);
+      if (isNaN(num)) {
+        throw new Error(`Invalid number: ${val}`);
+      }
+      return num.toString();
+    };
+
+    // Validate date/time format for relative time
+    const validateRelativeTime = (val: string): string => {
+      if (!/^\d+[hdm]$/.test(val)) {
+        throw new Error(`Invalid relative time format: ${val}. Use format like: 1h, 24h, 7d`);
+      }
+      return val;
+    };
+
     conditions.forEach(c => {
       if (!c.field || !c.operator) return;
-      const t = findType(c.field);
-      const v = (c.value ?? '').trim();
-      const v2 = (c.value2 ?? '').trim();
-      const q = (s: string) => `"${s.replace(/"/g, '\\"')}"`;
-      switch (t) {
-        case 'enum':
-        case 'text':
-        case 'relation':
-          if (c.operator === 'eq') parts.push(`${c.field} = ${q(v)}`);
-          else if (c.operator === 'neq') parts.push(`${c.field} != ${q(v)}`);
-          else if (c.operator === 'contains') parts.push(`${c.field} ~ ${q(v)}`);
-          else if (c.operator === 'starts') parts.push(`${c.field} ~ ${q('^' + v)}`);
-          break;
-        case 'number':
-          if (c.operator === 'between') parts.push(`${c.field} >= ${v} && ${c.field} <= ${v2}`);
-          else if (c.operator === 'gt') parts.push(`${c.field} > ${v}`);
-          else if (c.operator === 'gte') parts.push(`${c.field} >= ${v}`);
-          else if (c.operator === 'lt') parts.push(`${c.field} < ${v}`);
-          else if (c.operator === 'lte') parts.push(`${c.field} <= ${v}`);
-          else if (c.operator === 'eq') parts.push(`${c.field} = ${v}`);
-          else if (c.operator === 'neq') parts.push(`${c.field} != ${v}`);
-          break;
-        case 'date':
-          if (c.operator === 'last') {
-            // value examples: 1h, 24h, 7d
-            parts.push(`${c.field} >= @now-"${v}"`);
-          } else if (c.operator === 'between') {
-            parts.push(`${c.field} >= ${q(v)} && ${c.field} <= ${q(v2)}`);
-          } else if (c.operator === 'after') parts.push(`${c.field} >= ${q(v)}`);
-          else if (c.operator === 'before') parts.push(`${c.field} <= ${q(v)}`);
-          break;
+
+      try {
+        const safeField = sanitizeFieldName(c.field);
+        const t = findType(c.field);
+        const v = (c.value ?? '').trim();
+        const v2 = (c.value2 ?? '').trim();
+
+        switch (t) {
+          case 'enum':
+          case 'text':
+          case 'relation':
+            if (c.operator === 'eq') parts.push(`${safeField} = ${q(v)}`);
+            else if (c.operator === 'neq') parts.push(`${safeField} != ${q(v)}`);
+            else if (c.operator === 'contains') parts.push(`${safeField} ~ ${q(v)}`);
+            else if (c.operator === 'starts') parts.push(`${safeField} ~ ${q('^' + v)}`);
+            break;
+          case 'number':
+            const numV = validateNumber(v);
+            const numV2 = v2 ? validateNumber(v2) : '';
+            if (c.operator === 'between') parts.push(`${safeField} >= ${numV} && ${safeField} <= ${numV2}`);
+            else if (c.operator === 'gt') parts.push(`${safeField} > ${numV}`);
+            else if (c.operator === 'gte') parts.push(`${safeField} >= ${numV}`);
+            else if (c.operator === 'lt') parts.push(`${safeField} < ${numV}`);
+            else if (c.operator === 'lte') parts.push(`${safeField} <= ${numV}`);
+            else if (c.operator === 'eq') parts.push(`${safeField} = ${numV}`);
+            else if (c.operator === 'neq') parts.push(`${safeField} != ${numV}`);
+            break;
+          case 'date':
+            if (c.operator === 'last') {
+              const validTime = validateRelativeTime(v);
+              parts.push(`${safeField} >= @now-"${validTime}"`);
+            } else if (c.operator === 'between') {
+              parts.push(`${safeField} >= ${q(v)} && ${safeField} <= ${q(v2)}`);
+            } else if (c.operator === 'after') parts.push(`${safeField} >= ${q(v)}`);
+            else if (c.operator === 'before') parts.push(`${safeField} <= ${q(v)}`);
+            break;
+        }
+      } catch (error) {
+        console.error('Filter compilation error:', error);
+        // Skip invalid conditions instead of breaking the entire filter
       }
     });
     const joiner = logic === 'OR' ? ' || ' : ' && ';
@@ -824,7 +884,7 @@ export function NodeConfigEditor({
 
   // --- Simple helpers for Sort/Limit/Expand/Fields ---
   const addSortRow = (field?: string) => {
-    const next = [...sortRows, { field: field || '', dir: 'desc' }];
+    const next: SortRow[] = [...sortRows, { field: field || '', dir: 'desc' as const }];
     setSortRows(next);
     handleConfigChange('sort', stringifySort(next));
   };
@@ -1184,8 +1244,8 @@ export function NodeConfigEditor({
             {/* Test Results */}
             {testResult && (
               <div className={`p-3 rounded-md border ${testResult.success
-                  ? 'bg-green-50 border-green-200'
-                  : 'bg-red-50 border-red-200'
+                ? 'bg-green-50 border-green-200'
+                : 'bg-red-50 border-red-200'
                 }`}>
                 <div className="flex items-center gap-2 mb-2">
                   {testResult.success ? (

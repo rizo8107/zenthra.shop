@@ -167,7 +167,7 @@ export const flowTemplates: FlowTemplate[] = [
             type: 'trigger.webhook',
             config: {
               path: '/hooks/razorpay-payment',
-              secret: 'your-razorpay-webhook-secret',
+              secret: '', // Configure in node settings
               forwardPayload: true
             }
           }
@@ -180,8 +180,8 @@ export const flowTemplates: FlowTemplate[] = [
             label: 'Verify Payment',
             type: 'razorpay.verify',
             config: {
-              keyId: 'rzp_test_your_key_id',
-              secret: 'your_razorpay_secret',
+              keyId: '', // Configure with your Razorpay key
+              secret: '', // Configure with your Razorpay secret
               signatureHeader: 'x-razorpay-signature'
             }
           }

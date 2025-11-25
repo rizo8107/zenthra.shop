@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { deduplicateCartItems, isValidCartItem } from '@/utils/cartUtils';
 import { trackEcommerceEvent } from '@/utils/analytics';
 import { sendWebhookEvent } from '@/lib/webhooks';
+import { trackJourneyAddToCart } from '@/utils/journeyTracking';
 
 // Define a PocketBaseError interface to avoid using 'any'
 interface PocketBaseError {
@@ -489,6 +490,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         quantity: quantity,
         item_variant: variantStr || undefined
       }]);
+
+      trackJourneyAddToCart(product.id, quantity, {
+        name: product.name,
+        price: typeof unitPrice === 'number' ? unitPrice : (Number(product.price) || 0),
+        source: 'cart_context',
+      });
 
       setIsCartOpen(true);
 

@@ -46,6 +46,7 @@ import {
   trackAddToCart,
   trackButtonClick,
 } from '@/lib/analytics';
+import { trackJourneyProductView } from '@/utils/journeyTracking';
 import { Breadcrumbs, BreadcrumbItem } from '@/components/Breadcrumbs';
 import { DEFAULT_CONFIG, getOrderConfig } from '@/lib/order-config-service';
 import { getProductSettings } from '@/lib/config/product-settings';
@@ -750,6 +751,12 @@ const ProductDetail = () => {
             item_category: data.category || 'Tote Bag',
             item_brand: 'Konipai',
             affiliation: 'Konipai Web Store',
+          });
+          trackJourneyProductView(data.id, {
+            name: data.name,
+            price: Number(data.price) || 0,
+            category: data.category,
+            source: 'product_detail',
           });
           sessionStorage.setItem(viewedProductKey, 'true');
         }

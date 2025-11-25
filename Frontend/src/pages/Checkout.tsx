@@ -61,6 +61,7 @@ import {
   calculateShippingCostFromConfig,
   getDeliveryTimeFromConfig,
 } from "@/lib/shipping-config-service";
+import { trackJourneyCheckoutStart } from "@/utils/journeyTracking";
 
 interface CouponData {
   id: string;
@@ -450,6 +451,28 @@ export default function CheckoutPage() {
 
     loadUserAddress();
   }, [user, navigate, items, cartLoading, toast]);
+
+  useEffect(() => {
+    if (cartLoading) return;
+    if (!items || items.length === 0) return;
+
+    const key = 'journey_checkout_started';
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, '1');
+
+    const cartData = {
+      items: items.map((i) => ({
+        product_id: i.productId,
+        name: i.product.name,
+        quantity: i.quantity,
+        price: typeof i.unitPrice === 'number' ? i.unitPrice : (Number(i.product.price) || 0),
+      })),
+      subtotal,
+      total,
+    };
+
+    trackJourneyCheckoutStart(cartData);
+  }, [cartLoading, items, subtotal, total]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -1190,7 +1213,7 @@ export default function CheckoutPage() {
     return () => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [items, isSubmitting, isPaymentProcessing, formData]);
+  }, [items, isSubmitting, isPaymentProcessing]);
 
   // Re-validate form when user data changes
   useEffect(() => {
@@ -1213,7 +1236,7 @@ export default function CheckoutPage() {
         });
       }
     }
-  }, [user, formData, showLoginOptions, toast]);
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1897,11 +1920,11 @@ export default function CheckoutPage() {
           order_id: razorpayOrderResponse.id,
           amount: expectedAmountInPaise,
           currency: "INR",
-          name: "Karigai",
+          name: import.meta.env.VITE_SITE_TITLE || "Viruthi Gold",
           description: `Order #${order.id} - Total ₹${orderAmount}`,
           image:
             import.meta.env.VITE_SITE_LOGO ||
-            "https://karigai.in/assets/logo.png",
+            "/assets/logo.png",
           handler: (response) => handlePaymentSuccess(response, order.id),
           prefill: {
             name: formData.name,

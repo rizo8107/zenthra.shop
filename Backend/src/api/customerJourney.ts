@@ -1,6 +1,7 @@
 import express from 'express';
 import crypto from 'crypto';
 import { pb, ensureAdminAuth } from '../lib/pocketbase.js';
+import { emitEvent } from '../server/webhookDispatcher.js';
 
 const router = express.Router();
 
@@ -282,6 +283,29 @@ router.post('/webhook/customer-journey', async (req, res) => {
       stage: event.stage,
       timestamp: event.timestamp
     });
+
+    // Emit automation/webhook event for subscribed flows (non-blocking)
+    try {
+      await emitEvent({
+        id: event.id,
+        type: `customer_journey.${event.event}`,
+        timestamp: event.timestamp,
+        source: 'customer_journey',
+        data: {
+          customer,
+          event,
+        },
+        metadata: {
+          stage: event.stage,
+          customer_id: event.customer_id,
+          customer_email: event.customer_email,
+          customer_name: event.customer_name,
+        },
+      });
+    } catch (emitError) {
+      console.warn('Webhook emit warning for customer journey event (non-fatal):',
+        emitError instanceof Error ? emitError.message : emitError);
+    }
     
     // Return success response
     res.status(200).json({

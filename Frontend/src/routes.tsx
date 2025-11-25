@@ -7,6 +7,7 @@ import Footer from "./components/Footer"
 import { lazy, Suspense, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { trackPageView } from "@/lib/analytics"
+import { trackJourneyPageView } from "@/utils/journeyTracking"
 import useUtmParams from "@/hooks/useUtmParams"
 import { getUtmParamsForAnalytics } from "@/lib/utm"
 import { MetaPixelRouterTracker } from "./components/MetaPixelRouterTracker"
@@ -108,6 +109,7 @@ function ScrollToTop() {
     
     // Track page view in Google Analytics with UTM data
     trackPageView(pathname, document.title);
+    trackJourneyPageView(pathname);
   }, [pathname]);
   
   return null;

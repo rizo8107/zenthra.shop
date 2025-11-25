@@ -28,13 +28,13 @@ const startServer = (port: number): Promise<number> => {
         reject(err);
       }
     });
-    
+
     server.once('listening', () => {
-      console.log(`Email server running on port ${port}`);
+      console.log(`[API] Server running on port ${port}`);
       savePortInfo(port);
       resolve(port);
     });
-    
+
     server.listen(port);
   });
 };
@@ -53,7 +53,7 @@ const tryPorts = async () => {
         console.log(`Port ${port} also failed, trying next...`);
       }
     }
-    
+
     if (!started) {
       console.error('Failed to start server on any port');
       process.exit(1);

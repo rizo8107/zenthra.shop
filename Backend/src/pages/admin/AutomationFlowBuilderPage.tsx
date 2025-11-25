@@ -56,6 +56,10 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
   const [draggedNodeType, setDraggedNodeType] = useState<string | null>(null);
   const [runningNodes, setRunningNodes] = useState<Set<string>>(new Set());
   const [errorLogs, setErrorLogs] = useState<Array<{ id: string, message: string, timestamp: Date, nodeId?: string }>>([]);
+  const [apiHealth, setApiHealth] = useState<{ status: 'online' | 'offline' | 'checking', url: string }>({
+    status: 'checking',
+    url: window.location.origin
+  });
 
   const loadFlow = useCallback(async () => {
     try {
@@ -115,6 +119,45 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
       }
     })();
   }, [selectedRunId]);
+
+  // API Health Check
+  useEffect(() => {
+    const checkHealth = async () => {
+      try {
+        const response = await fetch('/health', {
+          method: 'GET',
+          signal: AbortSignal.timeout(5000) // 5 second timeout
+        });
+
+        if (response.ok) {
+          setApiHealth({
+            status: 'online',
+            url: window.location.origin
+          });
+        } else {
+          setApiHealth({
+            status: 'offline',
+            url: window.location.origin
+          });
+        }
+      } catch (error) {
+        setApiHealth({
+          status: 'offline',
+          url: window.location.origin
+        });
+      }
+    };
+
+    // Initial check
+    void checkHealth();
+
+    // Check every 30 seconds
+    const interval = setInterval(() => {
+      void checkHealth();
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const runStatusVariant: Record<RunStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
     queued: 'outline',
@@ -401,6 +444,24 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
     }
   };
 
+  const handleToggleStatus = async () => {
+    if (!flow) return;
+    try {
+      const newStatus = flow.status === 'active' ? 'draft' : 'active';
+      await updateFlow(flow.id, { status: newStatus });
+      toast({
+        title: newStatus === 'active' ? 'Flow activated' : 'Flow deactivated',
+        description: newStatus === 'active'
+          ? 'Your automation is now live and will trigger on events.'
+          : 'Your automation has been paused.'
+      });
+      void loadFlow();
+    } catch (error) {
+      console.error('Failed to toggle status', error);
+      toast({ title: 'Error', description: 'Unable to update flow status.', variant: 'destructive' });
+    }
+  };
+
   if (loading || !flow) {
     return (
       <AdminLayout>
@@ -430,6 +491,26 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
                   <p className="text-sm text-muted-foreground">
                     Design your automation canvas with triggers, logic, and actions.
                   </p>
+                  {/* API Status Indicator */}
+                  <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <div className={`w-2 h-2 rounded-full ${apiHealth.status === 'online' ? 'bg-green-500 animate-pulse' :
+                        apiHealth.status === 'offline' ? 'bg-red-500' :
+                          'bg-yellow-500 animate-pulse'
+                        }`} />
+                      <span className="text-muted-foreground">API:</span>
+                      <Badge
+                        variant={apiHealth.status === 'online' ? 'secondary' : 'destructive'}
+                        className="text-[10px] uppercase tracking-wide"
+                      >
+                        {apiHealth.status}
+                      </Badge>
+                    </div>
+                    <span className="text-xs text-muted-foreground">•</span>
+                    <code className="text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded">
+                      {apiHealth.url}
+                    </code>
+                  </div>
                 </div>
               </div>
             </div>
@@ -437,6 +518,23 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
               <Button variant="outline" size="sm" onClick={handleTestRun}>
                 <Zap className="w-4 h-4 mr-2" />
                 Test run
+              </Button>
+              <Button
+                variant={flow.status === 'active' ? 'outline' : 'default'}
+                size="sm"
+                onClick={handleToggleStatus}
+              >
+                {flow.status === 'active' ? (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-green-500 mr-2" />
+                    Active
+                  </>
+                ) : (
+                  <>
+                    <span className="w-2 h-2 rounded-full bg-gray-400 mr-2" />
+                    Activate
+                  </>
+                )}
               </Button>
               <Button variant="outline" size="sm" disabled>
                 <Share2 className="w-4 h-4 mr-2" />

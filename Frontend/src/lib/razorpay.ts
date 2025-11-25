@@ -93,7 +93,7 @@ export const createRazorpayOrder = async (
     console.log('Using Supabase function for order creation');
     
     // Use your working Supabase function
-    const proxyUrl = import.meta.env.VITE_CRM_ORDER_ENDPOINT || 'https://crm-supabase.7za6uc.easypanel.host/functions/v1/create-order';
+    const proxyUrl = import.meta.env.VITE_CRM_ORDER_ENDPOINT ;
     
     try {
       const response = await fetch(proxyUrl, {
@@ -174,7 +174,7 @@ export const openRazorpayCheckout = (options: RazorpayOptions): void => {
       key: options.key || getRazorpayKeyId(),
       amount: options.amount, // Amount in paise
       currency: options.currency || 'INR',
-      name: options.name || 'Karigai',
+      name: options.name || import.meta.env.VITE_SITE_TITLE || 'Viruthi Gold',
       description: options.description || 'Payment',
       image: options.image,
       order_id: options.order_id,
@@ -336,13 +336,13 @@ const sendOrderToWebhook = async (orderId: string, user: Record<string, unknown>
         totalFormatted: formatCurrency(order.total || 0)
       },
       emailTemplateData: {
-        siteName: "Karigai",
-        siteUrl: import.meta.env.VITE_SITE_URL || "https://karigai.com",
-        logoUrl: `${import.meta.env.VITE_SITE_URL || "https://karigai.com"}/assets/logo.png`,
+        siteName: import.meta.env.VITE_SITE_TITLE || "Viruthi Gold",
+        siteUrl: import.meta.env.VITE_SITE_URL || "https://viruthigold.in",
+        logoUrl: `${import.meta.env.VITE_SITE_URL || "https://viruthigold.in"}/assets/logo.png`,
         year: new Date().getFullYear(),
-        viewOrderUrl: `${import.meta.env.VITE_SITE_URL || "https://karigai.com"}/orders/${order.id}`,
-        supportEmail: "contact@karigai.com",
-        supportPhone: "+91 9363020252"
+        viewOrderUrl: `${import.meta.env.VITE_SITE_URL || "https://viruthigold.in"}/orders/${order.id}`,
+        supportEmail: import.meta.env.VITE_SUPPORT_EMAIL || "support@viruthigold.in",
+        supportPhone: import.meta.env.VITE_SUPPORT_PHONE || "+91 9363020252"
       }
     };
 
