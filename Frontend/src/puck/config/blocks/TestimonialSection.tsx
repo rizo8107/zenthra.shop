@@ -179,7 +179,7 @@ export const TestimonialSection: ComponentConfig<TestimonialSectionProps> = {
 
     return (
       <section
-        className="py-16"
+        className="py-12 md:py-14"
         style={{
           ...(backgroundColor ? { backgroundColor } : {}),
           ...(typeof paddingTop === "number" ? { paddingTop } : {}),

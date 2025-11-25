@@ -400,6 +400,15 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
 
   const videoUrl = product.videoUrl || '';
 
+  // For long descriptions, prefer bullet points for better readability
+  const descriptionBullets = hasDescription
+    ? product.description
+        .split(/\r?\n|[•\-]\s+/)
+        .map((item) => item.replace(/^[-•\s]+/, '').trim())
+        .filter((item) => item.length > 0)
+    : [];
+  const useBulletDescription = descriptionBullets.length > 1;
+
   return (
     <div className="space-y-6 md:space-y-8 pb-8">
       <div className={`grid gap-6 ${hasVideo ? 'md:grid-cols-2' : ''}`}>
@@ -504,9 +513,17 @@ export const ProductDetails = ({ product }: ProductDetailsProps) => {
               <Separator className="bg-blue-100" />
             </CardHeader>
             <CardContent>
-              <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
-                {product.description}
-              </p>
+              {useBulletDescription ? (
+                <ul className="space-y-2 text-sm leading-relaxed text-muted-foreground md:text-base list-disc pl-4">
+                  {descriptionBullets.map((item, index) => (
+                    <li key={`${item}-${index}`}>{item}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
+                  {product.description}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}

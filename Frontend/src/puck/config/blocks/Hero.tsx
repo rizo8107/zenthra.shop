@@ -328,6 +328,7 @@ export const Hero: ComponentConfig<HeroProps> = {
     textAlign: "center",
     textColor: "white",
     height: "lg",
+    heightMobile: "md",
     overlay: true,
     overlayOpacity: 50,
     mode: "single",
@@ -340,7 +341,6 @@ export const Hero: ComponentConfig<HeroProps> = {
     slides: [],
     buttons: [
       { text: "Shop Now", href: "/shop", variant: "default", target: "_self" },
-      { text: "Learn More", href: "/about", variant: "outline", target: "_self" },
     ],
   },
   render: (props) => {

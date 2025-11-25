@@ -85,7 +85,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
   const shadowCls = pc.shadow === 'none' ? '' : pc.shadow === 'soft' ? 'shadow-sm' : pc.shadow === 'medium' ? 'shadow-md' : 'shadow-lg';
   const ctaRounded = pc.ctaStyle === 'pill' ? 'rounded-[24px]' : '';
   // Force a 1:1 aspect ratio for the product image area to match the desired card design
-  const aspectCls = 'aspect-square';
+  const aspectCls = 'aspect-[4/5] md:aspect-[4/5]';
   // Make title and description text smaller on mobile while preserving existing sizes on larger screens
   const titleSizeCls =
     pc.titleSize === 'lg'
@@ -219,9 +219,9 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
         )}
       </div>
 
-      {/* Text + price + CTA */}
-      <div className="flex flex-col gap-[20px] px-0 pb-0">
-        <div className="flex flex-col items-start gap-1">
+      {/* Text + rating + price + CTA */}
+      <div className="flex flex-col gap-[14px] px-0 pb-0">
+        <div className="flex flex-col items-start gap-1.5">
           {product.brand && (
             <p className="text-xs font-medium text-primary mb-1">{String(product.brand)}</p>
           )}
@@ -234,6 +234,16 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
           >
             {product.name}
           </h3>
+          {typeof (product as any).rating === 'number' && (product as any).rating > 0 && (
+            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[#5E5E5E]">
+              <span className="flex items-center text-[#F59E0B]">
+                {'★★★★★'.slice(0, Math.round((product as any).rating))}
+              </span>
+              {typeof (product as any).review_count === 'number' && (
+                <span className="text-[10px] text-muted-foreground">({(product as any).review_count})</span>
+              )}
+            </div>
+          )}
           {pc.showDescription && product.description && (
             <p
               className={cn('text-black line-clamp-2 mt-1', descSizeCls)}
@@ -281,20 +291,20 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 {pc.ctaLabel}
               </Button>
             ) : (
-              <div className="flex items-center justify-center gap-0 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] relative">
+              <div className="flex items-center justify-between gap-1.5 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] px-1.5 bg-white">
                 <button
                   onClick={handleDecrement}
-                  className="absolute left-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#6D8877] flex items-center justify-center text-white text-xl leading-none"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6D8877] text-white text-sm"
                   aria-label="Decrease quantity"
                 >
                   –
                 </button>
-                <span className="text-[16px] font-bold text-black">
+                <span className="text-[16px] font-bold text-black text-center min-w-[24px]">
                   {currentQty}
                 </span>
                 <button
                   onClick={handleIncrement}
-                  className="absolute right-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#15803D] flex items-center justify-center text-white text-xl leading-none"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#15803D] text-white text-sm"
                   aria-label="Increase quantity"
                 >
                   +
@@ -320,26 +330,26 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 className={cn(
                   'w-full justify-center h-[40px] font-bold text-[16px]',
                   ctaRounded || 'rounded-[24px]',
-                   'bg-[#15803D] text-white hover:bg-[#15803D]/90'
+                  'bg-[#15803D] text-white hover:bg-[#15803D]/90'
                 )}
               >
                 {pc.ctaLabel}
               </Button>
             ) : (
-              <div className="flex items-center justify-center gap-0 w-full h-[40px] border-2 border-[#829F8D] rounded-[24px] relative">
+              <div className="flex items-center justify-between gap-1.5 w-full h-[40px] border-2 border-[#829F8D] rounded-[24px] px-1.5 bg-white">
                 <button
                   onClick={handleDecrement}
-                  className="absolute left-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#6D8877] flex items-center justify-center text-white text-xl leading-none"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6D8877] text-white text-sm"
                   aria-label="Decrease quantity"
                 >
                   –
                 </button>
-                <span className="text-[16px] font-bold text-black">
+                <span className="text-[16px] font-bold text-black text-center min-w-[24px]">
                   {currentQty}
                 </span>
                 <button
                   onClick={handleIncrement}
-                  className="absolute right-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#15803D] flex items-center justify-center text-white text-xl leading-none"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#15803D] text-white text-sm"
                   aria-label="Increase quantity"
                 >
                   +
@@ -384,20 +394,20 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 {pc.ctaLabel}
               </Button>
             ) : (
-              <div className="flex items-center justify-center gap-0 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] relative">
+              <div className="flex items-center justify-between gap-1.5 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] px-1.5 bg-white">
                 <button
                   onClick={handleDecrement}
-                  className="absolute left-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#6D8877] flex items-center justify-center text-white text-xl leading-none"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6D8877] text-white text-sm"
                   aria-label="Decrease quantity"
                 >
                   –
                 </button>
-                <span className="text-[16px] font-bold text-black">
+                <span className="text-[16px] font-bold text-black text-center min-w-[24px]">
                   {currentQty}
                 </span>
                 <button
                   onClick={handleIncrement}
-                  className="absolute right-[3.5px] top-[3.5px] w-[33px] h-[33px] rounded-[17px] bg-[#15803D] flex items-center justify-center text-white text-xl leading-none"
+                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#15803D] text-white text-sm"
                   aria-label="Increase quantity"
                 >
                   +

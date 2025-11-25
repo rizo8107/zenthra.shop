@@ -116,25 +116,30 @@ export const FeatureSection: ComponentConfig<FeatureSectionProps> = {
     },
   },
   defaultProps: {
-    title: "Why Choose Us",
-    subtitle: "We provide the best service with these amazing features",
-    columns: 3,
+    title: "Why Customers Trust Us",
+    subtitle: "Thoughtfully crafted, clean formulations designed for everyday rituals.",
+    columns: 4,
     centered: true,
     features: [
       {
-        title: "Fast Delivery",
-        description: "Get your orders delivered quickly and safely",
-        icon: "🚚",
+        title: "100% Natural",
+        description: "Only clean, skin-safe ingredients in every formula.",
+        icon: "🌿",
       },
       {
-        title: "Quality Products",
-        description: "We ensure all products meet our high quality standards",
-        icon: "⭐",
+        title: "Handcrafted",
+        description: "Small-batch production for consistent quality.",
+        icon: "🖐️",
       },
       {
-        title: "24/7 Support",
-        description: "Our customer support team is always here to help",
-        icon: "💬",
+        title: "No Sulphates or Parabens",
+        description: "Free from harsh foaming agents and parabens.",
+        icon: "🚫",
+      },
+      {
+        title: "Made in India",
+        description: "Lovingly made locally with Indian botanicals.",
+        icon: "🇮🇳",
       },
     ],
   },
@@ -147,7 +152,7 @@ export const FeatureSection: ComponentConfig<FeatureSectionProps> = {
 
     return (
       <section
-        className="py-16"
+        className="py-12 md:py-14"
         style={{
           ...(backgroundColor ? { backgroundColor } : {}),
           ...(typeof paddingTop === "number" ? { paddingTop } : {}),

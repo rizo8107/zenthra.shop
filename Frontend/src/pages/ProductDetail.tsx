@@ -37,6 +37,7 @@ import { cn } from '@/lib/utils';
 import { Card } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { ProductImage } from '@/components/ProductImage';
 import { getPocketBaseImageUrl } from '@/utils/imageOptimizer';
 import { useAuth } from '@/contexts/AuthContext';
@@ -118,6 +119,7 @@ const ProductDetail = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
   const [displayImages, setDisplayImages] = useState<string[]>([]);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [imagesPreloaded, setImagesPreloaded] = useState(false);
@@ -1340,17 +1342,23 @@ const ProductDetail = () => {
             >
               {selectedImage ? (
                 <>
-                  <ProductImage
-                    key={selectedImage || 'main-image'}
-                    url={selectedImage}
-                    alt={product.name}
-                    className="aspect-square w-full object-cover"
-                    priority={true}
-                    width={700}
-                    height={700}
-                    size="large"
-                    aspectRatio="square"
-                  />
+                  <button
+                    type="button"
+                    className="block w-full"
+                    onClick={() => setIsImageZoomOpen(true)}
+                  >
+                    <ProductImage
+                      key={selectedImage || 'main-image'}
+                      url={selectedImage}
+                      alt={product.name}
+                      className="aspect-square w-full object-cover cursor-zoom-in"
+                      priority={true}
+                      width={700}
+                      height={700}
+                      size="large"
+                      aspectRatio="square"
+                    />
+                  </button>
 
                   {/* mobile back */}
                   <button
@@ -1454,6 +1462,21 @@ const ProductDetail = () => {
             )}
           </div>
 
+          {/* Zoom dialog for main product image */}
+          {selectedImage && (
+            <Dialog open={isImageZoomOpen} onOpenChange={setIsImageZoomOpen}>
+              <DialogContent className="max-w-3xl w-full border-none bg-black/95 p-0">
+                <div className="relative flex items-center justify-center bg-black">
+                  <img
+                    src={getPocketBaseImageUrl(selectedImage, Collections.PRODUCTS, 'large', 'webp')}
+                    alt={product.name}
+                    className="max-h-[80vh] w-full object-contain"
+                  />
+                </div>
+              </DialogContent>
+            </Dialog>
+          )}
+
           {/* INFO COLUMN */}
           <div className="space-y-6">
             {/* title + rating + tags */}
@@ -1478,7 +1501,7 @@ const ProductDetail = () => {
 
               {/* Desktop title + rating */}
               <div className="hidden md:block space-y-2">
-                <h1 className="text-2xl font-semibold tracking-tight text-foreground md:text-3xl">
+                <h1 className="text-2xl md:text-[32px] font-bold tracking-tight text-foreground">
                   {product.name}
                   {selectedSizeLabel && (
                     <span className="ml-2 align-middle text-sm font-medium text-muted-foreground">
@@ -1519,7 +1542,7 @@ const ProductDetail = () => {
               {/* Mobile compact header: title + price + discount + rating/reviews */}
               <div className="md:hidden space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-xl font-semibold tracking-tight text-foreground">
+                  <h1 className="text-xl font-bold tracking-tight text-foreground">
                     {product.name}
                   </h1>
                   {selectedSizeLabel && (
@@ -1639,12 +1662,12 @@ const ProductDetail = () => {
                 </div>
               )}
 
-              {/* size */}
+              {/* variants (size-based) */}
               {sizeOptions.length > 0 && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium text-foreground">
-                      Size
+                      Variant
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {selectedSizeLabel || 'Choose'}
@@ -1668,14 +1691,16 @@ const ProductDetail = () => {
                           className={cn(
                             'rounded-xl border px-3.5 py-2.5 text-xs font-medium transition-all bg-background/80 hover:bg-background shadow-sm/0',
                             selectedSize?.value === sz.value
-                              ? 'border-primary border-dashed bg-primary/5 text-primary shadow-sm ring-1 ring-primary/10'
+                              ? 'border-primary border-dashed bg-background text-foreground shadow-sm ring-1 ring-primary/10'
                               : 'border-border text-foreground/80 hover:border-primary/40 hover:bg-accent/5',
                             sz.inStock === false &&
                               'cursor-not-allowed opacity-40 line-through',
                           )}
                         >
                           <div className="flex flex-col items-start gap-0.5 text-left">
-                            <span>{formatSizeOptionLabel(sz)}</span>
+                            <span className="text-[14px] font-semibold text-white bg-primary px-4 py-[1px] rounded-[8px] padding-[4px]">
+                              {formatSizeOptionLabel(sz)}
+                            </span>
                             <span className="text-[11px] font-semibold text-foreground">
                               ₹{finalPrice.toFixed(2)}
                             </span>
@@ -2087,6 +2112,19 @@ const ProductDetail = () => {
                   </Button>
                 </div>
               </div>
+
+              {/* Trust badges under desktop add to cart */}
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                  100% Natural
+                </Badge>
+                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-700">
+                  Handcrafted
+                </Badge>
+                <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-700">
+                  Made in India
+                </Badge>
+              </div>
             </Card>
           </div>
         </div>
@@ -2276,7 +2314,7 @@ const ProductDetail = () => {
             )}`}
             target="_blank"
             rel="noreferrer"
-            className="fixed bottom-28 right-4 z-50 md:bottom-8 md:right-8"
+            className="fixed bottom-40 right-4 z-50 md:bottom-15 md:right-8"
             aria-label="Order via WhatsApp"
           >
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600">
@@ -2294,49 +2332,54 @@ const ProductDetail = () => {
         {/* mobile bottom bar */}
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 py-2.5 shadow-[0_-6px_16px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
           <div className="konipai-container mx-auto max-w-7xl px-4 space-y-2">
-            {/* total price at top */}
-            <div className="flex flex-col items-start gap-0.5 text-xs text-muted-foreground">
-              <div className="text-sm font-semibold text-foreground">
-                ₹{stickyCartTotal.toFixed(2)}
+            {/* total price + qty + trust text at top */}
+            <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+              <div className="flex flex-col items-start gap-0.5">
+                <div className="text-sm font-semibold text-foreground">
+                  ₹{stickyCartTotal.toFixed(2)}
+                </div>
+                {isInCart ? (
+                  <span>Subtotal in cart</span>
+                ) : (
+                  <span>Total for selected options</span>
+                )}
+                <span className="mt-0.5 text-[10px] text-muted-foreground/80">
+                  100% Natural • Handcrafted • Made in India
+                </span>
               </div>
-              {isInCart ? (
-                <span>Subtotal in cart</span>
-              ) : (
-                <span>Total for selected options</span>
-              )}
-            </div>
-
-            {/* variant + qty + button row */}
-            <div className="flex w-full items-center gap-2">
-              <span className="inline-flex min-w-[96px] max-w-[40%] items-center truncate rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                {selectionLabel || 'Choose option'}
-              </span>
-              <div className="ml-auto flex items-center overflow-hidden rounded-full border bg-white text-[13px]">
+              <div className="flex items-center justify-between gap-2.5 overflow-hidden rounded-full border bg-white text-[13px] w-40">
                 <button
                   type="button"
                   onClick={decreaseQuantity}
                   disabled={quantity <= 1}
-                  className="grid h-7 w-7 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                  className="grid h-10 w-10 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted disabled:opacity-40"
                   aria-label="Decrease quantity"
                 >
                   <Minus className="h-3 w-3" />
                 </button>
-                <span className="min-w-[24px] px-0.5 border-x border-border/60 bg-white text-center font-semibold">
+                <span className="inline-block min-w-[24px] px-0.5 border-x border-border/60 bg-white text-center font-semibold">
                   {quantity}
                 </span>
                 <button
                   type="button"
                   onClick={increaseQuantity}
-                  className="grid h-7 w-7 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
+                  className="grid h-10 w-10 place-items-center bg-primary/5 text-muted-foreground transition-colors hover:bg-muted"
                   aria-label="Increase quantity"
                 >
                   <Plus className="h-3 w-3" />
                 </button>
               </div>
+            </div>
+
+            {/* variant + button row */}
+            <div className="flex w-full items-center gap-2">
+              <span className="inline-flex min-w-[96px] max-w-[40%] items-center truncate rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                {selectionLabel || 'Choose option'}
+              </span>
 
               {!isInCart && (
                 <Button
-                  className="flex-1 max-w-[160px]"
+                  className="ml-auto flex-1 max-w-[160px]"
                   onClick={handleAddToCart}
                   disabled={!product.inStock}
                 >

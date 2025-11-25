@@ -300,7 +300,7 @@ const ProductGridContent = ({
 
   const SectionShell: React.FC<{ children: React.ReactNode }> = ({ children }) => (
     <section
-      className="py-10 md:py-12"
+      className="py-8 md:py-10"
       style={{
         ...(backgroundColor ? { backgroundColor } : {}),
         ...(typeof paddingTop === "number" ? { paddingTop } : {}),
@@ -774,14 +774,14 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
     },
   },
   defaultProps: {
-    title: "Featured Products",
-    description: "Explore our most-loved picks, tailored just for you.",
+    title: "Best Sellers",
+    description: "Our most-loved products customers keep coming back for.",
     limit: 8,
     mode: "grid",
     columnsDesktop: 4,
     columnsTablet: 2,
     columnsMobile: 2,
-    showFeatured: false,
+    showFeatured: true,
     carouselRows: 1,
     showArrows: true,
     showDots: true,
