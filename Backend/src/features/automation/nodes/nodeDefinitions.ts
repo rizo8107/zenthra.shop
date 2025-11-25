@@ -2,7 +2,7 @@ export interface NodeDefinition {
   type: string;
   category: 'trigger' | 'data' | 'logic' | 'messaging' | 'payments' | 'utilities';
   label: string;
-  description: string;
+  description?: string;
   icon: string;
   color: string;
   inputs?: NodePort[];
@@ -35,7 +35,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'trigger.manual',
     category: 'trigger',
     label: 'Manual Trigger',
-    description: 'Start flow manually for testing or on-demand execution',
     icon: '▶️',
     color: '#10B981',
     outputs: [
@@ -97,7 +96,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'trigger.webhook',
     category: 'trigger',
     label: 'Webhook Trigger',
-    description: 'Trigger flow from external webhook calls',
     icon: '🔗',
     color: '#10B981',
     outputs: [
@@ -139,7 +137,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'trigger.pbChange',
     category: 'trigger',
     label: 'PocketBase Change',
-    description: 'Trigger when a PocketBase record is created or updated',
     icon: '🗄️',
     color: '#10B981',
     outputs: [
@@ -179,7 +176,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'trigger.journey',
     category: 'trigger',
     label: 'Customer Journey',
-    description: 'Trigger flow from customer journey events (page views, actions, milestones)',
     icon: '🗺️',
     color: '#10B981',
     outputs: [
@@ -189,7 +185,7 @@ export const nodeDefinitions: NodeDefinition[] = [
     config: [
       {
         key: 'eventType',
-        label: 'Event Type',
+        label: 'Event type',
         type: 'select',
         required: true,
         options: [
@@ -203,21 +199,21 @@ export const nodeDefinitions: NodeDefinition[] = [
           { value: 'any', label: 'Any Event' }
         ],
         defaultValue: 'any',
-        description: 'Type of journey event to listen for'
+        description: 'Choose when this automation should start.'
       },
       {
         key: 'filter',
-        label: 'Event Filter',
+        label: 'Advanced filter (optional)',
         type: 'text',
-        placeholder: 'event.product_id="123" || event.category="electronics"',
-        description: 'Optional filter expression for journey events'
+        placeholder: 'Leave empty unless your developer asks you to change this.',
+        description: 'Optional. Used for advanced rules. You can ignore this for normal setups.'
       },
       {
         key: 'includeCustomerData',
-        label: 'Include Customer Data',
+        label: 'Include customer details',
         type: 'boolean',
         defaultValue: true,
-        description: 'Fetch and include full customer profile data'
+        description: 'Also load full customer profile when this runs.'
       },
       {
         key: 'debounceMs',
@@ -225,7 +221,7 @@ export const nodeDefinitions: NodeDefinition[] = [
         type: 'number',
         defaultValue: 0,
         placeholder: '5000',
-        description: 'Delay in milliseconds to wait before triggering (prevents duplicate events)'
+        description: 'Optional delay before this runs. Usually you can keep this as 0.'
       }
     ]
   },
@@ -235,7 +231,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'pb.find',
     category: 'data',
     label: 'Find Records',
-    description: 'Find multiple records from PocketBase collection',
     icon: '🔍',
     color: '#3B82F6',
     inputs: [
@@ -318,7 +313,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'pb.getOne',
     category: 'data',
     label: 'Get Record',
-    description: 'Get a single record by ID or filter',
     icon: '📄',
     color: '#3B82F6',
     inputs: [
@@ -382,7 +376,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'pb.create',
     category: 'data',
     label: 'Create Record',
-    description: 'Create a new record in PocketBase',
     icon: '➕',
     color: '#3B82F6',
     inputs: [
@@ -425,7 +418,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'pb.update',
     category: 'data',
     label: 'Update Record',
-    description: 'Update an existing record in PocketBase',
     icon: '✏️',
     color: '#3B82F6',
     inputs: [
@@ -475,7 +467,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'logic.if',
     category: 'logic',
     label: 'If Condition',
-    description: 'Branch flow based on a condition',
     icon: '🔀',
     color: '#F59E0B',
     inputs: [
@@ -500,7 +491,6 @@ export const nodeDefinitions: NodeDefinition[] = [
     type: 'iterate.each',
     category: 'logic',
     label: 'For Each',
-    description: 'Iterate over each item in an array',
     icon: '🔄',
     color: '#F59E0B',
     inputs: [

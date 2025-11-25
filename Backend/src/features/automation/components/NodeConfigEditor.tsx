@@ -56,7 +56,28 @@ export function NodeConfigEditor({
   useEffect(() => {
     setSortRows(parseSort(String(config.sort || '')));
   }, [config.sort]);
-  const [testInput, setTestInput] = useState<string>('{"test": true}');
+  const defaultTestInput =
+    nodeType === 'whatsapp.send'
+      ? JSON.stringify(
+          {
+            customer_name: 'John Doe',
+            customer_email: 'john@example.com',
+            phone: '919876543210',
+            event: 'add_to_cart',
+            stage: 'consideration',
+            metadata: {
+              title: 'Viruthvi Gold',
+              url: 'https://yourstore.com/checkout',
+              event_type: 'page_view',
+              total: 15000,
+              order_id: 'ORD123',
+            },
+          },
+          null,
+          2
+        )
+      : '{"test": true}';
+  const [testInput, setTestInput] = useState<string>(defaultTestInput);
   const [testResult, setTestResult] = useState<{
     success: boolean;
     output?: unknown;
@@ -105,6 +126,32 @@ export function NodeConfigEditor({
     if (Array.isArray(config.conditions)) setQbConditions(config.conditions as Array<{ field: string; operator: string; value?: string; value2?: string }>);
     if (config.logic === 'OR') setQbLogic('OR');
   }, [config]);
+
+  // Auto-fill Evolution Instance ID for WhatsApp node from plugin config
+  useEffect(() => {
+    if (nodeType !== 'whatsapp.send') return;
+    if (localConfig.connectionId !== 'evolution_api') return;
+    if (localConfig.sender) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cfg = await fetchPluginConfig('evolution_api');
+        const defaultSender = String((cfg as Record<string, unknown>).defaultSender ?? (cfg as Record<string, unknown>)['defaultSender'] ?? '').trim();
+        if (!cancelled && defaultSender) {
+          const next = { ...localConfig, sender: defaultSender };
+          setLocalConfig(next);
+          onConfigChange(nodeId, next);
+        }
+      } catch (error) {
+        console.warn('Failed to load Evolution instance ID from plugin config:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nodeType, localConfig.connectionId, localConfig.sender, nodeId, onConfigChange]);
 
   useEffect(() => {
     if (nodeType !== 'trigger.webhook') return;
@@ -681,6 +728,68 @@ export function NodeConfigEditor({
     utilities: 'bg-gray-100 text-gray-800 border-gray-200',
   };
 
+  const whatsappTemplateGroups: Array<{
+    title: string;
+    items: { token: string; label: string }[];
+  }> = [
+    {
+      title: 'Customer',
+      items: [
+        { token: 'input.customer_name', label: 'Name' },
+        { token: 'input.customer_email', label: 'Email' },
+        { token: 'input.customer_id', label: 'ID' },
+      ],
+    },
+    {
+      title: 'Event',
+      items: [
+        { token: 'input.event', label: 'Type' },
+        { token: 'input.stage', label: 'Stage' },
+        { token: 'input.metadata.title', label: 'Page' },
+        { token: 'input.metadata.url', label: 'URL' },
+        { token: 'input.metadata.event_type', label: 'Event key' },
+      ],
+    },
+    {
+      title: 'Order',
+      items: [
+        { token: 'input.metadata.order_id', label: 'Order ID' },
+        { token: 'input.metadata.total', label: 'Total' },
+      ],
+    },
+  ];
+
+  const whatsappPhonePathOptions = [
+    { path: 'input.phone', label: 'From customer' },
+    { path: 'input.metadata.phone', label: 'From event' },
+  ];
+
+  const insertWhatsAppTemplateVar = (token: string) => {
+    const current = String(localConfig.template ?? '');
+    const insertion = `{{${token}}}`;
+    const next = current
+      ? `${current}${current.endsWith(' ') ? '' : ' '}${insertion}`
+      : insertion;
+    handleConfigChange('template', next);
+  };
+
+  const setWhatsAppPhonePath = (path: string) => {
+    handleConfigChange('toPath', path);
+  };
+
+  const getVisibleConfigFields = (): NodeConfigField[] => {
+    if (nodeType === 'whatsapp.send') {
+      const msgType = String(localConfig.messageType ?? 'text');
+      return nodeDefinition.config.filter((field) => {
+        if (['mediaType', 'mediaRecordId', 'mediaFileName', 'mediaCaption'].includes(field.key)) {
+          return msgType === 'media';
+        }
+        return true;
+      });
+    }
+    return nodeDefinition.config;
+  };
+
   // Helpers for Find Records (pb.find)
   const getCollection = (): string => String((localConfig.collection ?? '') || '');
   const setCollection = (value: string) => {
@@ -1157,9 +1266,6 @@ export function NodeConfigEditor({
               </Badge>
             </div>
           </div>
-          <p className="text-sm text-muted-foreground">
-            {nodeDefinition.description}
-          </p>
           <div className="text-xs text-muted-foreground">
             <strong>ID:</strong> {nodeId}
           </div>
@@ -1171,7 +1277,7 @@ export function NodeConfigEditor({
         ) : nodeDefinition.config.length > 0 ? (
           <div className="space-y-4">
             <h5 className="font-medium text-sm">Configuration</h5>
-            {nodeDefinition.config.map((field) => (
+            {getVisibleConfigFields().map((field) => (
               <div key={field.key} className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor={`${nodeId}-${field.key}`} className="text-sm font-medium">
@@ -1180,31 +1286,56 @@ export function NodeConfigEditor({
                   </Label>
                   {field.type === 'boolean' && renderConfigField(field)}
                 </div>
-
                 {field.type !== 'boolean' && (
-                  <div>
+                  <div className="space-y-1">
                     {renderConfigField(field)}
-                  </div>
-                )}
-                {field.key === 'subscriptionId' && webhookLoading && (
-                  <div className="flex items-center text-xs text-muted-foreground gap-2">
-                    <Loader2 className="h-3 w-3 animate-spin" /> Loading saved webhooks...
-                  </div>
-                )}
 
-                {field.description && (
-                  <p className="text-xs text-muted-foreground">
-                    {field.description}
-                  </p>
+                    {nodeType === 'whatsapp.send' && field.key === 'template' && (
+                      <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-3">
+                        {whatsappTemplateGroups.map((group) => (
+                          <Select
+                            key={group.title}
+                            onValueChange={(token) => {
+                              insertWhatsAppTemplateVar(token);
+                            }}
+                          >
+                            <SelectTrigger className="h-8 text-[11px]">
+                              <SelectValue placeholder={group.title} />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {group.items.map((variable) => (
+                                <SelectItem key={variable.token} value={variable.token}>
+                                  {variable.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ))}
+                      </div>
+                    )}
+
+                    {nodeType === 'whatsapp.send' && field.key === 'toPath' && (
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {whatsappPhonePathOptions.map((option) => (
+                          <Button
+                            key={option.path}
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-6 px-2 text-[11px]"
+                            onClick={() => setWhatsAppPhonePath(option.path)}
+                          >
+                            {option.label}
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             ))}
           </div>
-        ) : (
-          <div className="text-sm text-muted-foreground">
-            This node has no configuration options.
-          </div>
-        )}
+        ) : null}
 
         {/* Node Testing */}
         <div className="space-y-3 pt-4 border-t">

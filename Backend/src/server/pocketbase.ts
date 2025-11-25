@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 import axios from 'axios';
 
-dotenv.config();
+// Load env from the project root (../.env) so the API and CMS share the same credentials
+dotenv.config({ path: '../.env' });
 
 // Initialize PocketBase with the URL from environment variables
 const POCKETBASE_URL = process.env.VITE_POCKETBASE_URL || 'https://backend-karigaibackend.7za6uc.easypanel.host';

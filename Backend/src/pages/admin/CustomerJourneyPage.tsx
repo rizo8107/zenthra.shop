@@ -19,7 +19,8 @@ import {
   Activity,
   Zap,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -73,6 +74,7 @@ const CustomerJourneyPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [webhookUrl, setWebhookUrl] = useState('');
   const [testPayload, setTestPayload] = useState('');
+  const [selectedEvent, setSelectedEvent] = useState<CustomerEvent | null>(null);
 
   // Journey stages configuration
   const journeyStages: JourneyStage[] = [
@@ -220,6 +222,32 @@ const CustomerJourneyPage: React.FC = () => {
       .filter(event => event.stage === stageId)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
       .slice(0, 10);
+  };
+
+  const handleEventClick = (event: CustomerEvent) => {
+    setSelectedEvent(event);
+  };
+
+  const handleCopySelectedEventAsTestJson = async () => {
+    if (!selectedEvent) return;
+
+    const testPayload = {
+      customer_name: selectedEvent.customer_name || '',
+      customer_email: selectedEvent.customer_email || '',
+      customer_id: selectedEvent.customer_id,
+      event: selectedEvent.event,
+      stage: selectedEvent.stage,
+      timestamp: selectedEvent.timestamp,
+      metadata: selectedEvent.metadata || {},
+    };
+
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(testPayload, null, 2));
+      toast.success('Copied event as test JSON');
+    } catch (error) {
+      console.error('Failed to copy test JSON', error);
+      toast.error('Unable to copy test JSON');
+    }
   };
 
   const selectedStageData = journeyStages.find(stage => stage.id === selectedStage);
@@ -404,7 +432,11 @@ const CustomerJourneyPage: React.FC = () => {
                     </div>
                   ) : (
                     stageEvents.map((event) => (
-                      <div key={event.id} className="flex items-start space-x-3 p-3 border rounded-lg">
+                      <div
+                        key={event.id}
+                        className="flex items-start space-x-3 p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleEventClick(event)}
+                      >
                         <div className={cn(
                           "w-2 h-2 rounded-full mt-2",
                           event.event === 'stage_completed' ? 'bg-green-500' : 
@@ -561,7 +593,11 @@ const CustomerJourneyPage: React.FC = () => {
             <ScrollArea className="h-[300px]">
               <div className="space-y-2">
                 {events.slice(0, 20).map((event) => (
-                  <div key={event.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div
+                    key={event.id}
+                    className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => handleEventClick(event)}
+                  >
                     <div className="flex items-center space-x-3">
                       <div className={cn(
                         "w-3 h-3 rounded-full",
@@ -593,6 +629,77 @@ const CustomerJourneyPage: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {selectedEvent && (
+        <div className="fixed inset-y-0 right-0 z-40 w-full max-w-md border-l bg-background shadow-lg flex flex-col">
+          <div className="flex items-center justify-between px-4 py-3 border-b">
+            <div>
+              <p className="text-xs uppercase text-muted-foreground">Event details</p>
+              <h2 className="text-lg font-semibold">
+                {selectedEvent.event.replace('_', ' ')} in {selectedEvent.stage}
+              </h2>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void handleCopySelectedEventAsTestJson();
+                }}
+              >
+                Copy test JSON
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => setSelectedEvent(null)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          <ScrollArea className="flex-1">
+            <div className="space-y-4 p-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Run summary</CardTitle>
+                  <CardDescription>
+                    {new Date(selectedEvent.timestamp).toLocaleString()}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-muted-foreground">Customer</p>
+                    <p className="font-medium">
+                      {selectedEvent.customer_name || selectedEvent.customer_id}
+                    </p>
+                    {selectedEvent.customer_email && (
+                      <p className="text-xs text-muted-foreground">{selectedEvent.customer_email}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-muted-foreground">Stage</p>
+                    <Badge variant="outline">{selectedEvent.stage}</Badge>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm">Metadata</CardTitle>
+                  <CardDescription>Payload attached to this event</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {selectedEvent.metadata && Object.keys(selectedEvent.metadata).length > 0 ? (
+                    <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
+                      {JSON.stringify(selectedEvent.metadata, null, 2)}
+                    </pre>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No metadata for this event.</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
+        </div>
+      )}
     </AdminLayout>
   );
 };

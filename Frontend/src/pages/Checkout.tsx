@@ -1611,13 +1611,49 @@ export default function CheckoutPage() {
         .create(orderData)) as unknown as OrderData;
       console.log("Order created successfully with ID:", order.id);
 
+      let webhookItems: any[] = [];
+      try {
+        const rawProducts = (order as any).products ?? (orderData as any).products;
+        if (typeof rawProducts === "string") {
+          webhookItems = JSON.parse(rawProducts);
+        } else if (Array.isArray(rawProducts)) {
+          webhookItems = rawProducts;
+        }
+      } catch (e) {
+        console.warn("Failed to parse order products for webhook payload", e);
+      }
+
       await sendWebhookEvent({
         type: 'order.created',
         data: {
           order_id: order.id,
+          subtotal: (order as any).subtotal ?? orderData.subtotal,
+          shipping_cost: (order as any).shipping_cost ?? orderData.shipping_cost,
+          discount_amount:
+            (order as any).discount_amount ?? orderData.discount_amount,
           total: order.total,
+          status: (order as any).status ?? orderData.status,
+          payment_status:
+            (order as any).payment_status ?? orderData.payment_status,
+          coupon_code: (order as any).coupon_code ?? orderData.coupon_code,
+          created: (order as any).created ?? orderData.created,
+          customer: {
+            id: user?.id ?? null,
+            name: formData.name,
+            email: formData.email,
+            phone: validatedPhone,
+            is_guest: isGuestCheckout,
+          },
+          address: {
+            street: formData.address,
+            city: formData.city,
+            state: formData.state,
+            postalCode: formData.zipCode,
+            country: "India",
+          },
+          items: webhookItems,
         },
-        metadata: { page: 'checkout' }
+        metadata: { page: 'checkout' },
       });
 
       // Track form completion
