@@ -32,7 +32,8 @@ const ProductsPage = () => {
     totalPages,
     createProduct,
     updateProduct,
-    refetch 
+    refetch,
+    duplicateProduct,
   } = useProducts({
     page,
     perPage,
@@ -64,6 +65,15 @@ const ProductsPage = () => {
   const handleViewModeChange = (value: string) => {
     if (value) {
       setViewMode(value as ViewMode);
+    }
+  };
+
+  const handleDuplicateProduct = async (product: Product) => {
+    if (!duplicateProduct) return;
+    try {
+      await duplicateProduct.mutateAsync(product);
+    } catch {
+      // toast handled in hook
     }
   };
 
@@ -124,6 +134,7 @@ const ProductsPage = () => {
             products={products}
             onView={handleViewProduct}
             onEdit={handleEditProduct}
+            onDuplicate={handleDuplicateProduct}
             isLoading={isLoading}
           />
         )}

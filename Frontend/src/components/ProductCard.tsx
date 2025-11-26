@@ -81,7 +81,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
     };
   }, [themeData, overrides]);
 
-  const cardRadius = pc.corner === 'pill' ? 'rounded-[24px]' : pc.corner === 'square' ? 'rounded-md' : 'rounded-[24px]';
+  const cardRadius = pc.corner === 'pill' ? 'rounded-[18px]' : pc.corner === 'square' ? 'rounded-md' : 'rounded-[18px]';
   const shadowCls = pc.shadow === 'none' ? '' : pc.shadow === 'soft' ? 'shadow-sm' : pc.shadow === 'medium' ? 'shadow-md' : 'shadow-lg';
   const ctaRounded = pc.ctaStyle === 'pill' ? 'rounded-[24px]' : '';
   // Force a 1:1 aspect ratio for the product image area to match the desired card design
@@ -276,46 +276,10 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
               )}
             </div>
 
-            {currentQty <= 0 ? (
-              <Button
-                onClick={handleQuickAdd}
-                size={ctaSize}
-                className={cn(
-                  'w-auto min-w-[5.75rem] md:min-w-[7rem] justify-center h-[34px] md:h-[40px] font-semibold text-[14px] md:text-[16px]',
-                  ctaRounded || 'rounded-[24px]',
-                  pc.ctaStyle === 'outline'
-                    ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                    : 'bg-[#15803D] text-white hover:bg-[#15803D]/90'
-                )}
-              >
-                {pc.ctaLabel}
-              </Button>
-            ) : (
-              <div className="flex items-center justify-between gap-1.5 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] px-1.5 bg-white">
-                <button
-                  onClick={handleDecrement}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6D8877] text-white text-sm"
-                  aria-label="Decrease quantity"
-                >
-                  –
-                </button>
-                <span className="text-[16px] font-bold text-black text-center min-w-[24px]">
-                  {currentQty}
-                </span>
-                <button
-                  onClick={handleIncrement}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#15803D] text-white text-sm"
-                  aria-label="Increase quantity"
-                >
-                  +
-                </button>
-              </div>
-            )}
           </div>
         ) : pc.layout === 'simple' ? (
-           // Map simple to split-like stacked if needed, but let's keep simple stacked
           <div className="mt-auto flex flex-col gap-2" style={ctaVars}>
-             <div className="inline-flex flex-col items-start">
+            <div className="inline-flex flex-col items-start">
               <span
                 className="text-[22px] font-semibold text-black leading-[27px]"
                 style={priceStyle}
@@ -323,39 +287,17 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
               </span>
             </div>
-            {currentQty <= 0 ? (
-              <Button
-                onClick={handleQuickAdd}
-                size={ctaSize}
-                className={cn(
-                  'w-full justify-center h-[34px] md:h-[40px] font-semibold text-[14px] md:text-[16px]',
-                  ctaRounded || 'rounded-[24px]',
-                  'bg-[#15803D] text-white hover:bg-[#15803D]/90'
-                )}
-              >
-                {pc.ctaLabel}
-              </Button>
-            ) : (
-              <div className="flex items-center justify-between gap-1.5 w-full h-[40px] border-2 border-[#829F8D] rounded-[24px] px-1.5 bg-white">
-                <button
-                  onClick={handleDecrement}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6D8877] text-white text-sm"
-                  aria-label="Decrease quantity"
-                >
-                  –
-                </button>
-                <span className="text-[16px] font-bold text-black text-center min-w-[24px]">
-                  {currentQty}
-                </span>
-                <button
-                  onClick={handleIncrement}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#15803D] text-white text-sm"
-                  aria-label="Increase quantity"
-                >
-                  +
-                </button>
-              </div>
-            )}
+            <Button
+              onClick={handleQuickAdd}
+              size={ctaSize}
+              className={cn(
+                'w-full justify-center h-[40px] font-semibold text-[15px]',
+                'rounded-[20px]',
+                'bg-[#111111] text-white hover:bg-black'
+              )}
+            >
+              {pc.ctaLabel}
+            </Button>
           </div>
         ) : (
           // Split layout (matches Frame 2)
@@ -379,41 +321,19 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
                 </span>
               )}
             </div>
-            {currentQty <= 0 ? (
-              <Button
-                onClick={handleQuickAdd}
-                size={ctaSize}
-                className={cn(
-                  'w-auto min-w-[7.5rem] md:min-w-[8.75rem] justify-center h-[34px] md:h-[40px] font-semibold text-[14px] md:text-[16px] px-4 md:px-6',
-                  ctaRounded || 'rounded-[24px]',
-                  pc.ctaStyle === 'outline'
-                    ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                    : 'bg-[#15803D] text-white hover:bg-[#15803D]/90'
-                )}
-              >
-                {pc.ctaLabel}
-              </Button>
-            ) : (
-              <div className="flex items-center justify-between gap-1.5 w-[139px] h-[40px] border-2 border-[#829F8D] rounded-[24px] px-1.5 bg-white">
-                <button
-                  onClick={handleDecrement}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#6D8877] text-white text-sm"
-                  aria-label="Decrease quantity"
-                >
-                  –
-                </button>
-                <span className="text-[16px] font-bold text-black text-center min-w-[24px]">
-                  {currentQty}
-                </span>
-                <button
-                  onClick={handleIncrement}
-                  className="flex h-7 w-7 items-center justify-center rounded-full bg-[#15803D] text-white text-sm"
-                  aria-label="Increase quantity"
-                >
-                  +
-                </button>
-              </div>
-            )}
+            <Button
+              onClick={handleQuickAdd}
+              size={ctaSize}
+              className={cn(
+                'w-auto min-w-[8.75rem] justify-center h-[40px] font-semibold text-[15px] px-6',
+                'rounded-[20px]',
+                pc.ctaStyle === 'outline'
+                  ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
+                  : 'bg-[#111111] text-white hover:bg-black'
+              )}
+            >
+              {pc.ctaLabel}
+            </Button>
           </div>
         )}
       </div>

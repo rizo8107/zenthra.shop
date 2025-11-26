@@ -276,5 +276,44 @@ export function useProducts(params: ProductsQueryParams = {}) {
     createProduct,
     updateProduct,
     deleteProduct,
+    duplicateProduct: useMutation({
+      mutationFn: async (source: Product) => {
+        try {
+          await ensureAdminAuth();
+
+          // Strip out PocketBase system fields and file fields that cannot be reused directly
+          const {
+            id,
+            created,
+            updated,
+            collectionId,
+            collectionName,
+            expand,
+            image,
+            images,
+            ...rest
+          } = source as any;
+
+          const payload: Record<string, unknown> = {
+            ...rest,
+            name: `${source.name || 'Untitled'} (Copy)`,
+          };
+
+          const record = await pb.collection('products').create(payload);
+          return record as Product;
+        } catch (error) {
+          console.error('Error duplicating product:', error);
+          const pbError = error as PocketBaseError;
+          throw new Error(pbError.message || 'Failed to duplicate product');
+        }
+      },
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['products'] });
+        toast.success('Product duplicated successfully');
+      },
+      onError: (error: Error) => {
+        toast.error(`Failed to duplicate product: ${error.message}`);
+      },
+    }),
   };
 }

@@ -10,9 +10,10 @@ interface ProductCardGridProps {
   onView: (product: Product) => void;
   onEdit: (product: Product) => void;
   isLoading?: boolean;
+  onDuplicate?: (product: Product) => void;
 }
 
-export function ProductCardGrid({ products, onView, onEdit, isLoading = false }: ProductCardGridProps) {
+export function ProductCardGrid({ products, onView, onEdit, onDuplicate, isLoading = false }: ProductCardGridProps) {
   // Add error handling for products array
   const validProducts = React.useMemo(() => {
     if (!Array.isArray(products)) {
@@ -79,6 +80,7 @@ export function ProductCardGrid({ products, onView, onEdit, isLoading = false }:
           product={product} 
           onView={onView} 
           onEdit={onEdit} 
+          onDuplicate={onDuplicate}
         />
       ))}
     </div>

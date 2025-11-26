@@ -10,9 +10,10 @@ interface ProductCardProps {
   product: Product;
   onView: (product: Product) => void;
   onEdit: (product: Product) => void;
+  onDuplicate?: (product: Product) => void;
 }
 
-export function ProductCard({ product, onView, onEdit }: ProductCardProps) {
+export function ProductCard({ product, onView, onEdit, onDuplicate }: ProductCardProps) {
   // Defensive check at the component level
   if (!product) {
     console.error('ProductCard received null or undefined product');
@@ -80,6 +81,18 @@ export function ProductCard({ product, onView, onEdit }: ProductCardProps) {
             <Badge variant="default" className="text-xs bg-green-500 hover:bg-green-600">
               New
             </Badge>
+          )}
+          {onDuplicate && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onDuplicate(product);
+              }}
+              className="text-[10px] px-2 py-1 rounded bg-background/90 text-foreground border border-border hover:bg-muted transition-colors"
+            >
+              Duplicate
+            </button>
           )}
         </div>
       </div>

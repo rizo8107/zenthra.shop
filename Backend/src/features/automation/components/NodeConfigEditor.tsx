@@ -1375,16 +1375,16 @@ export function NodeConfigEditor({
             {/* Test Results */}
             {testResult && (
               <div className={`p-3 rounded-md border ${testResult.success
-                ? 'bg-green-50 border-green-200'
+                ? 'bg-black-50 border-purple-200'
                 : 'bg-red-50 border-red-200'
                 }`}>
                 <div className="flex items-center gap-2 mb-2">
                   {testResult.success ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <CheckCircle2 className="w-4 h-4 text-purple-600" />
                   ) : (
                     <AlertCircle className="w-4 h-4 text-red-600" />
                   )}
-                  <span className={`text-sm font-medium ${testResult.success ? 'text-green-800' : 'text-red-800'
+                  <span className={`text-sm font-medium ${testResult.success ? 'text-purple-800' : 'text-red-800'
                     }`}>
                     {testResult.success ? 'Test Successful' : 'Test Failed'}
                   </span>
@@ -1395,8 +1395,8 @@ export function NodeConfigEditor({
 
                 {testResult.success && testResult.output && (
                   <div>
-                    <p className="text-xs font-medium text-green-700 mb-1">Output:</p>
-                    <pre className="text-xs bg-white p-2 rounded border overflow-auto max-h-32">
+                    <p className="text-xs font-medium text-purple-700 mb-1">Output:</p>
+                    <pre className="text-xs bg-black p-2 rounded border overflow-auto max-h-32">
                       {JSON.stringify(testResult.output, null, 2)}
                     </pre>
                   </div>
