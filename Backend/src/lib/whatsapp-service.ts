@@ -100,21 +100,22 @@ async function sendTemplatedNotification(
           // Fall through to send text message instead
         }
       }
-    } else {
-      // Use fallback message
-      message = fallbackMessage;
+
+      // Send text message (only if no media or media failed)
+      await sendWhatsAppMessage({
+        phone: phone,
+        message: message,
+        orderId: orderId,
+        templateName: templateName,
+      });
+      
+      console.log(`✅ WhatsApp ${templateName} sent to ${phone}`);
+      return { success: true };
     }
-    
-    // Send text message (only if no media or media failed)
-    await sendWhatsAppMessage({
-      phone: phone,
-      message: message,
-      orderId: orderId,
-      templateName: templateName,
-    });
-    
-    console.log(`✅ WhatsApp ${templateName} sent to ${phone}`);
-    return { success: true };
+
+    // If no template is configured, skip sending instead of using fallback
+    console.log(`⚠️ No active WhatsApp template found for ${templateName}, skipping send`);
+    return { success: false, error: 'TEMPLATE_MISSING' };
   } catch (error) {
     console.error(`Failed to send ${templateName}:`, error);
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
@@ -144,18 +145,8 @@ export async function notifyOrderConfirmation(order: OrderData): Promise<void> {
 /**
  * Send payment success notification
  */
-export async function notifyPaymentSuccess(order: OrderData): Promise<void> {
-  if (!order.customer_phone) return;
-  
-  const variables = {
-    customerName: order.customer_name,
-    orderId: order.id.slice(0, 8),
-    amount: String(order.total),
-  };
-  
-  const fallback = `✅ *Payment Successful* ✅\n\nHi ${order.customer_name},\n\nYour payment of ₹${order.total} for order #${order.id.slice(0, 8)} has been received.\n\nThank you for your purchase!`;
-  
-  await sendTemplatedNotification('PAYMENT_SUCCESS', order.customer_phone, variables, order.id, fallback);
+export async function notifyPaymentSuccess(_order: OrderData): Promise<void> {
+  return;
 }
 
 /**
