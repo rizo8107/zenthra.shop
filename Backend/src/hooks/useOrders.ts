@@ -75,12 +75,20 @@ export function useOrders() {
       // Send WhatsApp order confirmation if customer phone is available
       try {
         const order = data as unknown as Order;
-        if (order && order.customer_phone) {
-          notifyOrderConfirmation({
+        if (order.customer_phone) {
+          const expandedItems = Array.isArray(order.expand?.items) ? order.expand.items : [];
+          const firstProductName = expandedItems[0]?.name || '';
+          const productList = expandedItems.map((item) => item.name).join(', ');
+          const itemsCount = expandedItems.length;
+
+          void notifyOrderConfirmation({
             id: order.id,
             customer_name: order.customer_name,
             customer_phone: order.customer_phone,
             total: order.total,
+            first_product_name: firstProductName,
+            product_list: productList,
+            items_count: itemsCount,
           }).catch(err => console.error('Failed to send WhatsApp confirmation:', err));
         }
       } catch (whatsappError) {
@@ -110,6 +118,11 @@ export function useOrders() {
         // Handle WhatsApp notifications based on status changes
         if (newStatus && newStatus !== currentStatus && record.customer_phone) {
           const orderRecord = record as unknown as Order;
+          const expandedItems = Array.isArray(orderRecord.expand?.items) ? orderRecord.expand.items : [];
+          const firstProductName = expandedItems[0]?.name || '';
+          const productList = expandedItems.map((item) => item.name).join(', ');
+          const itemsCount = expandedItems.length;
+
           const orderData = {
             id: orderRecord.id,
             customer_name: orderRecord.customer_name,
@@ -118,6 +131,9 @@ export function useOrders() {
             tracking_link: orderRecord.tracking_link,
             shipping_carrier: orderRecord.shipping_carrier,
             refund_amount: data.refund_amount || orderRecord.refund_amount,
+            first_product_name: firstProductName,
+            product_list: productList,
+            items_count: itemsCount,
           };
           
           // Different notifications based on new status
@@ -167,11 +183,19 @@ export function useOrders() {
         // Handle payment status changes
         if (data.payment_status && data.payment_status !== paymentStatus && record.customer_phone) {
           const orderRecord = record as unknown as Order;
+          const expandedItems = Array.isArray(orderRecord.expand?.items) ? orderRecord.expand.items : [];
+          const firstProductName = expandedItems[0]?.name || '';
+          const productList = expandedItems.map((item) => item.name).join(', ');
+          const itemsCount = expandedItems.length;
+
           const orderData = {
             id: orderRecord.id,
             customer_name: orderRecord.customer_name,
             customer_phone: orderRecord.customer_phone,
             total: orderRecord.total,
+            first_product_name: firstProductName,
+            product_list: productList,
+            items_count: itemsCount,
           };
           
           if (data.payment_status === 'paid') {

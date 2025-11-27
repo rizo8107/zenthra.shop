@@ -107,15 +107,24 @@ export default function WhatsAppTemplatesPage() {
 
   // Available template variables
   const templateVariables = [
+    // Customer
     { name: 'customerName', description: 'Customer\'s full name' },
+    // Order basics
     { name: 'orderId', description: 'Order ID or reference number' },
-    { name: 'amount', description: 'Payment amount' },
-    { name: 'retryUrl', description: 'URL to retry payment' },
-    { name: 'carrier', description: 'Shipping carrier name' },
+    { name: 'amount', description: 'Order total amount' },
+    { name: 'storeName', description: 'Store name' },
+    // Products
+    { name: 'firstProductName', description: 'First product name in the order' },
+    { name: 'productList', description: 'Comma separated list of product names' },
+    { name: 'itemsCount', description: 'Number of items in the order' },
+    // Shipping / tracking
     { name: 'trackingLink', description: 'Tracking URL for shipment' },
+    { name: 'carrier', description: 'Shipping carrier name' },
     { name: 'estimatedDelivery', description: 'Estimated delivery date' },
+    // Links & journeys
     { name: 'feedbackLink', description: 'Link to leave feedback' },
     { name: 'reviewLink', description: 'Link to leave a review' },
+    { name: 'retryUrl', description: 'URL to retry payment' },
     { name: 'refundAmount', description: 'Amount refunded to customer' },
     { name: 'daysSinceDelivery', description: 'Days since order was delivered' },
     { name: 'reorderLink', description: 'Link to reorder products' },

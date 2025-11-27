@@ -31,6 +31,10 @@ interface OrderData {
   tracking_link?: string;
   shipping_carrier?: string;
   refund_amount?: number | string;
+  // Simple product summary fields for templates
+  first_product_name?: string;
+  product_list?: string;
+  items_count?: number | string;
 }
 
 // Get template from PocketBase
@@ -135,6 +139,9 @@ export async function notifyOrderConfirmation(order: OrderData): Promise<void> {
     orderId: order.id.slice(0, 8),
     amount: String(order.total),
     storeName: 'Zenthra Shop',
+    firstProductName: order.first_product_name || '',
+    productList: order.product_list || '',
+    itemsCount: String(order.items_count ?? ''),
   };
   
   const fallback = `🎉 *Order Confirmed* 🎉\n\nHi ${order.customer_name},\n\nYour order #${order.id.slice(0, 8)} has been confirmed!\n\nTotal: ₹${order.total}\n\nThank you for shopping with us.`;
