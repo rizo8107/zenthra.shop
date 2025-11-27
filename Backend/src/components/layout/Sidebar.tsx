@@ -17,7 +17,8 @@ import {
   Mail,
   MapPin,
   Workflow,
-  Menu
+  Menu,
+  MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -86,6 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
     { title: 'Abandoned carts', path: '/admin/abandoned-carts', icon: AlertTriangle },
     { title: 'Products', path: '/admin/products', icon: Package },
     { title: 'Automation', path: '/admin/automation', icon: Workflow, badge: 'Beta' },
+    { title: 'WhatsApp', path: '/admin/whatsapp', icon: MessageCircle },
     { title: 'Checkout Flow', path: '/admin/checkout-flow', icon: Workflow, badge: 'Beta'  },
     { title: 'Pages', path: '/admin/pages', icon: FileText },
     { title: 'Navbar', path: '/admin/navbar', icon: Menu },

@@ -24,29 +24,27 @@ export function useWhatsAppTemplates() {
   const fetchTemplates = async () => {
     setIsLoading(true);
     try {
-      // Check if collection exists
-      const collections = await pb.collections.getFullList();
-      const templateCollectionExists = collections.some(c => c.name === 'whatsapp_templates');
-      
-      // If collection doesn't exist, create default templates from enum
-      if (!templateCollectionExists) {
-        await createDefaultTemplates();
-        return;
-      }
-      
+      // Directly try to fetch templates - don't check collections (requires admin)
       const records = await pb.collection('whatsapp_templates').getFullList({
         sort: 'name',
       });
       
       setTemplates(records as unknown as Template[]);
       setError(null);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching WhatsApp templates:', err);
-      setError(err as Error);
       
-      // If collection doesn't exist, create default templates
-      if ((err as Error).message.includes('404') || (err as Error).message.includes('not found')) {
+      // If collection doesn't exist (404), try to create it
+      const errMessage = err?.message || err?.toString() || '';
+      const errStatus = err?.status || err?.response?.status;
+      
+      if (errStatus === 404 || errMessage.includes('404') || errMessage.includes('not found')) {
+        console.log('Templates collection not found, attempting to create...');
         await createDefaultTemplates();
+      } else {
+        // Other error - just set empty templates
+        setTemplates([]);
+        setError(err as Error);
       }
     } finally {
       setIsLoading(false);
@@ -55,53 +53,9 @@ export function useWhatsAppTemplates() {
 
   const createDefaultTemplates = async () => {
     try {
-      // Check if we need to create the collection first
-      try {
-        await pb.collections.create({
-          name: 'whatsapp_templates',
-          schema: [
-            {
-              name: 'name',
-              type: 'text',
-              required: true,
-              unique: true,
-            },
-            {
-              name: 'content',
-              type: 'text',
-              required: true,
-            },
-            {
-              name: 'requiresAdditionalInfo',
-              type: 'bool',
-              required: true,
-              default: false,
-            },
-            {
-              name: 'additionalInfoLabel',
-              type: 'text',
-            },
-            {
-              name: 'additionalInfoPlaceholder',
-              type: 'text',
-            },
-            {
-              name: 'isActive',
-              type: 'bool',
-              required: true,
-              default: true,
-            },
-            {
-              name: 'description',
-              type: 'text',
-            },
-          ],
-        });
-        console.log('Created whatsapp_templates collection');
-      } catch (err) {
-        console.error('Error creating collection:', err);
-        // Continue if collection already exists
-      }
+      // Note: Collection must be created manually in PocketBase admin
+      // This function just creates default template records if collection exists
+      console.log('Attempting to create default templates...');
 
       // Default templates
       const defaultTemplates = [

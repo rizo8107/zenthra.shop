@@ -2,7 +2,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { pb, ensureAdminAuth } from '@/lib/pocketbase';
 import { Order, Product, UpdateOrderData as SchemaUpdateOrderData } from '@/types/schema';
 import { toast } from 'sonner';
-import { sendWhatsAppMessage } from '@/lib/evolution';
+import {
+  notifyOrderConfirmation,
+  notifyPaymentSuccess,
+  notifyPaymentFailed,
+  notifyOrderShipped,
+  notifyOutForDelivery,
+  notifyOrderDelivered,
+  notifyOrderCancelled,
+  notifyRefundProcessed,
+} from '@/lib/whatsapp-service';
 
 export interface CreateOrderData {
   user_id: string;
@@ -63,20 +72,19 @@ export function useOrders() {
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       toast.success('Order created successfully');
       
-      // Send WhatsApp order confirmation if customer phone is available (no item fetch to avoid 400 logs)
+      // Send WhatsApp order confirmation if customer phone is available
       try {
         const order = data as unknown as Order;
         if (order && order.customer_phone) {
-          const confirmationMessage = `🎉 *Order Confirmed* 🎉\n\nHi ${order.customer_name},\n\nYour order #${order.id.slice(0, 8)} has been confirmed!\n\nThank you for shopping with us.\n\nWe'll update you when your order ships.`;
-          sendWhatsAppMessage({
-            phone: order.customer_phone,
-            message: confirmationMessage,
-            orderId: order.id,
+          notifyOrderConfirmation({
+            id: order.id,
+            customer_name: order.customer_name,
+            customer_phone: order.customer_phone,
+            total: order.total,
           }).catch(err => console.error('Failed to send WhatsApp confirmation:', err));
         }
       } catch (whatsappError) {
         console.error('Error sending WhatsApp notification:', whatsappError);
-        // Don't throw error to prevent disrupting the main flow
       }
     },
     onError: (error: Error) => {
@@ -102,72 +110,55 @@ export function useOrders() {
         // Handle WhatsApp notifications based on status changes
         if (newStatus && newStatus !== currentStatus && record.customer_phone) {
           const orderRecord = record as unknown as Order;
+          const orderData = {
+            id: orderRecord.id,
+            customer_name: orderRecord.customer_name,
+            customer_phone: orderRecord.customer_phone,
+            total: orderRecord.total,
+            tracking_link: orderRecord.tracking_link,
+            shipping_carrier: orderRecord.shipping_carrier,
+            refund_amount: data.refund_amount || orderRecord.refund_amount,
+          };
           
           // Different notifications based on new status
           switch(newStatus) {
             case 'processing':
               // If payment is successful, send payment success notification
               if (paymentStatus === 'paid') {
-                // Send payment success notification
-                const paymentMessage = `✅ *Payment Successful* ✅\n\nHi ${orderRecord.customer_name},\n\nYour payment of ₹${orderRecord.total} for order #${orderRecord.id.slice(0, 8)} has been successfully received.\n\nThank you for your purchase!`;
-                sendWhatsAppMessage({
-                  phone: orderRecord.customer_phone,
-                  message: paymentMessage,
-                  orderId: orderRecord.id
-                }).catch(err => console.error('Failed to send payment success notification:', err));
+                notifyPaymentSuccess(orderData).catch(err => 
+                  console.error('Failed to send payment success notification:', err)
+                );
               }
               break;
               
-            case 'shipped': {
-              // Get tracking info from order or use placeholder
-              const trackingLink = orderRecord.tracking_link || `${window.location.origin}/track/${orderRecord.id}`;
-              const carrier = orderRecord.shipping_carrier || 'Our Delivery Partner';
-              
-              // Send order shipped notification
-              const shippedMessage = `🚚 *Order Shipped* 🚚\n\nHi ${orderRecord.customer_name},\n\nGreat news! Your order #${orderRecord.id.slice(0, 8)} has been shipped.\n\nCarrier: ${carrier}\nTracking: ${trackingLink}\n\nThank you for your patience!`;
-              sendWhatsAppMessage({
-                phone: orderRecord.customer_phone,
-                message: shippedMessage,
-                orderId: orderRecord.id
-              }).catch(err => console.error('Failed to send order shipped notification:', err));
+            case 'shipped':
+              notifyOrderShipped(orderData).catch(err => 
+                console.error('Failed to send order shipped notification:', err)
+              );
               break;
-            }
               
             case 'out_for_delivery':
-              // Send out for delivery notification
-              const deliveryMessage = `🚚 *Out for Delivery* 🚚\n\nHi ${orderRecord.customer_name},\n\nYour order #${orderRecord.id.slice(0, 8)} is out for delivery today!\n\nPlease ensure someone is available to receive it.\n\nExcited for you to receive your items!`;
-              sendWhatsAppMessage({
-                phone: orderRecord.customer_phone,
-                message: deliveryMessage,
-                orderId: orderRecord.id
-              }).catch(err => console.error('Failed to send out for delivery notification:', err));
+              notifyOutForDelivery(orderData).catch(err => 
+                console.error('Failed to send out for delivery notification:', err)
+              );
               break;
               
-            case 'delivered': {
-              const feedbackLink = `${window.location.origin}/feedback/${orderRecord.id}`;
-              
-              // Send order delivered notification
-              const deliveredMessage = `📦 *Order Delivered* 📦\n\nHi ${orderRecord.customer_name},\n\nYour order #${orderRecord.id.slice(0, 8)} has been delivered!\n\nWe hope you love your purchase. Please share your feedback here: ${feedbackLink}\n\nThank you for shopping with us!`;
-              sendWhatsAppMessage({
-                phone: orderRecord.customer_phone,
-                message: deliveredMessage,
-                orderId: orderRecord.id
-              }).catch(err => console.error('Failed to send order delivered notification:', err));
+            case 'delivered':
+              notifyOrderDelivered(orderData).catch(err => 
+                console.error('Failed to send order delivered notification:', err)
+              );
               break;
-            }
               
             case 'cancelled':
               // If refunded, send refund confirmation
               if (data.refund_amount || orderRecord.refund_amount) {
-                const refundAmount = data.refund_amount || orderRecord.refund_amount || orderRecord.totalAmount;
-                
-                // Send refund confirmation
-                const refundMessage = `💰 *Refund Processed* 💰\n\nHi ${orderRecord.customer_name},\n\nWe've processed your refund of ₹${refundAmount} for order #${orderRecord.id.slice(0, 8)}.\n\nThe amount should appear in your account within 5-7 business days.\n\nThank you for your patience.`;
-                sendWhatsAppMessage({
-                  phone: orderRecord.customer_phone,
-                  message: refundMessage,
-                  orderId: orderRecord.id
-                }).catch(err => console.error('Failed to send refund confirmation:', err));
+                notifyRefundProcessed(orderData, data.refund_amount || orderRecord.refund_amount).catch(err => 
+                  console.error('Failed to send refund confirmation:', err)
+                );
+              } else {
+                notifyOrderCancelled(orderData).catch(err => 
+                  console.error('Failed to send cancellation notification:', err)
+                );
               }
               break;
           }
@@ -176,25 +167,21 @@ export function useOrders() {
         // Handle payment status changes
         if (data.payment_status && data.payment_status !== paymentStatus && record.customer_phone) {
           const orderRecord = record as unknown as Order;
+          const orderData = {
+            id: orderRecord.id,
+            customer_name: orderRecord.customer_name,
+            customer_phone: orderRecord.customer_phone,
+            total: orderRecord.total,
+          };
           
           if (data.payment_status === 'paid') {
-            // Send payment success notification
-            const paymentMessage = `✅ *Payment Successful* ✅\n\nHi ${orderRecord.customer_name},\n\nYour payment of ₹${orderRecord.total} for order #${orderRecord.id.slice(0, 8)} has been successfully received.\n\nThank you for your purchase!`;
-            sendWhatsAppMessage({
-              phone: orderRecord.customer_phone,
-              message: paymentMessage,
-              orderId: orderRecord.id
-            }).catch(err => console.error('Failed to send payment success notification:', err));
+            notifyPaymentSuccess(orderData).catch(err => 
+              console.error('Failed to send payment success notification:', err)
+            );
           } else if (data.payment_status === 'failed') {
-            const retryUrl = `${window.location.origin}/checkout/retry/${orderRecord.id}`;
-            
-            // Send payment failed notification
-            const failedMessage = `❌ *Payment Failed* ❌\n\nHi ${orderRecord.customer_name},\n\nWe couldn't process your payment of ₹${orderRecord.total} for order #${orderRecord.id.slice(0, 8)}.\n\nPlease try again using this link: ${retryUrl}\n\nIf you need assistance, reply to this message.`;
-            sendWhatsAppMessage({
-              phone: orderRecord.customer_phone,
-              message: failedMessage,
-              orderId: orderRecord.id
-            }).catch(err => console.error('Failed to send payment failed notification:', err));
+            notifyPaymentFailed(orderData).catch(err => 
+              console.error('Failed to send payment failed notification:', err)
+            );
           }
         }
         

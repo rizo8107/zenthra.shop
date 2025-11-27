@@ -62,6 +62,7 @@ import {
   getDeliveryTimeFromConfig,
 } from "@/lib/shipping-config-service";
 import { trackJourneyCheckoutStart } from "@/utils/journeyTracking";
+import { sendOrderConfirmation, sendPaymentSuccess, sendPaymentFailed } from "@/lib/whatsapp-notifications";
 
 interface CouponData {
   id: string;
@@ -945,6 +946,25 @@ export default function CheckoutPage() {
         sessionStorage.setItem(paymentTrackedKey, "true");
       }
 
+      // Send WhatsApp payment success notification
+      try {
+        console.log("Sending WhatsApp payment success notification...");
+        const paymentWhatsappResult = await sendPaymentSuccess({
+          id: orderId,
+          customer_name: formData.name || existingOrder?.customer_name || 'Customer',
+          customer_phone: formData.phone || existingOrder?.customer_phone || '',
+          total: calculateFinalTotal().finalTotal,
+        });
+        if (paymentWhatsappResult.success) {
+          console.log("✅ WhatsApp payment success notification sent");
+        } else {
+          console.warn("⚠️ WhatsApp payment notification failed:", paymentWhatsappResult.error);
+        }
+      } catch (whatsappError) {
+        console.error("Failed to send WhatsApp payment notification:", whatsappError);
+        // Don't block payment flow for WhatsApp failure
+      }
+
       // Clear the cart after successful order
       clearCart();
 
@@ -981,6 +1001,19 @@ export default function CheckoutPage() {
         "razorpay",
         error instanceof Error ? error.message : "Unknown error",
       );
+
+      // Send WhatsApp payment failed notification
+      try {
+        console.log("Sending WhatsApp payment failed notification...");
+        await sendPaymentFailed({
+          id: orderId,
+          customer_name: formData.name || 'Customer',
+          customer_phone: formData.phone || '',
+          total: calculateFinalTotal().finalTotal,
+        }, `${window.location.origin}/checkout?retry=${orderId}`);
+      } catch (whatsappError) {
+        console.error("Failed to send WhatsApp payment failed notification:", whatsappError);
+      }
 
       // Attempt to update order status to note the issue if we have an order ID
       if (orderId) {
@@ -1610,6 +1643,26 @@ export default function CheckoutPage() {
         .collection("orders")
         .create(orderData)) as unknown as OrderData;
       console.log("Order created successfully with ID:", order.id);
+
+      // Send WhatsApp order confirmation notification
+      try {
+        console.log("Sending WhatsApp order confirmation...");
+        const whatsappResult = await sendOrderConfirmation({
+          id: order.id,
+          customer_name: formData.name,
+          customer_phone: validatedPhone,
+          customer_email: formData.email,
+          total: order.total,
+        });
+        if (whatsappResult.success) {
+          console.log("✅ WhatsApp order confirmation sent successfully");
+        } else {
+          console.warn("⚠️ WhatsApp notification failed:", whatsappResult.error);
+        }
+      } catch (whatsappError) {
+        console.error("Failed to send WhatsApp notification:", whatsappError);
+        // Don't block order processing for WhatsApp failure
+      }
 
       let webhookItems: any[] = [];
       try {

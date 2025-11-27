@@ -125,18 +125,18 @@ router.post('/media', async (req, res) => {
     console.log(`Sending media to ${phone} via Evolution API instance: ${instanceName}`);
     console.log(`Media URL: ${mediaUrl}`);
     
+    // Evolution API v2 format - mediatype and media at root level
     const response = await axios.post(
       `${EVOLUTION_API_URL}/message/sendMedia/${instanceName}`,
       {
         number: phone,
+        mediatype: mediaType || 'image', // Required: 'image', 'video', 'audio', 'document'
+        media: mediaUrl,
+        caption: caption || '',
+        fileName: fileName || undefined,
         options: {
-          // Evolution expects media options here
-          // See: https://evolution-api.com/docs/message/sendMedia
-          // We pass caption and filename as part of options
-          mimetype: mediaType || 'image/jpeg',
-          fileName: fileName || 'product-image.jpg',
-          caption: caption || '',
-          media: mediaUrl
+          delay: 1200,
+          presence: 'composing',
         }
       },
       {

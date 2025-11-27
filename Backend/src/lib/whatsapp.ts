@@ -299,35 +299,27 @@ export async function sendWhatsAppImageMessage(
       });
     }
     
-    // Prepare the request data for Evolution API following the official structure
+    // Prepare the request data for Evolution API v2 format
     const data = {
       number: formattedPhone,
+      mediatype: 'image', // Required by Evolution API
+      media: validatedImageUrl,
+      caption: processedCaption || '',
       options: {
         delay: 1200,
         presence: "composing"
-      },
-      mediaMessage: {
-        image: {
-          url: validatedImageUrl
-        },
-        caption: processedCaption || undefined
       }
     };
     
     // Get the API endpoint with the correct path
-    const endpoint = getEvolutionEndpoint('/api/message/sendMedia/{instance}');
+    const endpoint = getEvolutionEndpoint('/message/sendMedia/{instance}');
     
     // Make the API request
     console.log('Sending WhatsApp image message to:', formattedPhone);
     console.log('Using Evolution API endpoint:', endpoint);
     console.log('Request data:', JSON.stringify({
       ...data,
-      mediaMessage: {
-        ...data.mediaMessage,
-        image: {
-          url: data.mediaMessage.image.url.startsWith('data:') ? '[BASE64_DATA_URL]' : data.mediaMessage.image.url
-        }
-      }
+      media: data.media.startsWith('data:') ? '[BASE64_DATA_URL]' : data.media
     }, null, 2));
     
     try {
@@ -428,19 +420,18 @@ export async function sendWhatsAppVideoMessage(
     // Get the API endpoint
     const apiEndpoint = getEvolutionEndpoint('/message/sendMedia/{instance}');
     
+    // Evolution API v2 format
     const response = await axios.post(
       apiEndpoint,
       {
         number: formattedPhone,
+        mediatype: 'video', // Required by Evolution API
+        media: validatedVideoUrl,
+        caption: processedCaption || '',
         options: {
           delay: 1200,
           presence: 'composing'
-        },
-        media: {
-          url: validatedVideoUrl,
-          type: "video"
-        },
-        caption: processedCaption || undefined
+        }
       },
       {
         headers: {
@@ -572,25 +563,24 @@ export async function sendWhatsAppDocumentMessage(
     }
     
     // Get the API endpoint with the correct path
-    const endpoint = getEvolutionEndpoint('/api/message/sendMedia/{instance}');
+    const endpoint = getEvolutionEndpoint('/message/sendMedia/{instance}');
     
     // Make the API request
     console.log('Sending WhatsApp document message to:', formattedPhone);
     console.log('Using Evolution API endpoint:', endpoint);
     
     try {
+      // Evolution API v2 format
       const response = await axios.post(endpoint, {
         number: formattedPhone,
+        mediatype: 'document', // Required by Evolution API
+        media: validatedDocumentUrl,
+        fileName: filename,
+        caption: processedCaption || '',
         options: {
           delay: 1200,
           presence: 'composing'
-        },
-        media: {
-          url: validatedDocumentUrl,
-          type: "document",
-          fileName: filename
-        },
-        caption: processedCaption || undefined
+        }
       }, {
         headers: {
           'Content-Type': 'application/json',
