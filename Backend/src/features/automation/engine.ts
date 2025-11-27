@@ -144,7 +144,18 @@ async function executePbFind(
   }
 
   // Substitute variables in filter
-  const filterTemplate = config.filter as string || '';
+  let filterTemplate = config.filter as string || '';
+  
+  // Handle date placeholders
+  const now = new Date();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+  
+  filterTemplate = filterTemplate
+    .replace(/@todayStart/g, `"${todayStart.toISOString()}"`)
+    .replace(/@yesterdayStart/g, `"${yesterdayStart.toISOString()}"`)
+    .replace(/@now/g, `"${now.toISOString()}"`);
+  
   const filter = substituteVariables(filterTemplate, context);
   
   const sort = (config.sort as string) || '-created';
@@ -161,21 +172,225 @@ async function executePbFind(
       expand: expand || undefined,
     });
 
-    return {
-      output: {
-        items: result.items,
-        totalItems: result.totalItems,
-        page: result.page,
-        totalPages: result.totalPages,
-      },
+    // Build base output
+    const output: Record<string, unknown> = {
+      items: result.items,
+      totalItems: result.totalItems,
+      page: result.page,
+      totalPages: result.totalPages,
     };
-  } catch (error: any) {
-    console.error(`[pb.find] Error querying ${collection}:`, error.message);
+
+    // Add sales summary if querying orders collection
+    if (collection === 'orders' && result.items.length > 0) {
+      const today = new Date();
+      const dateStr = today.toLocaleDateString('en-IN', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      
+      // Calculate totals
+      let totalSales = 0;
+      let productCount = 0;
+      
+      for (const order of result.items) {
+        const orderTotal = Number((order as Record<string, unknown>).total_amount) || 
+                          Number((order as Record<string, unknown>).total) || 0;
+        totalSales += orderTotal;
+        
+        // Count products from order items
+        const items = (order as Record<string, unknown>).items;
+        if (Array.isArray(items)) {
+          for (const item of items) {
+            productCount += Number((item as Record<string, unknown>).quantity) || 1;
+          }
+        } else {
+          productCount += 1; // At least 1 product per order
+        }
+      }
+      
+      const orderCount = result.items.length;
+      const avgOrderValue = orderCount > 0 ? Math.round(totalSales / orderCount) : 0;
+      
+      // Add summary fields
+      output.report_date = dateStr;
+      output.total_sales = totalSales.toLocaleString('en-IN');
+      output.order_count = orderCount;
+      output.product_count = productCount;
+      output.avg_order_value = avgOrderValue.toLocaleString('en-IN');
+      
+      console.log(`[pb.find] Sales summary: ₹${totalSales} from ${orderCount} orders, ${productCount} products`);
+    } else if (collection === 'orders') {
+      // No orders - add empty summary
+      const today = new Date();
+      output.report_date = today.toLocaleDateString('en-IN', { 
+        day: '2-digit', 
+        month: 'short', 
+        year: 'numeric' 
+      });
+      output.total_sales = '0';
+      output.order_count = 0;
+      output.product_count = 0;
+      output.avg_order_value = '0';
+    }
+
+    return { output };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[pb.find] Error querying ${collection}:`, errorMessage);
     return {
       output: {
         items: [],
         totalItems: 0,
-        error: error.message,
+        error: errorMessage,
+      },
+    };
+  }
+}
+
+/**
+ * Execute report.sales node
+ * Computes a sales summary over a date range from the orders collection.
+ */
+async function executeSalesReport(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  const config = (node.data?.config as Record<string, unknown>) || {};
+
+  const period = (config.period as string) || 'today';
+  const statusFilter = (config.statusFilter as string) || 'paid';
+  const customFilter = (config.customFilter as string) || '';
+
+  const now = new Date();
+  let from: Date;
+  let to: Date;
+  let reportLabel: string;
+
+  switch (period) {
+    case 'yesterday': {
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      from = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
+      to = todayStart;
+      reportLabel = from.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      break;
+    }
+    case 'last7d': {
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      from = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+      to = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+      reportLabel = 'Last 7 days';
+      break;
+    }
+    case 'today':
+    default: {
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      from = todayStart;
+      to = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000);
+      reportLabel = todayStart.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric',
+      });
+      break;
+    }
+  }
+
+  // Build base filter
+  let filterParts: string[] = [];
+
+  if (statusFilter === 'paid') {
+    filterParts.push('payment_status="paid"');
+  } else if (statusFilter === 'all') {
+    filterParts.push('id != ""');
+  } else if (statusFilter === 'custom' && customFilter.trim().length > 0) {
+    filterParts.push(customFilter.trim());
+  } else {
+    // Fallback: all orders
+    filterParts.push('id != ""');
+  }
+
+  // Date range filter
+  const fromIso = from.toISOString();
+  const toIso = to.toISOString();
+  filterParts.push(`created >= "${fromIso}" && created < "${toIso}"`);
+
+  const filter = filterParts.join(' && ');
+
+  console.log(`[report.sales] Querying orders with filter: ${filter}`);
+
+  try {
+    const result = await pb.collection('orders').getList(1, 500, {
+      filter,
+      sort: '-created',
+    });
+
+    const output: Record<string, unknown> = {
+      items: result.items,
+      totalItems: result.totalItems,
+    };
+
+    if (result.items.length > 0) {
+      let totalSales = 0;
+      let productCount = 0;
+
+      for (const order of result.items) {
+        const rec = order as Record<string, unknown>;
+        const orderTotal =
+          Number(rec.total_amount as number | string) ||
+          Number(rec.total as number | string) ||
+          0;
+        totalSales += orderTotal;
+
+        const items = rec.items as unknown;
+        if (Array.isArray(items)) {
+          for (const item of items as Array<Record<string, unknown>>) {
+            productCount += Number(item.quantity as number | string) || 1;
+          }
+        } else {
+          productCount += 1;
+        }
+      }
+
+      const orderCount = result.items.length;
+      const avgOrderValue = orderCount > 0 ? Math.round(totalSales / orderCount) : 0;
+
+      output.report_date = reportLabel;
+      output.total_sales = totalSales.toLocaleString('en-IN');
+      output.order_count = orderCount;
+      output.product_count = productCount;
+      output.avg_order_value = avgOrderValue.toLocaleString('en-IN');
+
+      console.log(
+        `[report.sales] Summary for ${reportLabel}: ₹${totalSales} from ${orderCount} orders, ${productCount} products`,
+      );
+    } else {
+      output.report_date = reportLabel;
+      output.total_sales = '0';
+      output.order_count = 0;
+      output.product_count = 0;
+      output.avg_order_value = '0';
+
+      console.log(`[report.sales] No orders found for ${reportLabel}`);
+    }
+
+    return {
+      output: {
+        ...context.input,
+        ...output,
+      },
+    };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('[report.sales] Error building report:', errorMessage);
+    return {
+      output: {
+        ...context.input,
+        error: errorMessage,
       },
     };
   }
@@ -208,14 +423,16 @@ async function executeLogicIf(
 
     return {
       output: {
-        condition,
-        result: isTrue,
+        ...context.input, // Forward all input data
+        _condition: condition,
+        _result: isTrue,
       },
       nextHandle: isTrue ? 'true' : 'false',
     };
-  } catch (error: any) {
-    console.error(`[logic.if] Error evaluating condition:`, error.message);
-    throw new Error(`Failed to evaluate condition: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[logic.if] Error evaluating condition:`, errorMessage);
+    throw new Error(`Failed to evaluate condition: ${errorMessage}`);
   }
 }
 
@@ -397,6 +614,8 @@ async function executeNode(
       return await executeTriggerCron(node, context);
     case 'pb.find':
       return await executePbFind(node, context);
+    case 'report.sales':
+      return await executeSalesReport(node, context);
     case 'logic.if':
       return await executeLogicIf(node, context);
     case 'util.delay':
@@ -655,14 +874,83 @@ export async function startRunFromJourneyEvent(
 // CRON SCHEDULER (OPTIMIZED)
 // ============================================================================
 
-// Cron schedule mapping
-const CRON_SCHEDULES: Record<string, string> = {
+// Interval schedule mapping
+const INTERVAL_SCHEDULES: Record<string, string> = {
   '5m': '*/5 * * * *',
   '15m': '*/15 * * * *',
+  '30m': '*/30 * * * *',
   '1h': '0 * * * *',
+  '2h': '0 */2 * * *',
+  '4h': '0 */4 * * *',
   '6h': '0 */6 * * *',
-  '1d': '0 9 * * *', // 9 AM daily
+  '12h': '0 */12 * * *',
 };
+
+// Weekday mapping for cron (0 = Sunday, 1 = Monday, etc.)
+const WEEKDAY_CRON: Record<string, string> = {
+  'everyday': '*',
+  'weekdays': '1-5',
+  'weekends': '0,6',
+  'mon': '1',
+  'tue': '2',
+  'wed': '3',
+  'thu': '4',
+  'fri': '5',
+  'sat': '6',
+  'sun': '0',
+};
+
+/**
+ * Build cron expression from schedule config
+ */
+function buildCronExpression(config: Record<string, unknown>): string {
+  const scheduleType = (config.scheduleType as string) || 'daily';
+  
+  // If custom cron is provided and scheduleType is custom, use it
+  if (scheduleType === 'custom' && config.cron) {
+    return config.cron as string;
+  }
+  
+  // Legacy support: if 'schedule' key exists (old format)
+  if (config.schedule && !config.scheduleType) {
+    const legacySchedules: Record<string, string> = {
+      '5m': '*/5 * * * *',
+      '15m': '*/15 * * * *',
+      '1h': '0 * * * *',
+      '6h': '0 */6 * * *',
+      '1d': '0 9 * * *',
+    };
+    return legacySchedules[config.schedule as string] || '';
+  }
+  
+  switch (scheduleType) {
+    case 'interval': {
+      const interval = (config.interval as string) || '1h';
+      return INTERVAL_SCHEDULES[interval] || '0 * * * *';
+    }
+    
+    case 'daily': {
+      const time = (config.time as string) || '09:00';
+      const [hour, minute] = time.split(':').map(Number);
+      return `${minute || 0} ${hour || 9} * * *`;
+    }
+    
+    case 'weekly': {
+      const time = (config.time as string) || '09:00';
+      const [hour, minute] = time.split(':').map(Number);
+      const weekdays = (config.weekdays as string) || 'weekdays';
+      const dayOfWeek = WEEKDAY_CRON[weekdays] || '*';
+      return `${minute || 0} ${hour || 9} * * ${dayOfWeek}`;
+    }
+    
+    case 'custom': {
+      return (config.cron as string) || '0 9 * * *';
+    }
+    
+    default:
+      return '0 9 * * *'; // Default: 9 AM daily
+  }
+}
 
 // Track last run times to prevent duplicate runs within the same minute
 const lastCronRuns: Map<string, number> = new Map();
@@ -753,11 +1041,10 @@ async function refreshCronFlowCache(): Promise<void> {
       for (const node of canvas.nodes) {
         if ((node.data?.type as string) !== 'trigger.cron') continue;
         
-        const config = node.data?.config as Record<string, any> || {};
-        let cronExpression = config.cron as string;
-        if (!cronExpression && config.schedule) {
-          cronExpression = CRON_SCHEDULES[config.schedule as string] || '';
-        }
+        const config = node.data?.config as Record<string, unknown> || {};
+        
+        // Build cron expression from config (handles all schedule types)
+        const cronExpression = buildCronExpression(config);
         
         if (cronExpression) {
           cronNodes.push({ nodeId: node.id, cron: cronExpression });

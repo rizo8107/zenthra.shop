@@ -14,8 +14,15 @@ export function NodePalette({ onNodeDragStart }: NodePaletteProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
-  // Only allow a minimal set of nodes in the palette for now
-  const allowedTypes = new Set<string>(['trigger.journey', 'whatsapp.send', 'logic.if']);
+  // Only allow a curated set of nodes in the palette for now
+  // Include core trigger/logic/messaging nodes and the new sales report data node
+  const allowedTypes = new Set<string>([
+    'trigger.journey',
+    'trigger.cron',
+    'logic.if',
+    'whatsapp.send',
+    'report.sales',
+  ]);
 
   const allAllowedNodes: NodeDefinition[] = Object.values(nodesByCategory)
     .flat()

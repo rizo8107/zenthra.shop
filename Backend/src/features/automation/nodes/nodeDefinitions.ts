@@ -61,8 +61,8 @@ export const nodeDefinitions: NodeDefinition[] = [
   {
     type: 'trigger.cron',
     category: 'trigger',
-    label: 'Cron Trigger',
-    description: 'Trigger flow on a simple recurring schedule',
+    label: 'Scheduled Trigger',
+    description: 'Trigger flow on a schedule - daily, weekly, or custom intervals',
     icon: '⏰',
     color: '#10B981',
     outputs: [
@@ -70,25 +70,85 @@ export const nodeDefinitions: NodeDefinition[] = [
     ],
     config: [
       {
-        key: 'schedule',
-        label: 'How often?',
+        key: 'scheduleType',
+        label: 'Schedule Type',
         type: 'select',
         required: true,
-        defaultValue: '15m',
+        defaultValue: 'daily',
         options: [
-          { value: '5m', label: 'Every 5 minutes' },
-          { value: '15m', label: 'Every 15 minutes' },
-          { value: '1h', label: 'Every hour' },
-          { value: '6h', label: 'Every 6 hours' },
-          { value: '1d', label: 'Every day (9 AM)' }
+          { value: 'interval', label: '⏱️ Interval (every X minutes/hours)' },
+          { value: 'daily', label: '📅 Daily (at specific time)' },
+          { value: 'weekly', label: '📆 Weekly (specific days & time)' },
+          { value: 'custom', label: '⚙️ Custom (cron expression)' }
         ]
       },
       {
+        key: 'interval',
+        label: 'Run every',
+        type: 'select',
+        defaultValue: '1h',
+        options: [
+          { value: '5m', label: 'Every 5 minutes' },
+          { value: '15m', label: 'Every 15 minutes' },
+          { value: '30m', label: 'Every 30 minutes' },
+          { value: '1h', label: 'Every hour' },
+          { value: '2h', label: 'Every 2 hours' },
+          { value: '4h', label: 'Every 4 hours' },
+          { value: '6h', label: 'Every 6 hours' },
+          { value: '12h', label: 'Every 12 hours' }
+        ],
+        description: 'Only used when Schedule Type is "Interval"'
+      },
+      {
+        key: 'time',
+        label: 'Time of day',
+        type: 'select',
+        defaultValue: '09:00',
+        options: [
+          { value: '06:00', label: '6:00 AM' },
+          { value: '07:00', label: '7:00 AM' },
+          { value: '08:00', label: '8:00 AM' },
+          { value: '09:00', label: '9:00 AM' },
+          { value: '10:00', label: '10:00 AM' },
+          { value: '11:00', label: '11:00 AM' },
+          { value: '12:00', label: '12:00 PM (Noon)' },
+          { value: '13:00', label: '1:00 PM' },
+          { value: '14:00', label: '2:00 PM' },
+          { value: '15:00', label: '3:00 PM' },
+          { value: '16:00', label: '4:00 PM' },
+          { value: '17:00', label: '5:00 PM' },
+          { value: '18:00', label: '6:00 PM' },
+          { value: '19:00', label: '7:00 PM' },
+          { value: '20:00', label: '8:00 PM' },
+          { value: '21:00', label: '9:00 PM' }
+        ],
+        description: 'Time to run (for Daily/Weekly schedules)'
+      },
+      {
+        key: 'weekdays',
+        label: 'Days of week',
+        type: 'select',
+        defaultValue: 'weekdays',
+        options: [
+          { value: 'everyday', label: 'Every day' },
+          { value: 'weekdays', label: 'Weekdays (Mon-Fri)' },
+          { value: 'weekends', label: 'Weekends (Sat-Sun)' },
+          { value: 'mon', label: 'Monday only' },
+          { value: 'tue', label: 'Tuesday only' },
+          { value: 'wed', label: 'Wednesday only' },
+          { value: 'thu', label: 'Thursday only' },
+          { value: 'fri', label: 'Friday only' },
+          { value: 'sat', label: 'Saturday only' },
+          { value: 'sun', label: 'Sunday only' }
+        ],
+        description: 'Only used when Schedule Type is "Weekly"'
+      },
+      {
         key: 'cron',
-        label: 'Cron Expression (advanced)',
+        label: 'Cron Expression',
         type: 'text',
-        placeholder: '*/15 * * * *',
-        description: 'Optional custom cron expression. Leave empty to use schedule above.'
+        placeholder: '0 9 * * *',
+        description: 'Custom cron expression (only for Custom schedule type)'
       }
     ]
   },
@@ -308,6 +368,53 @@ export const nodeDefinitions: NodeDefinition[] = [
         placeholder: '1'
       }
     ]
+  },
+  {
+    type: 'report.sales',
+    category: 'data',
+    label: 'Sales Report',
+    description: 'Compute sales summary for a date range',
+    icon: '📊',
+    color: '#3B82F6',
+    inputs: [
+      { id: 'in', label: 'Input', type: 'data' },
+    ],
+    outputs: [
+      { id: 'out', label: 'Report', type: 'data' },
+    ],
+    config: [
+      {
+        key: 'period',
+        label: 'Period',
+        type: 'select',
+        required: true,
+        defaultValue: 'today',
+        options: [
+          { value: 'today', label: 'Today' },
+          { value: 'yesterday', label: 'Yesterday' },
+          { value: 'last7d', label: 'Last 7 days' },
+        ],
+        description: 'Which date range to use for the report',
+      },
+      {
+        key: 'statusFilter',
+        label: 'Orders to include',
+        type: 'select',
+        defaultValue: 'paid',
+        options: [
+          { value: 'paid', label: 'Paid orders only' },
+          { value: 'all', label: 'All orders' },
+          { value: 'custom', label: 'Custom filter (advanced)' },
+        ],
+      },
+      {
+        key: 'customFilter',
+        label: 'Custom filter (advanced)',
+        type: 'text',
+        placeholder: 'status="delivered" && total >= 1000',
+        description: 'Optional PocketBase filter to combine with the date range when status filter is set to Custom',
+      },
+    ],
   },
   {
     type: 'pb.getOne',

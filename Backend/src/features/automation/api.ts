@@ -5,6 +5,7 @@ import type {
   FlowRun,
   FlowRunStep,
 } from './types.js';
+import { executeFlowRun } from './engine.js';
 
 type FlowRecord = {
   id: string;
@@ -297,4 +298,46 @@ async function simulateRunExecution(runId: string, flowId: string, input: Record
       error: error instanceof Error ? error.message : 'Unknown execution error',
     });
   }
+}
+
+/**
+ * Trigger a REAL flow run using the actual engine (not simulation)
+ * This executes the flow with real PocketBase queries and WhatsApp sends
+ */
+export async function triggerRealRun(flowId: string): Promise<FlowRun> {
+  // Validate flowId
+  if (!flowId || typeof flowId !== 'string' || flowId.trim().length === 0) {
+    throw new Error('Invalid flowId: must be a non-empty string');
+  }
+
+  // Get the flow
+  const flow = await getFlow(flowId);
+  if (!flow) {
+    throw new Error('Flow not found');
+  }
+
+  // Create input event for manual trigger
+  const inputEvent = {
+    trigger: 'manual',
+    flowId: flow.id,
+    triggered_at: new Date().toISOString(),
+    manual_run: true,
+  };
+
+  // Create the run record
+  const record = await pb.collection(COLLECTIONS.runs).create<RunRecord>({
+    flow_id: flowId,
+    status: 'queued',
+    trigger_type: 'manual',
+    test_mode: false, // This is a REAL run
+    started_at: new Date().toISOString(),
+    input_event: inputEvent,
+  } as unknown as RunRecord);
+
+  // Execute the flow using the REAL engine (in background)
+  executeFlowRun(record.id, flow, inputEvent).catch(error => {
+    console.error(`[api] Real run execution failed for ${record.id}:`, error);
+  });
+
+  return mapRun(record);
 }

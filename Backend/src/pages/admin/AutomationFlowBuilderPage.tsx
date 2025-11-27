@@ -19,7 +19,7 @@ import {
   addEdge,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { ArrowLeft, Loader2, Save, Share2, Trash2, Zap, Settings } from 'lucide-react';
+import { ArrowLeft, Loader2, Save, Share2, Trash2, Zap, Settings, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { getFlow, listRunSteps, listRuns, updateFlow, triggerTestRun } from '@/features/automation/api';
+import { getFlow, listRunSteps, listRuns, updateFlow, triggerTestRun, triggerRealRun } from '@/features/automation/api';
 import type { FlowRun, FlowRunStep, FlowSummary, FlowNode, FlowEdge, RunStatus } from '@/features/automation/types';
 import { NodePalette } from '@/features/automation/components/NodePalette';
 import { NodeConfigEditor } from '@/features/automation/components/NodeConfigEditor';
@@ -543,6 +543,79 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
     }
   };
 
+  const [runningRealFlow, setRunningRealFlow] = useState(false);
+  
+  const handleRunFlowNow = async () => {
+    if (!flow) return;
+    try {
+      setRunningRealFlow(true);
+      
+      // Save first to ensure latest changes are used
+      await updateFlow(flow.id, {
+        name: flowName,
+        description: flowDescription,
+        canvasJson: {
+          nodes: nodes as unknown as FlowNode[],
+          edges: edges as unknown as FlowEdge[],
+        },
+      });
+      
+      // Trigger real run
+      const run = await triggerRealRun(flow.id);
+      
+      toast({
+        title: '🚀 Flow Running',
+        description: 'Real execution started. Check Run History for results.',
+      });
+      
+      // Simulate node execution animation
+      simulateNodeExecution();
+      
+      // Refresh runs
+      void loadRuns();
+      
+      // Poll for run updates
+      const pollInterval = setInterval(async () => {
+        await loadRuns();
+        const updatedRuns = await listRuns(flow.id);
+        const currentRun = updatedRuns.find(r => r.id === run.id);
+        
+        if (currentRun && (currentRun.status === 'success' || currentRun.status === 'failed')) {
+          clearInterval(pollInterval);
+          setRunningRealFlow(false);
+          
+          if (currentRun.status === 'success') {
+            toast({
+              title: '✅ Flow Completed',
+              description: 'Real execution finished successfully!',
+            });
+          } else {
+            toast({
+              title: '❌ Flow Failed',
+              description: currentRun.error || 'Execution failed',
+              variant: 'destructive',
+            });
+          }
+        }
+      }, 2000);
+      
+      // Stop polling after 60 seconds
+      setTimeout(() => {
+        clearInterval(pollInterval);
+        setRunningRealFlow(false);
+      }, 60000);
+      
+    } catch (error) {
+      console.error('Failed to run flow', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Unable to run flow.',
+        variant: 'destructive',
+      });
+      setRunningRealFlow(false);
+    }
+  };
+
   const handleTestRun = async () => {
     if (!flow) return;
     try {
@@ -714,6 +787,20 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
                     Activate
                   </>
                 )}
+              </Button>
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleRunFlowNow} 
+                disabled={runningRealFlow || saving}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                {runningRealFlow ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4 mr-2" />
+                )}
+                {runningRealFlow ? 'Running...' : 'Run Now'}
               </Button>
               <Button variant="outline" size="sm" disabled>
                 <Share2 className="w-4 h-4 mr-2" />

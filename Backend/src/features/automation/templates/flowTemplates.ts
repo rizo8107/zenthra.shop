@@ -639,6 +639,122 @@ export const flowTemplates: FlowTemplate[] = [
         { id: 'e3', source: 'delay-test', target: 'final-log' }
       ]
     }
+  },
+
+  // DAILY SALES REPORT
+  {
+    id: 'daily-sales-report',
+    name: 'Daily Sales Report',
+    description: 'Send a daily WhatsApp report with sales amount, product count, and order summary at your preferred time',
+    category: 'ecommerce',
+    tags: ['sales', 'report', 'daily', 'whatsapp', 'analytics'],
+    requiredConnections: ['evolution-api'],
+    estimatedSetupTime: '3 minutes',
+    icon: '📊',
+    canvas: {
+      nodes: [
+        {
+          id: 'trigger-daily',
+          type: 'customNode',
+          position: { x: 50, y: 150 },
+          data: {
+            label: 'Daily at 9 AM',
+            type: 'trigger.cron',
+            config: {
+              scheduleType: 'daily',
+              time: '09:00',
+              cron: '0 9 * * *'
+            }
+          }
+        },
+        {
+          id: 'find-orders',
+          type: 'customNode',
+          position: { x: 300, y: 150 },
+          data: {
+            label: 'Find Today\'s Orders',
+            type: 'pb.find',
+            config: {
+              collection: 'orders',
+              filter: 'payment_status="paid" && created >= @todayStart',
+              limit: 1000
+            }
+          }
+        },
+        {
+          id: 'check-orders',
+          type: 'customNode',
+          position: { x: 550, y: 150 },
+          data: {
+            label: 'Has Orders?',
+            type: 'logic.if',
+            config: {
+              condition: 'input.items && input.items.length > 0'
+            }
+          }
+        },
+        {
+          id: 'send-report',
+          type: 'customNode',
+          position: { x: 800, y: 100 },
+          data: {
+            label: 'Send Sales Report',
+            type: 'whatsapp.send',
+            config: {
+              connectionId: 'evolution_api',
+              sender: 'zenthra',
+              toPath: '919941569662',
+              template: `📊 *Daily Sales Report*
+━━━━━━━━━━━━━━━━━
+📅 Date: {{input.report_date}}
+
+💰 *Total Sales*: ₹{{input.total_sales}}
+📦 *Orders*: {{input.order_count}}
+🛍️ *Products Sold*: {{input.product_count}}
+
+📈 *Average Order Value*: ₹{{input.avg_order_value}}
+
+✅ Report generated automatically
+━━━━━━━━━━━━━━━━━`,
+              delayMs: 250,
+              presence: 'composing',
+              linkPreview: false
+            }
+          }
+        },
+        {
+          id: 'send-no-sales',
+          type: 'customNode',
+          position: { x: 800, y: 250 },
+          data: {
+            label: 'No Sales Today',
+            type: 'whatsapp.send',
+            config: {
+              connectionId: 'evolution_api',
+              sender: 'zenthra',
+              toPath: '919941569662',
+              template: `📊 *Daily Sales Report*
+━━━━━━━━━━━━━━━━━
+📅 Date: {{input.report_date}}
+
+📭 No orders received today.
+
+💡 Consider running a promotion!
+━━━━━━━━━━━━━━━━━`,
+              delayMs: 250,
+              presence: 'composing',
+              linkPreview: false
+            }
+          }
+        }
+      ],
+      edges: [
+        { id: 'e1', source: 'trigger-daily', target: 'find-orders' },
+        { id: 'e2', source: 'find-orders', target: 'check-orders' },
+        { id: 'e3', source: 'check-orders', target: 'send-report', sourceHandle: 'true' },
+        { id: 'e4', source: 'check-orders', target: 'send-no-sales', sourceHandle: 'false' }
+      ]
+    }
   }
 ];
 

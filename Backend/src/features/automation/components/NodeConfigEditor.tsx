@@ -524,8 +524,22 @@ export function NodeConfigEditor({
 
       case 'logic.if': {
         if (!config.condition) throw new Error('Condition is required');
-        const conditionResult = Math.random() > 0.5; // Random true/false
-        return { condition_result: conditionResult, input };
+        // Try to evaluate the condition with test input
+        try {
+          const condition = String(config.condition);
+          // Simple evaluation - check if items exist
+          const hasItems = input && (
+            (Array.isArray((input as Record<string, unknown>).items) && ((input as Record<string, unknown>).items as unknown[]).length > 0) ||
+            (typeof (input as Record<string, unknown>).totalItems === 'number' && ((input as Record<string, unknown>).totalItems as number) > 0)
+          );
+          return { 
+            condition_result: hasItems, 
+            condition_evaluated: condition,
+            input 
+          };
+        } catch {
+          return { condition_result: true, input };
+        }
       }
 
       case 'iterate.each': {
@@ -603,13 +617,12 @@ export function NodeConfigEditor({
         };
 
       default:
-        // Random success/failure for unknown nodes
-        if (Math.random() < 0.1) {
-          throw new Error(`Simulated error in ${definition.type} node`);
-        }
+        // Always succeed for unknown nodes in test mode
         return {
           node_type: definition.type,
           processed_at: new Date().toISOString(),
+          status: 'simulated',
+          message: `Test passed for ${definition.label || definition.type}`,
           input,
           config
         };
@@ -951,6 +964,33 @@ export function NodeConfigEditor({
         return true;
       });
     }
+    
+    // Conditional visibility for trigger.cron based on scheduleType
+    if (nodeType === 'trigger.cron') {
+      const scheduleType = String(localConfig.scheduleType ?? 'daily');
+      return nodeDefinition.config.filter((field) => {
+        // Always show scheduleType
+        if (field.key === 'scheduleType') return true;
+        
+        // Show 'interval' only for interval type
+        if (field.key === 'interval') return scheduleType === 'interval';
+        
+        // Show 'time' for daily and weekly
+        if (field.key === 'time') return scheduleType === 'daily' || scheduleType === 'weekly';
+        
+        // Show 'weekdays' only for weekly
+        if (field.key === 'weekdays') return scheduleType === 'weekly';
+        
+        // Show 'cron' only for custom
+        if (field.key === 'cron') return scheduleType === 'custom';
+        
+        // Hide legacy 'schedule' field
+        if (field.key === 'schedule') return false;
+        
+        return true;
+      });
+    }
+    
     return nodeDefinition.config;
   };
 
