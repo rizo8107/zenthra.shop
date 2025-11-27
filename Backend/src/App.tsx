@@ -31,6 +31,7 @@ import BrandingPage from "./pages/admin/BrandingPage";
 import ProductPageEditor from "./pages/admin/ProductPageEditor";
 import WhatsAppConfigPage from "./pages/admin/WhatsAppConfigPage";
 import CampaignBuilderPage from "./pages/admin/CampaignBuilderPage";
+import CampaignsPage from "./pages/admin/CampaignsPage";
 
 // Set PocketBase URL from environment variable
 if (import.meta.env.VITE_POCKETBASE_URL) {
@@ -101,6 +102,7 @@ const App = () => {
               <Route path="/admin/automation/:flowId" element={<ProtectedRoute><AutomationFlowBuilderPage /></ProtectedRoute>} />
               <Route path="/admin/whatsapp" element={<ProtectedRoute><WhatsAppConfigPage /></ProtectedRoute>} />
               <Route path="/admin/campaigns" element={<ProtectedRoute><CampaignBuilderPage /></ProtectedRoute>} />
+              <Route path="/admin/bulk-campaigns" element={<ProtectedRoute><CampaignsPage /></ProtectedRoute>} />
 
               {/* Catch-all route */}
               <Route path="*" element={<NotFound />} />
