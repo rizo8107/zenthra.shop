@@ -21,7 +21,7 @@ export function Breadcrumbs({ items, className, isLoading = false }: Breadcrumbs
     <nav 
       aria-label="Breadcrumb" 
       className={cn(
-        "w-full min-h-[32px] flex items-center mb-4 text-sm text-muted-foreground",
+        "w-full min-h-[28px] flex items-center text-xs sm:text-sm text-muted-foreground",
         // Apply overflow protection for long breadcrumbs
         "overflow-x-auto scrollbar-hide", 
         className
@@ -36,12 +36,12 @@ export function Breadcrumbs({ items, className, isLoading = false }: Breadcrumbs
         </ol>
       ) : (
         // Normal state
-        <ol className="flex flex-row items-center flex-nowrap">
+        <ol className="flex flex-row items-center flex-nowrap gap-1">
           {/* Home is always first */}
           <li className="flex items-center">
             <Link 
               to="/" 
-              className="transition-colors hover:text-primary whitespace-nowrap"
+              className="transition-colors hover:text-foreground whitespace-nowrap"
             >
               Home
             </Link>
@@ -50,11 +50,11 @@ export function Breadcrumbs({ items, className, isLoading = false }: Breadcrumbs
           {/* Render path items */}
           {items.map((item, index) => (
             <li key={item.id || index} className="flex items-center">
-              <ChevronRight className="h-4 w-4 mx-2 flex-shrink-0" aria-hidden="true" />
+              <ChevronRight className="h-3 w-3 mx-1 flex-shrink-0 text-muted-foreground/60" aria-hidden="true" />
               {item.href ? (
                 <Link 
                   to={item.href}
-                  className="transition-colors hover:text-primary whitespace-nowrap"
+                  className="transition-colors hover:text-foreground whitespace-nowrap"
                 >
                   {item.label}
                 </Link>

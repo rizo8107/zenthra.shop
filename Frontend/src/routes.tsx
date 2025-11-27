@@ -4,6 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import Navbar from "./components/Navbar"
 import Footer from "./components/Footer"
+import MobileBottomNav from "./components/MobileBottomNav"
 import { lazy, Suspense, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { trackPageView } from "@/lib/analytics"
@@ -135,8 +136,12 @@ export function Routes() {
             const isPuckAdmin = !!(flags && (flags as any).isPuckAdmin);
             return (
               <div className="flex flex-col min-h-screen">
-                {/* Hide Navbar on Puck admin editor pages and embed mode */}
-                {!isPuckAdmin && !isEmbed && <Navbar />}
+                {/* Hide Navbar on Puck admin editor pages and embed mode; only show on md+ */}
+                {!isPuckAdmin && !isEmbed && (
+                  <div className="hidden md:block">
+                    <Navbar />
+                  </div>
+                )}
                 {isEmbed && <EmbedBridge />}
                 <main className="flex-grow">
                   <Suspense fallback={<PageLoader />}>
@@ -223,6 +228,8 @@ export function Routes() {
                   </Suspense>
                 </main>
                 {!isEmbed && !isPuckAdmin && <Footer />}
+                {/* Mobile bottom navigation - shows on mobile screens only */}
+                {!isEmbed && !isPuckAdmin && <MobileBottomNav />}
               </div>
             )
           })()}

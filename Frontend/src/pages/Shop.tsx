@@ -19,7 +19,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { preloadImages } from '@/utils/imageOptimizer';
 import { Collections } from '@/lib/pocketbase';
 import { pocketbase } from '@/lib/pocketbase';
-import { Breadcrumbs, BreadcrumbItem } from '@/components/Breadcrumbs';
 import ProductCard from '@/components/ProductCard';
 
 export default function Shop() {
@@ -418,59 +417,47 @@ export default function Shop() {
     );
   }
 
-  // Generate breadcrumb items
-  const breadcrumbItems = [
-    { label: 'Shop' }
-  ];
-  
-  // Add category if filtered
-  if (category && category !== 'all') {
-    breadcrumbItems.push({
-      label: category.charAt(0).toUpperCase() + category.slice(1),
-    });
-  }
-
   return (
     <div className="min-h-screen bg-background">
       {/* Hero Section removed as requested */}
 
       <div className="konipai-container py-10">
-        {/* Breadcrumbs */}
-        <Breadcrumbs 
-          items={breadcrumbItems} 
-          className="mb-6"
-          isLoading={loading}
-        />
-        
         <div className="space-y-8">
-          {/* Search and Filters */}
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="relative w-full max-w-sm">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search products..."
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-4">
-              <Select value={sortBy} onValueChange={(value: 'default' | 'name' | 'price' | 'bestseller') => setSortBy(value)}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="default">Default</SelectItem>
-                  <SelectItem value="name">Name</SelectItem>
-                  <SelectItem value="price">Price</SelectItem>
-                  <SelectItem value="bestseller">Bestseller</SelectItem>
-                </SelectContent>
-              </Select>
+          {/* Search and Filters - Sticky on mobile */}
+          <div className="sticky top-14 lg:top-16 z-40 bg-background/95 backdrop-blur-sm -mx-4 px-4 py-3 sm:static sm:bg-transparent sm:backdrop-blur-none sm:mx-0 sm:px-0 sm:py-0 border-b sm:border-b-0 border-border">
+            <div className="bg-card border border-border/60 rounded-xl px-3 py-3 sm:px-4 sm:py-3 shadow-sm flex items-center justify-between gap-3 flex-wrap">
+              {/* Search - Full width on mobile */}
+              <div className="relative w-full sm:w-auto sm:max-w-sm order-1 sm:order-none">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search products..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="pl-10 h-10 rounded-lg bg-background border border-border/70 focus-visible:ring-1 focus-visible:ring-primary/50"
+                />
+              </div>
+              {/* Sort and Filter buttons */}
+              <div className="flex gap-2 sm:gap-4 order-2 w-full sm:w-auto">
+                <Select value={sortBy} onValueChange={(value: 'default' | 'name' | 'price' | 'bestseller') => setSortBy(value)}>
+                  <SelectTrigger className="flex-1 sm:flex-none sm:w-[150px] h-10 rounded-lg border-border/70 text-xs sm:text-sm">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="default">Default</SelectItem>
+                    <SelectItem value="name">Name</SelectItem>
+                    <SelectItem value="price">Price</SelectItem>
+                    <SelectItem value="bestseller">Bestseller</SelectItem>
+                  </SelectContent>
+                </Select>
 
               <Sheet>
                 <SheetTrigger asChild>
-                  <Button variant="outline" size="icon">
+                  <Button
+                    variant="outline"
+                    className="h-10 px-3 sm:px-2 gap-2 rounded-lg border-border/70 text-xs sm:text-sm"
+                  >
                     <SlidersHorizontal className="h-4 w-4" />
+                    <span className="sm:hidden">Filter</span>
                   </Button>
                 </SheetTrigger>
                 <SheetContent>
@@ -543,6 +530,7 @@ export default function Shop() {
                   </ScrollArea>
                 </SheetContent>
               </Sheet>
+              </div>
             </div>
           </div>
 

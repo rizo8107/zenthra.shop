@@ -388,22 +388,25 @@ export default function Navbar() {
         </nav>
 
         {/* Search, cart and user menu */}
-        <div className="flex flex-1 items-center justify-end space-x-4">
-          <nav className="flex items-center space-x-2">
+        <div className="flex flex-1 items-center justify-end space-x-2 sm:space-x-4">
+          <nav className="flex items-center space-x-1 sm:space-x-2">
             <Button variant="ghost" size="icon" onClick={() => setSearchOpen(true)} aria-label="Search (Ctrl/Cmd+K)">
               <Search className="h-5 w-5" />
             </Button>
-            <Cart>
-              <Button variant="ghost" size="icon" className="relative">
-                <ShoppingBag className="h-6 w-6" />
-                {itemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
-                    {itemCount}
-                  </span>
-                )}
-                <span className="sr-only">Open cart</span>
-              </Button>
-            </Cart>
+            {/* Cart button - hidden on mobile since we have bottom nav */}
+            <div className="hidden sm:block">
+              <Cart>
+                <Button variant="ghost" size="icon" className="relative">
+                  <ShoppingBag className="h-6 w-6" />
+                  {itemCount > 0 && (
+                    <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-primary text-[10px] font-medium text-primary-foreground flex items-center justify-center">
+                      {itemCount}
+                    </span>
+                  )}
+                  <span className="sr-only">Open cart</span>
+                </Button>
+              </Cart>
+            </div>
 
             <div className="hidden lg:block">
               {user ? (
