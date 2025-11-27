@@ -20,6 +20,7 @@ import {
   Menu,
   MessageCircle,
   Megaphone,
+  CreditCard,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -83,6 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   const items = [
     { title: 'Dashboard', path: '/admin', icon: LayoutDashboard },
     { title: 'Orders', path: '/admin/orders', icon: ShoppingCart },
+    { title: 'Payments', path: '/admin/payments', icon: CreditCard },
     { title: 'Coupons', path: '/admin/coupons', icon: FileText },
     { title: 'Customers', path: '/admin/customers', icon: Users },
     { title: 'Abandoned carts', path: '/admin/abandoned-carts', icon: AlertTriangle },

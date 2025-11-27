@@ -8,6 +8,7 @@ import { ThemeProvider } from "@/components/theme/theme-provider";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import DashboardPage from "./pages/admin/DashboardPage";
 import OrdersPage from "./pages/admin/OrdersPage";
+import PaymentsPage from "./pages/admin/PaymentsPage";
 import CustomersPage from "./pages/admin/CustomersPage";
 import AbandonedCartsPage from "./pages/admin/AbandonedCartsPage";
 import ProductsPage from "./pages/admin/ProductsPage";
@@ -80,6 +81,7 @@ const App = () => {
               {/* Admin routes */}
               <Route path="/admin" element={<ProtectedRoute><DashboardPage /></ProtectedRoute>} />
               <Route path="/admin/orders" element={<ProtectedRoute><OrdersPage /></ProtectedRoute>} />
+              <Route path="/admin/payments" element={<ProtectedRoute><PaymentsPage /></ProtectedRoute>} />
               <Route path="/admin/customers" element={<ProtectedRoute><CustomersPage /></ProtectedRoute>} />
               <Route path="/admin/abandoned-carts" element={<ProtectedRoute><AbandonedCartsPage /></ProtectedRoute>} />
               <Route path="/admin/products" element={<ProtectedRoute><ProductsPage /></ProtectedRoute>} />
