@@ -279,9 +279,10 @@ export default function PaymentLink() {
       const order = await pocketbase.collection('orders').create(orderData);
       console.log("Order created:", order.id);
       
-      // Create Razorpay order
+      // Create Razorpay order - pass amount in RUPEES (not paise)
+      // The createRazorpayOrder function sends to backend which converts to paise
       const razorpayOrder = await createRazorpayOrder(
-        Math.round(linkData.total * 100), // Amount in paise
+        linkData.total, // Amount in rupees - backend will convert to paise
         "INR",
         order.id
       );
@@ -308,7 +309,7 @@ export default function PaymentLink() {
       const response = await new Promise<RazorpayResponse>((resolve, reject) => {
         const options = {
           key: getRazorpayKeyId(),
-          amount: Math.round(linkData.total * 100), // Amount in paise
+          amount: razorpayOrder.amount, // Use the amount from the created order (already in paise)
           currency: "INR",
           name: shopName,
           description: linkData.title,
@@ -342,10 +343,10 @@ export default function PaymentLink() {
         response.razorpay_signature || ''
       );
       
-      // Capture payment
+      // Capture payment - use amount from order (already in paise)
       const captureSuccess = await captureRazorpayPayment(
         response.razorpay_payment_id,
-        Math.round(linkData.total * 100)
+        razorpayOrder.amount
       );
       
       // Update order with payment details
