@@ -990,6 +990,23 @@ export function NodeConfigEditor({
         return true;
       });
     }
+
+    // Conditional visibility for report.sales based on statusFilter
+    if (nodeType === 'report.sales') {
+      const statusFilter = String(localConfig.statusFilter ?? 'paid');
+      return nodeDefinition.config.filter((field) => {
+        // Always show period & statusFilter
+        if (field.key === 'period') return true;
+        if (field.key === 'statusFilter') return true;
+
+        // Show customFilter only when advanced mode is selected
+        if (field.key === 'customFilter') {
+          return statusFilter === 'custom';
+        }
+
+        return true;
+      });
+    }
     
     return nodeDefinition.config;
   };

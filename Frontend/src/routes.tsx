@@ -38,13 +38,6 @@ const ForgotPasswordPage = lazy(() => import("./pages/auth/forgot-password"))
 const ResetPasswordPage = lazy(() => import("./pages/auth/reset-password"))
 const ProfilePage = lazy(() => import("./pages/profile"))
 const OrderDetail = lazy(() => import("./pages/OrderDetail"))
-const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"))
-const OrderTracking = lazy(() => import("./pages/OrderTracking"))
-const Orders = lazy(() => import("./pages/Orders"))
-
-// Builder.io pages
-const BuilderPage = lazy(() => import("./pages/BuilderPage"))
-const BuilderExample = lazy(() => import("./pages/BuilderExample"))
 
 // Policy pages
 const ContactUs = lazy(() => import("./pages/ContactUs"))
@@ -52,6 +45,15 @@ const ShippingPolicy = lazy(() => import("./pages/ShippingPolicy"))
 const TermsAndConditions = lazy(() => import("./pages/TermsAndConditions"))
 const CancellationsRefunds = lazy(() => import("./pages/CancellationsRefunds"))
 const PrivacyPolicy = lazy(() => import("./pages/PrivacyPolicy"))
+
+const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"))
+const OrderTracking = lazy(() => import("./pages/OrderTracking"))
+const Orders = lazy(() => import("./pages/Orders"))
+const PaymentLink = lazy(() => import("./pages/PaymentLink"))
+
+// Builder.io pages
+const BuilderPage = lazy(() => import("./pages/BuilderPage"))
+const BuilderExample = lazy(() => import("./pages/BuilderExample"))
 
 // Add the webhook test page to the import
 const WebhookTest = lazy(() => import("./pages/WebhookTest"))
@@ -211,6 +213,9 @@ export function Routes() {
                       />
                       <Route path="/webhook-test" element={<WebhookTest />} />
                       
+                      {/* Payment Link - public checkout page */}
+                      <Route path="/pay/:code" element={<PaymentLink />} />
+
                       {/* Puck CMS routes */}
                       <Route path="/page/:slug" element={<PuckRenderer />} />
                       <Route path="/admin" element={<AdminRoute />}>

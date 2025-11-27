@@ -36,7 +36,9 @@ import {
   AlertCircle,
   Printer,
   Download,
+  Link2,
 } from "lucide-react";
+import { CreatePaymentLinkDialog } from "@/components/dialogs/CreatePaymentLinkDialog";
 import { format } from "date-fns";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { Card, CardContent } from "@/components/ui/card";
@@ -141,6 +143,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
   const [showFilters, setShowFilters] = useState(false);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [showPaymentLinkDialog, setShowPaymentLinkDialog] = useState(false);
 
   // Webhook target for status changes
   const WEBHOOK_URL =
@@ -492,6 +495,13 @@ export const OrdersTable: FC<OrdersTableProps> = ({
                 {selectedOrders.length} Selected
               </Button>
             )}
+            <Button
+              variant="default"
+              onClick={() => setShowPaymentLinkDialog(true)}
+              className="whitespace-nowrap bg-primary"
+            >
+              <Link2 size={16} className="mr-2" /> Create Payment Link
+            </Button>
             {onRefresh && (
               <Button variant="outline" onClick={onRefresh}>
                 Refresh
@@ -499,6 +509,15 @@ export const OrdersTable: FC<OrdersTableProps> = ({
             )}
           </div>
         </div>
+
+        {/* Payment Link Dialog */}
+        <CreatePaymentLinkDialog
+          open={showPaymentLinkDialog}
+          onOpenChange={setShowPaymentLinkDialog}
+          onCreated={() => {
+            // Optionally refresh or show notification
+          }}
+        />
 
         {showFilters && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-md bg-muted/30">

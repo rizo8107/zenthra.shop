@@ -301,7 +301,7 @@ async function executeSalesReport(
   }
 
   // Build base filter
-  let filterParts: string[] = [];
+  const filterParts: string[] = [];
 
   if (statusFilter === 'paid') {
     filterParts.push('payment_status="paid"');
