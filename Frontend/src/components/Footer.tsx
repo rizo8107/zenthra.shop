@@ -30,14 +30,14 @@ const Footer = () => {
 
   return (
     <footer className="text-white" style={{ backgroundColor: footerBgColor }}>
-      <div className="karigai-container py-8 px-6 lg:px-30 md:py-10">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+      <div className="karigai-container py-5 px-4 lg:px-30 md:py-6">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-start">
           {/* Logo + about + socials */}
           <div className="md:col-span-4">
-            <Link to="/" className="inline-block mb-4">
-              <Logo variant="light" className="h-8" />
+            <Link to="/" className="inline-block mb-3">
+              <Logo variant="light" className="h-7" />
             </Link>
-            <p className="text-white/80 mb-4 text-sm leading-relaxed">
+            <p className="text-white/80 mb-3 text-xs md:text-sm leading-relaxed">
               {aboutText}
             </p>
             <div className="flex space-x-4">
@@ -67,7 +67,7 @@ const Footer = () => {
 
           {/* Shop */}
           <div className="md:col-span-2">
-            <h3 className="font-semibold mb-4 text-[18px] leading-[24px]">Shop</h3>
+            <h3 className="font-semibold mb-3 text-sm md:text-[18px] md:leading-[24px]">Shop</h3>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -98,7 +98,7 @@ const Footer = () => {
 
           {/* Policies */}
           <div className="md:col-span-3">
-            <h3 className="font-semibold mb-4 text-[18px] leading-[24px]">Policies</h3>
+            <h3 className="font-semibold mb-3 text-sm md:text-[18px] md:leading-[24px]">Policies</h3>
             <ul className="space-y-2">
               <li>
                 <Link
@@ -145,25 +145,25 @@ const Footer = () => {
 
           {/* Stay Connected / newsletter */}
           <div className="md:col-span-3">
-            <h3 className="font-semibold mb-4 text-[18px] leading-[24px]">
+            <h3 className="font-semibold mb-3 text-sm md:text-[18px] md:leading-[24px]">
               Stay Connected
             </h3>
-            <p className="text-white/80 text-sm mb-3">
+            <p className="text-white/80 text-xs md:text-sm mb-2">
               Subscribe to our newsletter for exclusive offers and updates.
             </p>
             <form className="flex items-center gap-2 max-w-xs">
-              <div className="flex items-center bg-white/10 rounded-full px-4 py-2 w-full">
+              <div className="flex items-center bg-white/10 rounded-full px-3 py-1.5 w-full">
                 <input
                   type="email"
                   placeholder="Enter your email"
-                  className="bg-transparent placeholder:text-white/70 text-white outline-none w-full text-sm"
+                  className="bg-transparent placeholder:text-white/70 text-white outline-none w-full text-xs md:text-sm"
                   aria-label="Email"
                 />
               </div>
               <Button
                 type="submit"
                 size="icon"
-                className="rounded-full bg-white/20 hover:bg-white/30 text-white"
+                className="rounded-full bg-white/20 hover:bg-white/30 text-white h-8 w-8"
                 aria-label="Subscribe"
               >
                 
@@ -172,8 +172,8 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="border-t border-white/20 mt-6">
-          <div className="py-3 flex justify-center items-center text-white/80 text-xs text-center">
+        <div className="border-t border-white/20 mt-4">
+          <div className="py-2 flex justify-center items-center text-white/80 text-[11px] md:text-xs text-center">
             <p>{copyright}</p>
           </div>
         </div>

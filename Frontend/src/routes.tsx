@@ -5,6 +5,8 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import Navbar from "./components/Navbar"
 import Footer from "./components/Footer"
 import MobileBottomNav from "./components/MobileBottomNav"
+import MobileBrandBar from "./components/MobileBrandBar"
+
 import { lazy, Suspense, useEffect } from "react"
 import { Loader2 } from "lucide-react"
 import { trackPageView } from "@/lib/analytics"
@@ -138,9 +140,13 @@ export function Routes() {
               <div className="flex flex-col min-h-screen">
                 {/* Hide Navbar on Puck admin editor pages and embed mode; only show on md+ */}
                 {!isPuckAdmin && !isEmbed && (
-                  <div className="hidden md:block">
-                    <Navbar />
-                  </div>
+                  <>
+                    <div className="hidden md:block">
+                      <Navbar />
+                    </div>
+                    {/* Mobile brand bar (shown only on mobile via its own classes) */}
+                    <MobileBrandBar />
+                  </>
                 )}
                 {isEmbed && <EmbedBridge />}
                 <main className="flex-grow">
