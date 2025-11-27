@@ -98,8 +98,14 @@ const ORDER_EVENTS = [
 // Template variables available
 const TEMPLATE_VARIABLES = [
   { key: '{{customerName}}', description: 'Customer name' },
+  { key: '{{customerPhone}}', description: 'Customer phone number' },
   { key: '{{orderId}}', description: 'Order ID' },
   { key: '{{amount}}', description: 'Order amount' },
+  { key: '{{firstProductName}}', description: 'First product name in the order' },
+  { key: '{{productList}}', description: 'Comma separated list of product names' },
+  { key: '{{itemsCount}}', description: 'Number of items in the order' },
+  { key: '{{firstProductImageUrl}}', description: 'URL of the first product image in the order' },
+  { key: '{{shippingAddress}}', description: 'Full shipping address' },
   { key: '{{trackingLink}}', description: 'Tracking URL' },
   { key: '{{carrier}}', description: 'Shipping carrier' },
   { key: '{{estimatedDelivery}}', description: 'Estimated delivery date' },
@@ -109,6 +115,26 @@ const TEMPLATE_VARIABLES = [
   { key: '{{cartUrl}}', description: 'Cart URL' },
   { key: '{{storeName}}', description: 'Store name' },
 ];
+
+const TEMPLATE_VARIABLE_GROUPS = [
+  {
+    label: 'Customer',
+    keys: ['{{customerName}}', '{{customerPhone}}'],
+  },
+  {
+    label: 'Order & Products',
+    keys: ['{{orderId}}', '{{amount}}', '{{firstProductName}}', '{{productList}}', '{{itemsCount}}', '{{firstProductImageUrl}}'],
+  },
+  {
+    label: 'Shipping & Links',
+    keys: ['{{shippingAddress}}', '{{trackingLink}}', '{{carrier}}', '{{estimatedDelivery}}', '{{feedbackLink}}', '{{retryUrl}}', '{{refundAmount}}', '{{cartUrl}}', '{{storeName}}'],
+  },
+].map(group => ({
+  label: group.label,
+  items: group.keys
+    .map(key => TEMPLATE_VARIABLES.find(v => v.key === key))
+    .filter((v): v is { key: string; description: string } => Boolean(v)),
+}));
 
 export default function WhatsAppConfigPage() {
   const { toast } = useToast();
@@ -995,18 +1021,25 @@ export default function WhatsAppConfigPage() {
                       {/* Variable quick insert */}
                       <div className="grid gap-2">
                         <Label>Quick Insert Variables</Label>
-                        <div className="flex flex-wrap gap-2">
-                          {TEMPLATE_VARIABLES.map(v => (
-                            <Button
-                              key={v.key}
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => insertVariable(v.key)}
-                              title={v.description}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          {TEMPLATE_VARIABLE_GROUPS.map((group) => (
+                            <Select
+                              key={group.label}
+                              onValueChange={(variableKey) => {
+                                insertVariable(variableKey);
+                              }}
                             >
-                              {v.key}
-                            </Button>
+                              <SelectTrigger className="h-8 text-xs">
+                                <SelectValue placeholder={group.label} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {group.items.map((v) => (
+                                  <SelectItem key={v.key} value={v.key}>
+                                    {v.key}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           ))}
                         </div>
                       </div>
@@ -1193,15 +1226,24 @@ export default function WhatsAppConfigPage() {
                                 id="mediaUrl"
                                 value={newTemplateForm.mediaUrl}
                                 onChange={(e) => setNewTemplateForm(prev => ({ ...prev, mediaUrl: e.target.value }))}
-                                placeholder="Select from content or paste URL"
+                                placeholder="Select from content, paste URL, or use a variable"
                                 className="flex-1"
                               />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setNewTemplateForm(prev => ({ ...prev, mediaUrl: '{{firstProductImageUrl}}' }))}                                className="text-xs"
+                              >
+                                Use product image
+                              </Button>
                               {newTemplateForm.mediaUrl && (
                                 <Button
                                   type="button"
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => setNewTemplateForm(prev => ({ ...prev, mediaUrl: '' }))}
+                                  title="Clear media URL"
                                 >
                                   <X className="h-4 w-4" />
                                 </Button>
@@ -1362,8 +1404,13 @@ export default function WhatsAppConfigPage() {
                                 {/* Message with variables replaced */}
                                 {newTemplateForm.content
                                   .replace(/\{\{customerName\}\}/g, 'John Doe')
+                                  .replace(/\{\{customerPhone\}\}/g, '+91 98765 43210')
                                   .replace(/\{\{orderId\}\}/g, 'ORD12345')
                                   .replace(/\{\{amount\}\}/g, '₹1,299')
+                                  .replace(/\{\{firstProductName\}\}/g, 'Viruthvi Gold Saree')
+                                  .replace(/\{\{productList\}\}/g, 'Viruthvi Gold Saree, Ananya Silk Blouse')
+                                  .replace(/\{\{itemsCount\}\}/g, '2')
+                                  .replace(/\{\{shippingAddress\}\}/g, '12, MG Road, Chennai, TN 600001, India')
                                   .replace(/\{\{trackingLink\}\}/g, 'https://track.example.com/123')
                                   .replace(/\{\{carrier\}\}/g, 'BlueDart')
                                   .replace(/\{\{estimatedDelivery\}\}/g, '3-5 business days')
@@ -1372,6 +1419,7 @@ export default function WhatsAppConfigPage() {
                                   .replace(/\{\{refundAmount\}\}/g, '₹500')
                                   .replace(/\{\{cartUrl\}\}/g, 'https://example.com/cart')
                                   .replace(/\{\{storeName\}\}/g, 'Zenthra Shop')
+                                  .replace(/\{\{firstProductImageUrl\}\}/g, 'https://cdn.example.com/products/first.jpg')
                                 }
                                 {/* Timestamp */}
                                 <div className="text-[10px] text-white/50 text-right mt-1 flex items-center justify-end gap-1">

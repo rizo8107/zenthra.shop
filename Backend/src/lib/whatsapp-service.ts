@@ -35,6 +35,9 @@ interface OrderData {
   first_product_name?: string;
   product_list?: string;
   items_count?: number | string;
+  // Shipping details and product image for richer templates
+  shipping_address?: string;
+  first_product_image_url?: string;
 }
 
 // Get template from PocketBase
@@ -136,12 +139,15 @@ export async function notifyOrderConfirmation(order: OrderData): Promise<void> {
   
   const variables = {
     customerName: order.customer_name,
+    customerPhone: order.customer_phone,
     orderId: order.id.slice(0, 8),
     amount: String(order.total),
     storeName: 'Zenthra Shop',
     firstProductName: order.first_product_name || '',
     productList: order.product_list || '',
     itemsCount: String(order.items_count ?? ''),
+    shippingAddress: order.shipping_address || '',
+    firstProductImageUrl: order.first_product_image_url || '',
   };
   
   const fallback = `🎉 *Order Confirmed* 🎉\n\nHi ${order.customer_name},\n\nYour order #${order.id.slice(0, 8)} has been confirmed!\n\nTotal: ₹${order.total}\n\nThank you for shopping with us.`;
@@ -166,9 +172,15 @@ export async function notifyPaymentFailed(order: OrderData, retryUrl?: string): 
   
   const variables = {
     customerName: order.customer_name,
+    customerPhone: order.customer_phone,
     orderId: order.id.slice(0, 8),
     amount: String(order.total),
     retryUrl: url,
+    firstProductName: order.first_product_name || '',
+    productList: order.product_list || '',
+    itemsCount: String(order.items_count ?? ''),
+    shippingAddress: order.shipping_address || '',
+    firstProductImageUrl: order.first_product_image_url || '',
   };
   
   const fallback = `❌ *Payment Failed* ❌\n\nHi ${order.customer_name},\n\nWe couldn't process your payment for order #${order.id.slice(0, 8)}.\n\nPlease try again: ${url}`;
@@ -187,10 +199,16 @@ export async function notifyOrderShipped(order: OrderData, trackingLink?: string
   
   const variables = {
     customerName: order.customer_name,
+    customerPhone: order.customer_phone,
     orderId: order.id.slice(0, 8),
     trackingLink: tracking,
     carrier: shipCarrier,
     estimatedDelivery: '3-5 business days',
+    firstProductName: order.first_product_name || '',
+    productList: order.product_list || '',
+    itemsCount: String(order.items_count ?? ''),
+    shippingAddress: order.shipping_address || '',
+    firstProductImageUrl: order.first_product_image_url || '',
   };
   
   const fallback = `🚚 *Order Shipped* 🚚\n\nHi ${order.customer_name},\n\nGreat news! Your order #${order.id.slice(0, 8)} has been shipped.\n\nCarrier: ${shipCarrier}\nTracking: ${tracking}\n\nThank you for your patience!`;
@@ -206,7 +224,13 @@ export async function notifyOutForDelivery(order: OrderData): Promise<void> {
   
   const variables = {
     customerName: order.customer_name,
+    customerPhone: order.customer_phone,
     orderId: order.id.slice(0, 8),
+    firstProductName: order.first_product_name || '',
+    productList: order.product_list || '',
+    itemsCount: String(order.items_count ?? ''),
+    shippingAddress: order.shipping_address || '',
+    firstProductImageUrl: order.first_product_image_url || '',
   };
   
   const fallback = `🚚 *Out for Delivery* 🚚\n\nHi ${order.customer_name},\n\nYour order #${order.id.slice(0, 8)} is out for delivery today!\n\nPlease ensure someone is available to receive it.`;
@@ -224,8 +248,14 @@ export async function notifyOrderDelivered(order: OrderData): Promise<void> {
   
   const variables = {
     customerName: order.customer_name,
+    customerPhone: order.customer_phone,
     orderId: order.id.slice(0, 8),
     feedbackLink: feedbackLink,
+    firstProductName: order.first_product_name || '',
+    productList: order.product_list || '',
+    itemsCount: String(order.items_count ?? ''),
+    shippingAddress: order.shipping_address || '',
+    firstProductImageUrl: order.first_product_image_url || '',
   };
   
   const fallback = `📦 *Order Delivered* 📦\n\nHi ${order.customer_name},\n\nYour order #${order.id.slice(0, 8)} has been delivered!\n\nWe hope you love your purchase. Share your feedback: ${feedbackLink}\n\nThank you!`;
@@ -241,7 +271,13 @@ export async function notifyOrderCancelled(order: OrderData): Promise<void> {
   
   const variables = {
     customerName: order.customer_name,
+    customerPhone: order.customer_phone,
     orderId: order.id.slice(0, 8),
+    firstProductName: order.first_product_name || '',
+    productList: order.product_list || '',
+    itemsCount: String(order.items_count ?? ''),
+    shippingAddress: order.shipping_address || '',
+    firstProductImageUrl: order.first_product_image_url || '',
   };
   
   const fallback = `❌ *Order Cancelled* ❌\n\nHi ${order.customer_name},\n\nYour order #${order.id.slice(0, 8)} has been cancelled.\n\nIf you have any questions, please contact our support team.`;
@@ -259,8 +295,14 @@ export async function notifyRefundProcessed(order: OrderData, refundAmount?: num
   
   const variables = {
     customerName: order.customer_name,
+    customerPhone: order.customer_phone,
     orderId: order.id.slice(0, 8),
     refundAmount: String(amount),
+    firstProductName: order.first_product_name || '',
+    productList: order.product_list || '',
+    itemsCount: String(order.items_count ?? ''),
+    shippingAddress: order.shipping_address || '',
+    firstProductImageUrl: order.first_product_image_url || '',
   };
   
   const fallback = `💰 *Refund Processed* 💰\n\nHi ${order.customer_name},\n\nWe've processed your refund of ₹${amount} for order #${order.id.slice(0, 8)}.\n\nThe amount should appear in your account within 5-7 business days.\n\nThank you for your patience.`;

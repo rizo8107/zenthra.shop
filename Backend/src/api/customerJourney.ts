@@ -2,6 +2,7 @@ import express from 'express';
 import crypto from 'crypto';
 import { pb } from '../lib/pocketbase.js';
 import { emitEvent } from '../server/webhookDispatcher.js';
+import { startRunFromJourneyEvent } from '../features/automation/engine.js';
 import dotenv from 'dotenv';
 
 // Load env from the project root (../.env) so we pick up the same vars Vite sees
@@ -356,6 +357,24 @@ router.post('/webhook/customer-journey', async (req, res) => {
     } catch (emitError) {
       console.warn('Webhook emit warning for customer journey event (non-fatal):',
         emitError instanceof Error ? emitError.message : emitError);
+    }
+
+    // Start automation flow runs for journey events (non-blocking)
+    try {
+      // Construct payload for automation engine
+      const automationPayload = {
+        ...event,
+        customer,
+        phone: event.metadata.phone || customer.phone,
+        customer_name: event.customer_name,
+        customer_email: event.customer_email,
+      };
+      
+      // Start flows in background
+      void startRunFromJourneyEvent(automationPayload);
+    } catch (automationError) {
+      console.warn('Automation engine warning (non-fatal):',
+        automationError instanceof Error ? automationError.message : automationError);
     }
     
     // Return success response

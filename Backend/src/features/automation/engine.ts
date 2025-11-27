@@ -1,0 +1,621 @@
+import { pb } from '../../lib/pocketbase.js';
+import type { FlowSummary, FlowCanvas, FlowNode, FlowEdge, FlowRun, FlowRunStep } from './types.js';
+import { getNodeDefinition } from './nodes/nodeDefinitions.js';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface ExecutionContext {
+  input: Record<string, any>;
+  event: Record<string, any>; // Original trigger event data
+  vars: Record<string, any>;
+  metadata?: Record<string, any>;
+}
+
+interface NodeExecutionResult {
+  output: Record<string, any>;
+  nextNodeId?: string;
+  nextHandle?: string; // For conditional branching (e.g., "true" or "false")
+}
+
+// ============================================================================
+// TEMPLATE VARIABLE SUBSTITUTION
+// ============================================================================
+
+/**
+ * Replace {{path.to.value}} with actual values from context
+ * Substitute template variables like {{input.customer_name}}
+ */
+function substituteVariables(template: string, context: ExecutionContext): string {
+  return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
+    const trimmedPath = path.trim();
+    const value = getByPath(context, trimmedPath);
+    
+    // Debug logging
+    if (value === undefined || value === null) {
+      console.log(`[substituteVariables] Could not resolve: ${trimmedPath}`);
+      console.log(`[substituteVariables] Context keys:`, Object.keys(context));
+      console.log(`[substituteVariables] Input keys:`, context.input ? Object.keys(context.input) : 'no input');
+      console.log(`[substituteVariables] Event keys:`, context.event ? Object.keys(context.event) : 'no event');
+    }
+    
+    return value !== undefined && value !== null ? String(value) : match;
+  });
+}
+
+/**
+ * Get value from object by dot-separated path
+ * For ExecutionContext, tries input first, then falls back to event for paths starting with "input."
+ */
+function getByPath(obj: any, path: string): any {
+  const parts = path.split('.');
+  let current = obj;
+  
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    current = current[part];
+  }
+  
+  // If not found and path starts with "input." and obj has event, try event instead
+  if (current === undefined && obj.event && path.startsWith('input.')) {
+    const eventPath = path.substring(6); // Remove "input." prefix
+    current = obj.event;
+    const eventParts = eventPath.split('.');
+    for (const part of eventParts) {
+      if (current === null || current === undefined) return undefined;
+      current = current[part];
+    }
+  }
+  
+  return current;
+}
+
+/**
+ * Substitute variables in JSON object (recursive)
+ */
+function substituteInObject(obj: any, context: ExecutionContext): any {
+  if (typeof obj === 'string') {
+    return substituteVariables(obj, context);
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(item => substituteInObject(item, context));
+  }
+  if (obj && typeof obj === 'object') {
+    const result: Record<string, any> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = substituteInObject(value, context);
+    }
+    return result;
+  }
+  return obj;
+}
+
+// ============================================================================
+// NODE HANDLERS
+// ============================================================================
+
+/**
+ * Execute trigger.journey node
+ */
+async function executeTriggerJourney(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  // Journey trigger just forwards the input event data
+  return {
+    output: {
+      ...context.input,
+      event: context.input.event || context.input,
+      customer: context.input.customer,
+    },
+  };
+}
+
+/**
+ * Execute pb.find node
+ */
+async function executePbFind(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  const config = node.data?.config as Record<string, any> || {};
+  
+  const collection = config.collection as string;
+  if (!collection) {
+    throw new Error('pb.find: collection is required');
+  }
+
+  // Substitute variables in filter
+  const filterTemplate = config.filter as string || '';
+  const filter = substituteVariables(filterTemplate, context);
+  
+  const sort = (config.sort as string) || '-created';
+  const limit = Number(config.limit) || 50;
+  const page = Number(config.page) || 1;
+  const expand = (config.expand as string) || '';
+
+  console.log(`[pb.find] Querying ${collection} with filter: ${filter}`);
+
+  try {
+    const result = await pb.collection(collection).getList(page, limit, {
+      filter: filter || undefined,
+      sort,
+      expand: expand || undefined,
+    });
+
+    return {
+      output: {
+        items: result.items,
+        totalItems: result.totalItems,
+        page: result.page,
+        totalPages: result.totalPages,
+      },
+    };
+  } catch (error: any) {
+    console.error(`[pb.find] Error querying ${collection}:`, error.message);
+    return {
+      output: {
+        items: [],
+        totalItems: 0,
+        error: error.message,
+      },
+    };
+  }
+}
+
+/**
+ * Execute logic.if node
+ */
+async function executeLogicIf(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  const config = node.data?.config as Record<string, any> || {};
+  const condition = config.condition as string;
+
+  if (!condition) {
+    throw new Error('logic.if: condition is required');
+  }
+
+  console.log(`[logic.if] Evaluating: ${condition}`);
+
+  try {
+    // Create safe evaluation function
+    // WARNING: This uses Function constructor - only safe because flows are admin-created
+    const evalFn = new Function('input', 'vars', `return (${condition});`);
+    const result = evalFn(context.input, context.vars);
+    const isTrue = Boolean(result);
+
+    console.log(`[logic.if] Result: ${isTrue}`);
+
+    return {
+      output: {
+        condition,
+        result: isTrue,
+      },
+      nextHandle: isTrue ? 'true' : 'false',
+    };
+  } catch (error: any) {
+    console.error(`[logic.if] Error evaluating condition:`, error.message);
+    throw new Error(`Failed to evaluate condition: ${error.message}`);
+  }
+}
+
+/**
+ * Execute util.delay node
+ */
+async function executeUtilDelay(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  const config = node.data?.config as Record<string, any> || {};
+  
+  const amount = Number(config.amount) || 0;
+  const unit = (config.unit as string) || 'seconds';
+
+  let delayMs = 0;
+  switch (unit) {
+    case 'seconds':
+      delayMs = amount * 1000;
+      break;
+    case 'minutes':
+      delayMs = amount * 60 * 1000;
+      break;
+    case 'hours':
+      delayMs = amount * 60 * 60 * 1000;
+      break;
+  }
+
+  console.log(`[util.delay] Waiting ${amount} ${unit} (${delayMs}ms)`);
+
+  await new Promise(resolve => setTimeout(resolve, delayMs));
+
+  return {
+    output: context.input, // Pass through
+  };
+}
+
+/**
+ * Execute whatsapp.send node
+ */
+async function executeWhatsAppSend(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  const config = node.data?.config as Record<string, any> || {};
+  
+  const toPath = (config.toPath as string) || 'input.phone';
+  const template = (config.template as string) || '';
+  const connectionId = config.connectionId as string;
+  const instanceId = (config.sender as string) || 'zenthra'; // Evolution Instance ID from config
+  const delayMs = (config.delayMs as number) || 250;
+  const presence = (config.presence as string) || 'composing';
+  const linkPreview = config.linkPreview !== false; // Default true
+
+  // Get phone number from context
+  const phone = getByPath(context, toPath);
+  if (!phone) {
+    throw new Error(`whatsapp.send: Could not resolve phone from path "${toPath}"`);
+  }
+
+  // Substitute variables in template
+  const message = substituteVariables(template, context);
+
+  console.log(`[whatsapp.send] Sending to ${phone}: ${message.substring(0, 50)}...`);
+  console.log(`[whatsapp.send] Using instanceId: ${instanceId}`);
+
+  try {
+    // Get Evolution API config from plugins collection
+    let evolutionConfig: any;
+    
+    try {
+      console.log(`[whatsapp.send] Fetching plugin config for: ${connectionId}`);
+      const pluginRecord = await pb.collection('plugins').getFirstListItem(`key="${connectionId}"`, {
+        $autoCancel: false,
+      });
+      evolutionConfig = pluginRecord.config;
+      console.log(`[whatsapp.send] Plugin config loaded successfully`);
+    } catch (error) {
+      console.error('[whatsapp.send] Error fetching Evolution config:', error);
+      throw new Error('Evolution API not configured in Plugins Manager');
+    }
+
+    if (!evolutionConfig?.baseUrl || !evolutionConfig?.tokenOrKey) {
+      throw new Error('Evolution API baseUrl or tokenOrKey not configured');
+    }
+    
+    // Use instanceId from node config, or fall back to plugin config
+    const finalInstanceId = instanceId || evolutionConfig.defaultSender || 'zenthra';
+    const apiKey = evolutionConfig.tokenOrKey;
+
+    console.log(`[whatsapp.send] Evolution API: ${evolutionConfig.baseUrl}, Instance: ${finalInstanceId}`);
+
+    // Send directly to Evolution API
+    const url = `${evolutionConfig.baseUrl.replace(/\/$/, '')}/message/sendText/${finalInstanceId}`;
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': apiKey,
+      },
+      body: JSON.stringify({
+        number: String(phone).replace(/\D/g, ''),
+        text: message,
+        options: {
+          delay: delayMs,
+          presence: presence,
+          linkPreview: linkPreview,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `Evolution API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`[whatsapp.send] Message sent successfully:`, result);
+
+    // Log to whatsapp_activity for deduplication
+    try {
+      await pb.collection('whatsapp_activity').create({
+        recipient: String(phone),
+        template_name: 'ABANDONED_CART',
+        message_text: message,
+        status: 'sent',
+      });
+    } catch (logError) {
+      console.warn('[whatsapp.send] Failed to log activity:', logError);
+    }
+
+    return {
+      output: {
+        phone,
+        message,
+        sent: true,
+        result,
+      },
+    };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[whatsapp.send] Error sending message:`, errorMessage);
+    throw new Error(`Failed to send WhatsApp: ${errorMessage}`);
+  }
+}
+
+// ============================================================================
+// CORE EXECUTOR
+// ============================================================================
+
+/**
+ * Execute a single node
+ */
+async function executeNode(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  const nodeType = node.data?.type as string;
+  
+  console.log(`[executor] Executing node ${node.id} (${nodeType})`);
+
+  switch (nodeType) {
+    case 'trigger.journey':
+      return await executeTriggerJourney(node, context);
+    case 'pb.find':
+      return await executePbFind(node, context);
+    case 'logic.if':
+      return await executeLogicIf(node, context);
+    case 'util.delay':
+      return await executeUtilDelay(node, context);
+    case 'whatsapp.send':
+      return await executeWhatsAppSend(node, context);
+    default:
+      console.warn(`[executor] Unsupported node type: ${nodeType}`);
+      return {
+        output: context.input, // Pass through
+      };
+  }
+}
+
+/**
+ * Find the next node to execute based on edges
+ */
+function findNextNode(
+  currentNodeId: string,
+  edges: FlowEdge[],
+  handle?: string
+): string | null {
+  // Find edge from current node
+  let targetEdge = edges.find(
+    edge => edge.source === currentNodeId && (!handle || edge.sourceHandle === handle)
+  );
+
+  // Fallback: if no edge with specific handle, try default edge
+  if (!targetEdge && handle) {
+    targetEdge = edges.find(edge => edge.source === currentNodeId && !edge.sourceHandle);
+  }
+
+  return targetEdge?.target || null;
+}
+
+/**
+ * Execute a flow run
+ */
+export async function executeFlowRun(
+  runId: string,
+  flow: FlowSummary,
+  inputEvent: Record<string, any>
+): Promise<void> {
+  console.log(`[engine] Starting execution of run ${runId} for flow ${flow.id}`);
+
+  try {
+    // Mark run as running
+    await pb.collection('runs').update(runId, {
+      status: 'running',
+    });
+
+    const canvas = flow.canvasJson;
+    const nodes = canvas.nodes;
+    const edges = canvas.edges;
+
+    // Build node lookup
+    const nodesById = new Map<string, FlowNode>();
+    for (const node of nodes) {
+      nodesById.set(node.id, node);
+    }
+
+    // Find trigger node
+    const triggerNode = nodes.find(node => {
+      const nodeType = node.data?.type as string;
+      return nodeType?.startsWith('trigger.');
+    });
+
+    if (!triggerNode) {
+      throw new Error('No trigger node found in flow');
+    }
+
+    // Initialize execution context
+    const context: ExecutionContext = {
+      input: inputEvent,
+      event: inputEvent, // Preserve original event data
+      vars: {},
+      metadata: {
+        flowId: flow.id,
+        runId,
+      },
+    };
+
+    // Start execution from trigger
+    let currentNodeId: string | null = triggerNode.id;
+    let stepCount = 0;
+    const maxSteps = 100; // Prevent infinite loops
+
+    while (currentNodeId && stepCount < maxSteps) {
+      const currentNode = nodesById.get(currentNodeId);
+      if (!currentNode) {
+        throw new Error(`Node ${currentNodeId} not found`);
+      }
+
+      stepCount++;
+      const stepStartTime = new Date().toISOString();
+
+      // Create run step record
+      const stepRecord = await pb.collection('run_steps').create({
+        run_id: runId,
+        node_id: currentNode.id,
+        node_type: currentNode.data?.type || 'unknown',
+        status: 'running',
+        started_at: stepStartTime,
+        input: context.input,
+      });
+
+      try {
+        // Execute node
+        const result = await executeNode(currentNode, context);
+
+        // Update step as success
+        await pb.collection('run_steps').update(stepRecord.id, {
+          status: 'success',
+          finished_at: new Date().toISOString(),
+          output: result.output,
+        });
+
+        // Update context with output
+        context.input = result.output;
+
+        // Find next node
+        currentNodeId = findNextNode(currentNode.id, edges, result.nextHandle);
+
+      } catch (error: any) {
+        // Update step as failed
+        await pb.collection('run_steps').update(stepRecord.id, {
+          status: 'failed',
+          finished_at: new Date().toISOString(),
+          error: error.message,
+        });
+
+        throw error; // Propagate to fail the run
+      }
+    }
+
+    if (stepCount >= maxSteps) {
+      throw new Error('Flow execution exceeded maximum steps (possible infinite loop)');
+    }
+
+    // Mark run as success
+    await pb.collection('runs').update(runId, {
+      status: 'success',
+      finished_at: new Date().toISOString(),
+    });
+
+    console.log(`[engine] Run ${runId} completed successfully`);
+
+  } catch (error: any) {
+    console.error(`[engine] Run ${runId} failed:`, error.message);
+
+    // Mark run as failed
+    await pb.collection('runs').update(runId, {
+      status: 'failed',
+      finished_at: new Date().toISOString(),
+      error: error.message,
+    });
+  }
+}
+
+/**
+ * Start flow run from customer journey event
+ */
+export async function startRunFromJourneyEvent(
+  eventPayload: Record<string, any>
+): Promise<void> {
+  console.log(`[engine] Processing journey event:`, eventPayload);
+
+  try {
+    // Find active flows with trigger.journey
+    const flows = await pb.collection('flows').getFullList({
+      filter: 'status = "active"',
+    });
+
+    console.log(`[engine] Found ${flows.length} active flows`);
+
+    for (const flow of flows) {
+      // Parse canvasJson if it's a string (PocketBase might store it as JSON string)
+      let canvas: FlowCanvas;
+      try {
+        const rawCanvas = (flow as any).canvas_json || (flow as any).canvasJson;
+        if (!rawCanvas) {
+          console.warn(`[engine] Flow ${flow.id} has no canvasJson, skipping`);
+          continue;
+        }
+        
+        canvas = typeof rawCanvas === 'string' ? JSON.parse(rawCanvas) : rawCanvas;
+        
+        if (!canvas.nodes || !Array.isArray(canvas.nodes)) {
+          console.warn(`[engine] Flow ${flow.id} has invalid canvas structure, skipping`);
+          continue;
+        }
+      } catch (parseError) {
+        console.error(`[engine] Failed to parse canvas for flow ${flow.id}:`, parseError);
+        continue;
+      }
+
+      const triggerNode = canvas.nodes.find(node => {
+        const nodeType = node.data?.type as string;
+        return nodeType === 'trigger.journey';
+      });
+
+      if (!triggerNode) {
+        console.log(`[engine] Flow ${flow.id} has no trigger.journey node, skipping`);
+        continue;
+      }
+
+      const triggerConfig = triggerNode.data?.config as Record<string, any> || {};
+      const eventType = triggerConfig.eventType as string;
+
+      // Check if this flow should be triggered
+      const shouldTrigger =
+        eventType === 'any' ||
+        eventType === eventPayload.event ||
+        (eventType === 'cart_abandon' && eventPayload.event === 'stage_entered'); // Temporary compatibility
+
+      if (!shouldTrigger) {
+        console.log(`[engine] Flow ${flow.id} not triggered (eventType mismatch)`);
+        continue;
+      }
+
+      console.log(`[engine] Starting run for flow ${flow.id}`);
+
+      // Create run record
+      const run = await pb.collection('runs').create({
+        flow_id: flow.id,
+        trigger_type: 'customer_journey',
+        status: 'queued',
+        test_mode: false,
+        started_at: new Date().toISOString(),
+        input_event: eventPayload,
+      });
+
+      // Map flow to FlowSummary structure for executor
+      const flowSummary: FlowSummary = {
+        id: flow.id,
+        name: (flow as any).name || 'Unnamed Flow',
+        description: (flow as any).description,
+        status: (flow as any).status || 'active',
+        version: (flow as any).version || 1,
+        createdAt: (flow as any).created || new Date().toISOString(),
+        updatedAt: (flow as any).updated || new Date().toISOString(),
+        canvasJson: canvas,
+      };
+
+      // Execute flow in background (don't await to prevent blocking)
+      executeFlowRun(run.id, flowSummary, eventPayload).catch(error => {
+        console.error(`[engine] Background execution failed for run ${run.id}:`, error);
+      });
+    }
+  } catch (error: any) {
+    console.error(`[engine] Error processing journey event:`, error.message);
+  }
+}

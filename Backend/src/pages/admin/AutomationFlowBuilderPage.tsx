@@ -257,6 +257,185 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
     setDraggedNodeType(null);
   }, [draggedNodeType]);
 
+  const createNodeFromDefinition = (
+    type: string,
+    id: string,
+    position: { x: number; y: number },
+    initialConfig?: Record<string, unknown>
+  ): CanvasNode | null => {
+    const nodeDefinition = getNodeDefinition(type);
+    if (!nodeDefinition) return null;
+
+    const baseConfig = nodeDefinition.config.reduce((acc, field) => {
+      if (field.defaultValue !== undefined) {
+        acc[field.key] = field.defaultValue;
+      }
+      return acc;
+    }, {} as Record<string, unknown>);
+
+    const config = {
+      ...baseConfig,
+      ...(initialConfig ?? {}),
+    };
+
+    return {
+      id,
+      type: 'customNode',
+      position,
+      data: {
+        label: nodeDefinition.label,
+        type,
+        config,
+      },
+    } as CanvasNode;
+  };
+
+  const applyTemplate = (templateId: string) => {
+    if (templateId !== 'abandoned_cart_simple') return;
+
+    if (nodes.length > 0) {
+      const replace = window.confirm('Replace existing canvas with the Abandoned Cart template?');
+      if (!replace) return;
+    }
+
+    const triggerNode = createNodeFromDefinition(
+      'trigger.journey',
+      'trigger-journey-1',
+      { x: 0, y: 0 },
+      {
+        eventType: 'any',
+        includeCustomerData: true,
+      }
+    );
+
+    const activityFindNode = createNodeFromDefinition(
+      'pb.find',
+      'find-activity-1',
+      { x: 260, y: 0 },
+      {
+        collection: 'whatsapp_activity',
+        filter:
+          'recipient = "{{input.phone}}" && template_name = "ABANDONED_CART"',
+      }
+    );
+
+    const ifActivity: Node = {
+      id: 'if-activity-1',
+      type: 'customNode',
+      position: { x: 520, y: 0 },
+      data: {
+        type: 'logic.if',
+        label: 'If Condition',
+        config: {
+          condition: 'input.totalItems > 0',
+        },
+      },
+    };
+
+    const delayNode = createNodeFromDefinition(
+      'util.delay',
+      'delay-1',
+      { x: 820, y: 0 },
+      {
+        amount: 60,
+        unit: 'minutes',
+      }
+    );
+
+    const ordersFindNode = createNodeFromDefinition(
+      'pb.find',
+      'find-orders-1',
+      { x: 1120, y: 0 },
+      {
+        collection: 'orders',
+        filter: 'customer_phone = "{{input.phone}}" && created >= @today-1d',
+        limit: 1,
+        sort: '-created',
+      }
+    );
+
+    const ordersIfNode = createNodeFromDefinition(
+      'logic.if',
+      'if-orders-1',
+      { x: 1420, y: 0 },
+      {
+        condition: 'input.totalItems > 0',
+      }
+    );
+
+    const whatsappNode = createNodeFromDefinition(
+      'whatsapp.send',
+      'whatsapp-send-1',
+      { x: 1720, y: 0 },
+      {
+        toPath: 'input.phone',
+        template:
+          '🛒 *Your cart is waiting* 🛒\n\nHi {{input.customer_name}},\n\nYou left some lovely items in your cart. You can complete your order here: {{input.metadata.url}}\n\nIf you have any questions, just reply to this message.',
+      }
+    );
+
+    const templateNodes = [
+      triggerNode,
+      activityFindNode,
+      ifActivity,
+      delayNode,
+      ordersFindNode,
+      ordersIfNode,
+      whatsappNode,
+    ].filter((n): n is CanvasNode => n !== null);
+
+    const templateEdges: CanvasEdge[] = [
+      {
+        id: 'e-trigger-activity',
+        source: 'trigger-journey-1',
+        target: 'find-activity-1',
+        type: 'default',
+      },
+      {
+        id: 'e-activity-if',
+        source: 'find-activity-1',
+        target: 'if-activity-1',
+        type: 'default',
+      },
+      {
+        id: 'e-if-activity-delay',
+        source: 'if-activity-1',
+        target: 'delay-1',
+        sourceHandle: 'false',
+        type: 'default',
+      },
+      {
+        id: 'e-delay-orders',
+        source: 'delay-1',
+        target: 'find-orders-1',
+        type: 'default',
+      },
+      {
+        id: 'e-orders-if',
+        source: 'find-orders-1',
+        target: 'if-orders-1',
+        type: 'default',
+      },
+      {
+        id: 'e-if-orders-whatsapp',
+        source: 'if-orders-1',
+        target: 'whatsapp-send-1',
+        sourceHandle: 'false',
+        type: 'default',
+      },
+    ];
+
+    setNodes(templateNodes);
+    setEdges(templateEdges);
+
+    if (!flowName.trim()) {
+      setFlowName('Abandoned Cart – WhatsApp Reminder');
+    }
+    if (!flowDescription.trim()) {
+      setFlowDescription('Sends a WhatsApp reminder 60 minutes after a cart is abandoned.');
+    }
+  };
+
   const handleNodeConfigChange = useCallback((nodeId: string, config: Record<string, unknown>) => {
     setNodes((nds) =>
       nds.map((node) =>
@@ -550,8 +729,26 @@ function FlowBuilderContent({ flowId }: { flowId: string }) {
 
         {/* Main Content */}
         <div className="grid gap-4 lg:grid-cols-[280px_minmax(0,1fr)_320px] xl:grid-cols-[300px_minmax(0,1fr)_360px] overflow-hidden">
-          {/* Node Palette */}
+          {/* Node Palette & Templates */}
           <div className="space-y-6 min-w-0">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm">Flow templates</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs text-muted-foreground">
+                <p>Start from a ready-made automation.</p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start text-xs"
+                  type="button"
+                  onClick={() => applyTemplate('abandoned_cart_simple')}
+                >
+                  Abandoned Cart – WhatsApp Reminder
+                </Button>
+              </CardContent>
+            </Card>
+
             <NodePalette onNodeDragStart={onNodeDragStart} />
           </div>
 

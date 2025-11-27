@@ -80,6 +80,15 @@ export function useOrders() {
           const firstProductName = expandedItems[0]?.name || '';
           const productList = expandedItems.map((item) => item.name).join(', ');
           const itemsCount = expandedItems.length;
+          const firstProductImageUrl = expandedItems[0]?.image || '';
+
+          let shippingAddress = order.shipping_address_text || '';
+          const addr = order.expand?.shipping_address;
+          if (addr) {
+            shippingAddress = [addr.street, addr.city, addr.state, addr.postal_code, addr.country]
+              .filter(Boolean)
+              .join(', ');
+          }
 
           void notifyOrderConfirmation({
             id: order.id,
@@ -89,6 +98,8 @@ export function useOrders() {
             first_product_name: firstProductName,
             product_list: productList,
             items_count: itemsCount,
+            shipping_address: shippingAddress,
+            first_product_image_url: firstProductImageUrl,
           }).catch(err => console.error('Failed to send WhatsApp confirmation:', err));
         }
       } catch (whatsappError) {
@@ -122,6 +133,15 @@ export function useOrders() {
           const firstProductName = expandedItems[0]?.name || '';
           const productList = expandedItems.map((item) => item.name).join(', ');
           const itemsCount = expandedItems.length;
+          const firstProductImageUrl = expandedItems[0]?.image || '';
+
+          let shippingAddress = orderRecord.shipping_address_text || '';
+          const addr = orderRecord.expand?.shipping_address;
+          if (addr) {
+            shippingAddress = [addr.street, addr.city, addr.state, addr.postal_code, addr.country]
+              .filter(Boolean)
+              .join(', ');
+          }
 
           const orderData = {
             id: orderRecord.id,
@@ -134,6 +154,8 @@ export function useOrders() {
             first_product_name: firstProductName,
             product_list: productList,
             items_count: itemsCount,
+            shipping_address: shippingAddress,
+            first_product_image_url: firstProductImageUrl,
           };
           
           // Different notifications based on new status
@@ -187,6 +209,15 @@ export function useOrders() {
           const firstProductName = expandedItems[0]?.name || '';
           const productList = expandedItems.map((item) => item.name).join(', ');
           const itemsCount = expandedItems.length;
+          const firstProductImageUrl = expandedItems[0]?.image || '';
+
+          let shippingAddress = orderRecord.shipping_address_text || '';
+          const addr = orderRecord.expand?.shipping_address;
+          if (addr) {
+            shippingAddress = [addr.street, addr.city, addr.state, addr.postal_code, addr.country]
+              .filter(Boolean)
+              .join(', ');
+          }
 
           const orderData = {
             id: orderRecord.id,
@@ -196,6 +227,8 @@ export function useOrders() {
             first_product_name: firstProductName,
             product_list: productList,
             items_count: itemsCount,
+            shipping_address: shippingAddress,
+            first_product_image_url: firstProductImageUrl,
           };
           
           if (data.payment_status === 'paid') {

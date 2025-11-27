@@ -34,6 +34,15 @@ export function NodeConfigEditor({
     (config.conditions as Array<{ field: string; operator: string; value?: string; value2?: string }>) || []
   );
   const [qbLogic, setQbLogic] = useState<'AND' | 'OR'>(((config.logic as string) === 'OR' ? 'OR' : 'AND'));
+  
+  // Easy/Advanced mode for If Condition
+  const [ifConditionMode, setIfConditionMode] = useState<'easy' | 'advanced'>('easy');
+  const [easyCondition, setEasyCondition] = useState({
+    field: 'input.totalItems',
+    operator: '>',
+    value: '0',
+  });
+  
   // Sort builder state (must be before any early returns)
   type SortRow = { field: string; dir: 'asc' | 'desc' };
   const parseSort = (s: string): SortRow[] => {
@@ -607,8 +616,142 @@ export function NodeConfigEditor({
     }
   };
 
+  const renderIfConditionField = (currentValue: string) => {
+    return (
+      <div className="space-y-3">
+        {/* Mode Toggle */}
+        <div className="flex items-center justify-between">
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant={ifConditionMode === 'easy' ? 'default' : 'outline'}
+              onClick={() => setIfConditionMode('easy')}
+            >
+              Easy Mode
+            </Button>
+            <Button
+              size="sm"
+              variant={ifConditionMode === 'advanced' ? 'default' : 'outline'}
+              onClick={() => setIfConditionMode('advanced')}
+            >
+              Advanced
+            </Button>
+          </div>
+        </div>
+
+        {ifConditionMode === 'easy' ? (
+          // Easy Mode: Dropdown-based UI
+          <div className="space-y-3">
+            <div>
+              <label className="text-sm font-medium">Check this field</label>
+              <Select
+                value={easyCondition.field}
+                onValueChange={(value) => {
+                  setEasyCondition({ ...easyCondition, field: value });
+                  updateConditionFromEasy({ ...easyCondition, field: value });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="input.totalItems">Record count (input.totalItems)</SelectItem>
+                  <SelectItem value="input.items.length">Number of items (input.items.length)</SelectItem>
+                  <SelectItem value="input.customer_name">Customer name</SelectItem>
+                  <SelectItem value="input.phone">Phone number</SelectItem>
+                  <SelectItem value="input.metadata.value">Order value</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Condition</label>
+              <Select
+                value={easyCondition.operator}
+                onValueChange={(value) => {
+                  setEasyCondition({ ...easyCondition, operator: value });
+                  updateConditionFromEasy({ ...easyCondition, operator: value });
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value=">">is greater than</SelectItem>
+                  <SelectItem value=">=">is greater than or equal to</SelectItem>
+                  <SelectItem value="<">is less than</SelectItem>
+                  <SelectItem value="<=">is less than or equal to</SelectItem>
+                  <SelectItem value="===">equals (exact)</SelectItem>
+                  <SelectItem value="!==">does not equal</SelectItem>
+                  <SelectItem value="includes">contains (text)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium">Compare to</label>
+              <Input
+                value={easyCondition.value}
+                onChange={(e) => {
+                  setEasyCondition({ ...easyCondition, value: e.target.value });
+                  updateConditionFromEasy({ ...easyCondition, value: e.target.value });
+                }}
+                placeholder="Value to compare"
+              />
+            </div>
+
+            <div className="text-xs text-muted-foreground bg-muted p-2 rounded">
+              <strong>Generated:</strong> {generateConditionExpression(easyCondition)}
+            </div>
+          </div>
+        ) : (
+          // Advanced Mode: Custom JavaScript expression
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Custom JavaScript Expression</label>
+            <Textarea
+              value={String(currentValue)}
+              onChange={(e) => handleConfigChange('condition', e.target.value)}
+              placeholder="e.g., input.totalItems > 0"
+              rows={3}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              Available: <code>input</code>, <code>vars</code>. Use JavaScript syntax.
+            </p>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const updateConditionFromEasy = (easy: typeof easyCondition) => {
+    const expression = generateConditionExpression(easy);
+    handleConfigChange('condition', expression);
+  };
+
+  const generateConditionExpression = (easy: typeof easyCondition) => {
+    if (easy.operator === 'includes') {
+      return `String(${easy.field}).includes("${easy.value}")`;
+    }
+    
+    // Check if value is a number
+    const numValue = Number(easy.value);
+    const isNumber = !isNaN(numValue);
+    
+    if (isNumber) {
+      return `${easy.field} ${easy.operator} ${numValue}`;
+    }
+    
+    return `${easy.field} ${easy.operator} "${easy.value}"`;
+  };
+
   const renderConfigField = (field: NodeConfigField) => {
     const value = localConfig[field.key] ?? field.defaultValue ?? '';
+
+    // Special handler for logic.if condition field
+    if (nodeType === 'logic.if' && field.key === 'condition') {
+      return renderIfConditionField(String(value));
+    }
 
     switch (field.type) {
       case 'text':
@@ -727,6 +870,27 @@ export function NodeConfigEditor({
     payments: 'bg-red-100 text-red-800 border-red-200',
     utilities: 'bg-gray-100 text-gray-800 border-gray-200',
   };
+
+  const whatsappTemplateLibrary: Array<{ id: string; label: string; content: string }> = [
+    {
+      id: 'welcome_basic',
+      label: 'Welcome / first touch',
+      content:
+        'Hi {{input.customer_name}}, thanks for visiting {{input.metadata.title}}. If you have any questions, just reply to this message.',
+    },
+    {
+      id: 'cart_reminder',
+      label: 'Cart / browse reminder',
+      content:
+        'Hi {{input.customer_name}}, we noticed you were interested in {{input.metadata.title}}. You can continue here: {{input.metadata.url}}.',
+    },
+    {
+      id: 'order_confirmation_short',
+      label: 'Order confirmation (short)',
+      content:
+        'Hi {{input.customer_name}}, your order {{input.metadata.order_id}} is confirmed. Total: {{input.metadata.total}}.',
+    },
+  ];
 
   const whatsappTemplateGroups: Array<{
     title: string;
@@ -1291,26 +1455,50 @@ export function NodeConfigEditor({
                     {renderConfigField(field)}
 
                     {nodeType === 'whatsapp.send' && field.key === 'template' && (
-                      <div className="grid grid-cols-1 gap-2 pt-1 sm:grid-cols-3">
-                        {whatsappTemplateGroups.map((group) => (
+                      <div className="space-y-1 pt-1">
+                        <div className="flex gap-2">
                           <Select
-                            key={group.title}
-                            onValueChange={(token) => {
-                              insertWhatsAppTemplateVar(token);
+                            onValueChange={(templateId) => {
+                              const selected = whatsappTemplateLibrary.find((t) => t.id === templateId);
+                              if (selected) {
+                                handleConfigChange('template', selected.content);
+                              }
                             }}
                           >
                             <SelectTrigger className="h-8 text-[11px]">
-                              <SelectValue placeholder={group.title} />
+                              <SelectValue placeholder="Choose template" />
                             </SelectTrigger>
                             <SelectContent>
-                              {group.items.map((variable) => (
-                                <SelectItem key={variable.token} value={variable.token}>
-                                  {variable.label}
+                              {whatsappTemplateLibrary.map((tpl) => (
+                                <SelectItem key={tpl.id} value={tpl.id}>
+                                  {tpl.label}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
-                        ))}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                          {whatsappTemplateGroups.map((group) => (
+                            <Select
+                              key={group.title}
+                              onValueChange={(token) => {
+                                insertWhatsAppTemplateVar(token);
+                              }}
+                            >
+                              <SelectTrigger className="h-8 text-[11px]">
+                                <SelectValue placeholder={group.title} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {group.items.map((variable) => (
+                                  <SelectItem key={variable.token} value={variable.token}>
+                                    {variable.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ))}
+                        </div>
                       </div>
                     )}
 
