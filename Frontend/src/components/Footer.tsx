@@ -3,9 +3,11 @@ import { Facebook, Instagram, Twitter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/Logo';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
+import { useDynamicTheme } from '@/contexts/ThemeContext';
 
 const Footer = () => {
   const { settings } = useSiteSettings();
+  const { themeData } = useDynamicTheme();
 
   const siteTitle =
     settings?.siteTitle ||
@@ -20,8 +22,14 @@ const Footer = () => {
     settings?.footerCopyright ||
     `© ${new Date().getFullYear()} ${siteTitle}. All rights reserved.`;
 
+  // Prefer an explicit footer color from theme, fall back to primary, then to legacy green
+  const footerBgColor =
+    (themeData as any)?.footer?.backgroundHex ||
+    themeData?.primary?.hex ||
+    '#0F6B35';
+
   return (
-    <footer className="bg-[#0F6B35] text-white">
+    <footer className="text-white" style={{ backgroundColor: footerBgColor }}>
       <div className="karigai-container py-8 px-6 lg:px-30 md:py-10">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           {/* Logo + about + socials */}

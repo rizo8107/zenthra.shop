@@ -17,6 +17,7 @@ type ProductCardOverrides = {
   showDescription: boolean;
   ctaLabel: string;
   ctaStyle: 'pill' | 'outline' | 'default';
+  ctaColor?: string;
   imageRatio: 'portrait' | 'square' | 'wide';
   titleSize: 'sm' | 'md' | 'lg';
   descSize: 'sm' | 'md' | 'lg';
@@ -66,6 +67,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       showDescription: overrides?.showDescription ?? productCardSettings.showDescription ?? true,
       ctaLabel: overrides?.ctaLabel ?? productCardSettings.ctaLabel ?? 'Buy Now',
       ctaStyle: overrides?.ctaStyle ?? productCardSettings.ctaStyle ?? 'pill',
+      ctaColor: overrides?.ctaColor ?? productCardSettings.ctaColor,
       imageRatio: overrides?.imageRatio ?? productCardSettings.imageRatio ?? 'portrait',
       titleSize: overrides?.titleSize ?? productCardSettings.titleSize ?? 'md',
       descSize: overrides?.descSize ?? productCardSettings.descSize ?? 'sm',
@@ -81,7 +83,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
     };
   }, [themeData, overrides]);
 
-  const cardRadius = pc.corner === 'pill' ? 'rounded-[18px]' : pc.corner === 'square' ? 'rounded-md' : 'rounded-[18px]';
+  const cardRadius = pc.corner === 'square' ? 'rounded-md' : 'rounded-xl';
   const shadowCls = pc.shadow === 'none' ? '' : pc.shadow === 'soft' ? 'shadow-sm' : pc.shadow === 'medium' ? 'shadow-md' : 'shadow-lg';
   const ctaRounded = pc.ctaStyle === 'pill' ? 'rounded-[24px]' : '';
   // Force a 1:1 aspect ratio for the product image area to match the desired card design
@@ -109,11 +111,12 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
   const descStyle = pc.descSizePx ? { fontSize: `${pc.descSizePx}px` } : undefined;
   const priceStyle = pc.priceSizePx ? { fontSize: `${pc.priceSizePx}px` } : undefined;
   const originalPriceStyle = pc.originalPriceSizePx ? { fontSize: `${pc.originalPriceSizePx}px` } : undefined;
-  const imageCornerCls = pc.imageCorner === 'pill'
-    ? 'rounded-full'
-    : pc.imageCorner === 'square'
-    ? ''
-    : 'rounded-[17px]';
+  const imageCornerCls = pc.imageCorner === 'square'
+    ? 'rounded-lg'
+    : 'rounded-xl';
+
+  const effectiveCtaColor = pc.ctaColor || primaryColor || '#111111';
+  const effectiveCtaTextColor = primaryForeground || '#FFFFFF';
   
   const handleQuickAdd = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -157,8 +160,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
       className={cn(
         'group block bg-white overflow-hidden transition-all duration-300 relative flex flex-col gap-[10px] p-[10px]',
         cardRadius,
-        shadowCls,
-        'hover:shadow-xl'
+        shadowCls
       )}
     >
       {/* Image area */}
@@ -292,9 +294,9 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
               size={ctaSize}
               className={cn(
                 'w-full justify-center h-[40px] font-semibold text-[15px]',
-                'rounded-[20px]',
-                'bg-[#111111] text-white hover:bg-black'
+                'rounded-xl'
               )}
+              style={{ backgroundColor: effectiveCtaColor, color: effectiveCtaTextColor }}
             >
               {pc.ctaLabel}
             </Button>
@@ -326,11 +328,16 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
               size={ctaSize}
               className={cn(
                 'w-auto min-w-[8.75rem] justify-center h-[40px] font-semibold text-[15px] px-6',
-                'rounded-[20px]',
+                'rounded-xl',
                 pc.ctaStyle === 'outline'
                   ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'
-                  : 'bg-[#111111] text-white hover:bg-black'
+                  : 'hover:opacity-90'
               )}
+              style={
+                pc.ctaStyle === 'outline'
+                  ? undefined
+                  : { backgroundColor: effectiveCtaColor, color: effectiveCtaTextColor }
+              }
             >
               {pc.ctaLabel}
             </Button>

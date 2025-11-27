@@ -122,7 +122,7 @@ export function Cart({ children }: CartProps) {
                               const unit = match?.unit ? ` ${match.unit}` : '';
                               const label = `${sizeValue}${unit}`.trim();
                               return label ? (
-                                <Badge className="rounded-full bg-blue-600 text-white px-2 py-0.5 text-[10px]">{label}</Badge>
+                                <Badge className="rounded-full bg-primary text-primary-foreground px-2 py-0.5 text-[10px]">{label}</Badge>
                               ) : null;
                             })()}
                           </span>
@@ -142,7 +142,7 @@ export function Cart({ children }: CartProps) {
                           {item.options.comboType === 'buy_any_x' && (
                             <>
                               {item.options.combo && (
-                                <Badge className="rounded-full bg-blue-50 text-blue-800 border-blue-200 px-2 py-0.5">
+                                <Badge className="rounded-full bg-primary/5 text-primary border-primary/30 px-2 py-0.5">
                                   {item.options.combo}
                                 </Badge>
                               )}
@@ -239,7 +239,7 @@ export function Cart({ children }: CartProps) {
                 </div>
               )}
               
-              <Button asChild className="w-full bg-blue-600 hover:bg-blue-700" disabled={items.length === 0 || (total || 0) < 150}>
+              <Button asChild className="w-full" disabled={items.length === 0 || (total || 0) < 150}>
                 <Link to="/checkout" onClick={handleCheckout}>
                   Proceed to Checkout (₹{(total || 0).toFixed(2)})
                 </Link>

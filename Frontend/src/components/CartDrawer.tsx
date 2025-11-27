@@ -67,7 +67,7 @@ const CartDrawer = () => {
                                 <h3 className="text-sm font-medium">
                                   <Link 
                                     to={`/product/${item.productId}`}
-                                    className="hover:text-konipai-mint transition-colors"
+                                    className="hover:text-primary transition-colors"
                                   >
                                     {item.product.name}
                                   </Link>
@@ -80,7 +80,7 @@ const CartDrawer = () => {
                               <div className="flex items-center border rounded-lg bg-gray-50">
                                 <button
                                   onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                                  className="p-2 hover:text-konipai-mint transition-colors"
+                                  className="p-2 hover:text-primary transition-colors"
                                   aria-label="Decrease quantity"
                                 >
                                   <Minus className="h-3 w-3" />
@@ -88,7 +88,7 @@ const CartDrawer = () => {
                                 <span className="px-4 py-1 text-sm font-medium">{item.quantity}</span>
                                 <button
                                   onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                                  className="p-2 hover:text-konipai-mint transition-colors"
+                                  className="p-2 hover:text-primary transition-colors"
                                   aria-label="Increase quantity"
                                 >
                                   <Plus className="h-3 w-3" />
@@ -140,7 +140,7 @@ const CartDrawer = () => {
                   <div className="space-y-3">
                     <Button
                       asChild
-                      className="w-full bg-[#219898] hover:bg-[#219898]/90 text-white"
+                      className="w-full"
                     >
                       <Link
                         to="/checkout"
@@ -151,7 +151,7 @@ const CartDrawer = () => {
                     </Button>
                     <Button
                       variant="outline"
-                      className="w-full border-[#219898] text-[#219898] hover:bg-[#219898]/5"
+                      className="w-full"
                       onClick={() => setIsCartOpen(false)}
                     >
                       Continue Shopping

@@ -142,7 +142,7 @@ export const ProductImage = memo(function ProductImage({
         return (
             <div 
                 className={cn(
-                    "bg-muted flex items-center justify-center",
+                    "bg-muted flex items-center justify-center rounded-xl",
                     aspectRatioStyles[aspectRatio],
                     className
                 )}
@@ -159,7 +159,7 @@ export const ProductImage = memo(function ProductImage({
     return (
         <div 
             className={cn(
-                "relative overflow-hidden",
+                "relative overflow-hidden rounded-xl",
                 aspectRatioStyles[aspectRatio],
                 className
             )}

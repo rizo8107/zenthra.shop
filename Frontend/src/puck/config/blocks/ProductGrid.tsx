@@ -37,6 +37,7 @@ export interface ProductGridProps {
   cardCorner?: "rounded" | "square" | "pill";
   imageCorner?: "rounded" | "square" | "pill";
   cardCtaLabel?: string;
+  cardCtaColor?: string;
   cardImageRatio?: "portrait" | "square" | "wide";
   cardSpacing?: "compact" | "comfortable";
   cardGapPx?: number;
@@ -80,6 +81,7 @@ const ProductGridContent = ({
   cardCorner,
   imageCorner,
   cardCtaLabel,
+  cardCtaColor,
   cardImageRatio,
   cardSpacing,
   cardGapPx,
@@ -239,6 +241,7 @@ const ProductGridContent = ({
       corner: cardCorner,
       imageCorner,
       ctaLabel: cardCtaLabel,
+      ctaColor: cardCtaColor,
       imageRatio: cardImageRatio,
       spacing: effectiveCardSpacing,
       imagePadding,
@@ -255,6 +258,7 @@ const ProductGridContent = ({
       cardCorner,
       imageCorner,
       cardCtaLabel,
+      cardCtaColor,
       cardImageRatio,
       imagePadding,
       effectiveCardLayout,
@@ -683,6 +687,34 @@ export const ProductGrid: ComponentConfig<ProductGridProps> = {
       max: 48,
     },
     cardCtaLabel: { type: "text", label: "Card: CTA Label" },
+    cardCtaColor: {
+      type: "custom",
+      label: "Card: CTA Color",
+      render: ({ value, onChange }) => (
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <input
+              type="color"
+              value={
+                typeof value === "string" && value !== ""
+                  ? value
+                  : "#111111"
+              }
+              onChange={(e) => onChange(e.target.value)}
+              className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+              aria-label="CTA button color"
+            />
+            <input
+              type="text"
+              value={value || ""}
+              onChange={(e) => onChange(e.target.value)}
+              placeholder="#111111"
+              className="flex-1 rounded border border-border bg-background px-2 py-1 text-xs"
+            />
+          </div>
+        </div>
+      ),
+    },
     cardImageRatio: {
       type: "select",
       label: "Card: Image Ratio",

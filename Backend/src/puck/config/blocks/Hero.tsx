@@ -29,6 +29,9 @@ export interface HeroProps {
   heightDesktop?: "sm" | "md" | "lg" | "xl" | "screen";
   heightTablet?: "sm" | "md" | "lg" | "xl" | "screen";
   heightMobile?: "sm" | "md" | "lg" | "xl" | "screen";
+  heightPxDesktop?: number;
+  heightPxTablet?: number;
+  heightPxMobile?: number;
   paddingYDesktop?: number;
   paddingYTablet?: number;
   paddingYMobile?: number;
@@ -218,6 +221,9 @@ export const Hero: ComponentConfig<HeroProps> = {
       { label: "Extra Large", value: "xl" },
       { label: "Full Screen", value: "screen" },
     ]},
+    heightPxDesktop: { type: "number", label: "Desktop: Custom height (px)" },
+    heightPxTablet: { type: "number", label: "Tablet: Custom height (px)" },
+    heightPxMobile: { type: "number", label: "Mobile: Custom height (px)" },
     paddingYDesktop: { type: "number", label: "Desktop: Padding Y (px)" },
     paddingYTablet: { type: "number", label: "Tablet: Padding Y (px)" },
     paddingYMobile: { type: "number", label: "Mobile: Padding Y (px)" },
@@ -362,6 +368,9 @@ export const Hero: ComponentConfig<HeroProps> = {
       heightDesktop,
       heightTablet,
       heightMobile,
+      heightPxDesktop,
+      heightPxTablet,
+      heightPxMobile,
       bgFitDesktop,
       bgFitTablet,
       bgFitMobile,
@@ -449,6 +458,11 @@ export const Hero: ComponentConfig<HeroProps> = {
     const effFit = device === "desktop" ? (bgFitDesktop || "cover") : device === "tablet" ? (bgFitTablet || "cover") : (bgFitMobile || "cover");
     const effPos = device === "desktop" ? (bgPosDesktop || "center") : device === "tablet" ? (bgPosTablet || "center") : (bgPosMobile || "center");
     const effHeightKey = device === "desktop" ? (heightDesktop || height) : device === "tablet" ? (heightTablet || height) : (heightMobile || height);
+    const effHeightPx = device === "desktop"
+      ? heightPxDesktop
+      : device === "tablet"
+      ? heightPxTablet
+      : heightPxMobile;
     const effPaddingY = device === "desktop" ? (paddingYDesktop || 0) : device === "tablet" ? (paddingYTablet || 0) : (paddingYMobile || 0);
 
     const [index, setIndex] = useState(0);
@@ -476,7 +490,11 @@ export const Hero: ComponentConfig<HeroProps> = {
 
       if (mode === "slider" && slides && slides.length > 0) {
         return (
-        <section ref={containerRef} className={cn("relative overflow-hidden", heightClasses[effHeightKey || "lg"]) }>
+        <section
+          ref={containerRef}
+          className={cn("relative overflow-hidden", heightClasses[effHeightKey || "lg"])}
+          style={effHeightPx && effHeightPx > 0 ? { minHeight: `${effHeightPx}px` } : undefined}
+        >
           {/* Slides */}
           <div className="absolute inset-0">
             {slides.map((s, i) => {
@@ -604,6 +622,7 @@ export const Hero: ComponentConfig<HeroProps> = {
         style={{
           paddingTop: effPaddingY ? `${effPaddingY}px` : undefined,
           paddingBottom: effPaddingY ? `${effPaddingY}px` : undefined,
+          ...(effHeightPx && effHeightPx > 0 ? { minHeight: `${effHeightPx}px` } : {}),
         }}
         ref={containerRef}
       >
