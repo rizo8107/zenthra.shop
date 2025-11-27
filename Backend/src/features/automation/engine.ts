@@ -113,6 +113,23 @@ async function executeTriggerJourney(
 }
 
 /**
+ * Execute trigger.cron node
+ */
+async function executeTriggerCron(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  // Cron trigger just forwards with timestamp info
+  return {
+    output: {
+      ...context.input,
+      triggered_at: new Date().toISOString(),
+      trigger_type: 'cron',
+    },
+  };
+}
+
+/**
  * Execute pb.find node
  */
 async function executePbFind(
@@ -253,8 +270,20 @@ async function executeWhatsAppSend(
   const presence = (config.presence as string) || 'composing';
   const linkPreview = config.linkPreview !== false; // Default true
 
-  // Get phone number from context
-  const phone = getByPath(context, toPath);
+  // Get phone number - either from context path OR use directly if it's a phone number
+  let phone: string | undefined;
+  
+  // Check if toPath looks like a phone number (starts with digits)
+  if (/^\d+$/.test(toPath)) {
+    // It's a direct phone number, use it as-is
+    phone = toPath;
+    console.log(`[whatsapp.send] Using direct phone number: ${phone}`);
+  } else {
+    // It's a path, resolve from context
+    phone = getByPath(context, toPath);
+    console.log(`[whatsapp.send] Resolved phone from path "${toPath}": ${phone}`);
+  }
+  
   if (!phone) {
     throw new Error(`whatsapp.send: Could not resolve phone from path "${toPath}"`);
   }
@@ -364,6 +393,8 @@ async function executeNode(
   switch (nodeType) {
     case 'trigger.journey':
       return await executeTriggerJourney(node, context);
+    case 'trigger.cron':
+      return await executeTriggerCron(node, context);
     case 'pb.find':
       return await executePbFind(node, context);
     case 'logic.if':
@@ -617,5 +648,234 @@ export async function startRunFromJourneyEvent(
     }
   } catch (error: any) {
     console.error(`[engine] Error processing journey event:`, error.message);
+  }
+}
+
+// ============================================================================
+// CRON SCHEDULER (OPTIMIZED)
+// ============================================================================
+
+// Cron schedule mapping
+const CRON_SCHEDULES: Record<string, string> = {
+  '5m': '*/5 * * * *',
+  '15m': '*/15 * * * *',
+  '1h': '0 * * * *',
+  '6h': '0 */6 * * *',
+  '1d': '0 9 * * *', // 9 AM daily
+};
+
+// Track last run times to prevent duplicate runs within the same minute
+const lastCronRuns: Map<string, number> = new Map();
+
+// Cache for cron flows - refreshed every 5 minutes to reduce DB queries
+interface CronFlowCache {
+  flows: Array<{
+    id: string;
+    name: string;
+    canvas: FlowCanvas;
+    cronNodes: Array<{ nodeId: string; cron: string }>;
+  }>;
+  lastRefresh: number;
+}
+
+let cronFlowCache: CronFlowCache = { flows: [], lastRefresh: 0 };
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Check if a cron expression matches the current time
+ */
+function cronMatchesNow(cronExpression: string): boolean {
+  const now = new Date();
+  const parts = cronExpression.split(' ');
+  
+  if (parts.length !== 5) return false;
+  
+  const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
+  
+  const matchPart = (part: string, value: number): boolean => {
+    if (part === '*') return true;
+    
+    // Handle */n (every n)
+    if (part.startsWith('*/')) {
+      const interval = parseInt(part.substring(2), 10);
+      return value % interval === 0;
+    }
+    
+    // Handle comma-separated values
+    if (part.includes(',')) {
+      return part.split(',').map(Number).includes(value);
+    }
+    
+    // Handle range (e.g., 1-5)
+    if (part.includes('-')) {
+      const [start, end] = part.split('-').map(Number);
+      return value >= start && value <= end;
+    }
+    
+    // Direct match
+    return parseInt(part, 10) === value;
+  };
+  
+  return (
+    matchPart(minute, now.getMinutes()) &&
+    matchPart(hour, now.getHours()) &&
+    matchPart(dayOfMonth, now.getDate()) &&
+    matchPart(month, now.getMonth() + 1) &&
+    matchPart(dayOfWeek, now.getDay())
+  );
+}
+
+/**
+ * Refresh the cron flow cache from database
+ */
+async function refreshCronFlowCache(): Promise<void> {
+  try {
+    const flows = await pb.collection('flows').getFullList({
+      filter: 'status = "active"',
+    });
+
+    const cronFlows: CronFlowCache['flows'] = [];
+
+    for (const flow of flows) {
+      let canvas: FlowCanvas;
+      try {
+        const rawCanvas = (flow as any).canvas_json || (flow as any).canvasJson;
+        if (!rawCanvas) continue;
+        canvas = typeof rawCanvas === 'string' ? JSON.parse(rawCanvas) : rawCanvas;
+        if (!canvas.nodes || !Array.isArray(canvas.nodes)) continue;
+      } catch {
+        continue;
+      }
+
+      // Find cron trigger nodes
+      const cronNodes: Array<{ nodeId: string; cron: string }> = [];
+      
+      for (const node of canvas.nodes) {
+        if ((node.data?.type as string) !== 'trigger.cron') continue;
+        
+        const config = node.data?.config as Record<string, any> || {};
+        let cronExpression = config.cron as string;
+        if (!cronExpression && config.schedule) {
+          cronExpression = CRON_SCHEDULES[config.schedule as string] || '';
+        }
+        
+        if (cronExpression) {
+          cronNodes.push({ nodeId: node.id, cron: cronExpression });
+        }
+      }
+
+      if (cronNodes.length > 0) {
+        cronFlows.push({
+          id: flow.id,
+          name: (flow as any).name || 'Unnamed Flow',
+          canvas,
+          cronNodes,
+        });
+      }
+    }
+
+    cronFlowCache = { flows: cronFlows, lastRefresh: Date.now() };
+    
+    if (cronFlows.length > 0) {
+      console.log(`[cron] Cache refreshed: ${cronFlows.length} cron flow(s) found`);
+    }
+  } catch (error: any) {
+    console.error(`[cron] Failed to refresh cache:`, error.message);
+  }
+}
+
+/**
+ * Force refresh the cron cache (call when flows are updated)
+ */
+export function invalidateCronCache(): void {
+  cronFlowCache.lastRefresh = 0;
+}
+
+/**
+ * Start flow runs from cron triggers
+ * Called every minute by the scheduler - OPTIMIZED version
+ */
+export async function startRunFromCron(): Promise<void> {
+  const now = Date.now();
+  
+  // Refresh cache if stale (every 5 minutes) or empty
+  if (now - cronFlowCache.lastRefresh > CACHE_TTL || cronFlowCache.flows.length === 0) {
+    await refreshCronFlowCache();
+  }
+  
+  // Skip if no cron flows exist (no DB query, no logging)
+  if (cronFlowCache.flows.length === 0) {
+    return;
+  }
+
+  let triggeredCount = 0;
+
+  for (const flow of cronFlowCache.flows) {
+    for (const { nodeId, cron: cronExpression } of flow.cronNodes) {
+      // Check if cron matches current time
+      if (!cronMatchesNow(cronExpression)) {
+        continue;
+      }
+
+      // Prevent duplicate runs within the same minute
+      const runKey = `${flow.id}:${nodeId}`;
+      const lastRun = lastCronRuns.get(runKey) || 0;
+      
+      if (now - lastRun < 60000) {
+        continue; // Already ran within the last minute
+      }
+      
+      lastCronRuns.set(runKey, now);
+
+      console.log(`[cron] Triggering flow ${flow.id} (cron: ${cronExpression})`);
+
+      try {
+        // Create run record
+        const run = await pb.collection('runs').create({
+          flow_id: flow.id,
+          trigger_type: 'cron',
+          status: 'queued',
+          test_mode: false,
+          started_at: new Date().toISOString(),
+          input_event: {
+            trigger: 'cron',
+            flowId: flow.id,
+            nodeId,
+            cron: cronExpression,
+            triggered_at: new Date().toISOString(),
+          },
+        });
+
+        // Map flow to FlowSummary structure
+        const flowSummary: FlowSummary = {
+          id: flow.id,
+          name: flow.name,
+          status: 'active',
+          version: 1,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          canvasJson: flow.canvas,
+        };
+
+        // Execute flow in background
+        executeFlowRun(run.id, flowSummary, {
+          trigger: 'cron',
+          flowId: flow.id,
+          nodeId,
+          cron: cronExpression,
+          triggered_at: new Date().toISOString(),
+        }).catch(error => {
+          console.error(`[cron] Background execution failed for run ${run.id}:`, error);
+        });
+
+        triggeredCount++;
+      } catch (error: any) {
+        console.error(`[cron] Failed to create run for flow ${flow.id}:`, error.message);
+      }
+    }
+  }
+
+  if (triggeredCount > 0) {
+    console.log(`[cron] Triggered ${triggeredCount} flow(s)`);
   }
 }

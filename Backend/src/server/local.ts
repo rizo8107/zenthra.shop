@@ -2,6 +2,7 @@ import app from './index.js';
 import { createServer } from 'http';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
+import { startRunFromCron } from '../features/automation/engine.js';
 
 const DEFAULT_PORT = parseInt(process.env.SERVER_PORT || '3001', 10);
 const ALTERNATIVE_PORTS = [3002, 3003, 3004, 4001, 4002, 4003];
@@ -18,6 +19,27 @@ const savePortInfo = (port: number) => {
   }
 };
 
+// Start cron scheduler - runs every minute
+let cronInterval: NodeJS.Timeout | null = null;
+
+const startCronScheduler = () => {
+  console.log('[cron] Starting automation cron scheduler (every minute)');
+  
+  // Run immediately on startup
+  setTimeout(() => {
+    startRunFromCron().catch(err => {
+      console.error('[cron] Initial cron check failed:', err);
+    });
+  }, 5000); // Wait 5 seconds for server to fully start
+  
+  // Then run every minute
+  cronInterval = setInterval(() => {
+    startRunFromCron().catch(err => {
+      console.error('[cron] Scheduled cron check failed:', err);
+    });
+  }, 60000); // Every 60 seconds
+};
+
 const startServer = (port: number): Promise<number> => {
   return new Promise((resolve, reject) => {
     server.once('error', (err: NodeJS.ErrnoException) => {
@@ -32,6 +54,10 @@ const startServer = (port: number): Promise<number> => {
     server.once('listening', () => {
       console.log(`[API] Server running on port ${port}`);
       savePortInfo(port);
+      
+      // Start cron scheduler after server is running
+      startCronScheduler();
+      
       resolve(port);
     });
 
@@ -60,5 +86,22 @@ const tryPorts = async () => {
     }
   }
 };
+
+// Cleanup on shutdown
+process.on('SIGINT', () => {
+  console.log('[cron] Stopping cron scheduler...');
+  if (cronInterval) {
+    clearInterval(cronInterval);
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  console.log('[cron] Stopping cron scheduler...');
+  if (cronInterval) {
+    clearInterval(cronInterval);
+  }
+  process.exit(0);
+});
 
 tryPorts();
