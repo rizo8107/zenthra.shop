@@ -299,14 +299,37 @@ export function CreatePaymentLinkDialog({
     }
   };
   
-  // Get full link URL - Frontend runs on port 8080, Backend on 8081
+  // Get full link URL - Payment links should use the main domain, not admin subdomain
   const getLinkUrl = (code: string) => {
-    // Replace backend port with frontend port
     let baseUrl = window.location.origin;
-    // Handle common port mappings
+    
+    // Remove any subdomain (admin., backend., etc.) to use main domain
+    // e.g., https://admin.karigaistore.in -> https://karigaistore.in
+    try {
+      const url = new URL(baseUrl);
+      const hostParts = url.hostname.split('.');
+      
+      // If there's a subdomain (more than 2 parts for .in, .com, etc.)
+      // or more than 3 parts for .co.in, etc.
+      if (hostParts.length > 2) {
+        // Check if it's a subdomain like admin., backend., api.
+        const subdomain = hostParts[0].toLowerCase();
+        if (['admin', 'backend', 'api', 'app'].includes(subdomain)) {
+          // Remove the subdomain
+          hostParts.shift();
+          url.hostname = hostParts.join('.');
+          baseUrl = url.origin;
+        }
+      }
+    } catch (e) {
+      console.error('Error parsing URL:', e);
+    }
+    
+    // Handle common port mappings for local development
     baseUrl = baseUrl.replace(':8081', ':8080');  // Production-like
     baseUrl = baseUrl.replace(':5173', ':5174');  // Vite dev
     baseUrl = baseUrl.replace(':3001', ':3000');  // Common dev ports
+    
     return `${baseUrl}/pay/${code}`;
   };
   
