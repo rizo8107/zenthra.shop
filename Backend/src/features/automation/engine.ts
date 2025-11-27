@@ -797,6 +797,7 @@ export function invalidateCronCache(): void {
  */
 export async function startRunFromCron(): Promise<void> {
   const now = Date.now();
+  const currentMinute = Math.floor(now / 60000); // Minute-level timestamp
   
   // Refresh cache if stale (every 5 minutes) or empty
   if (now - cronFlowCache.lastRefresh > CACHE_TTL || cronFlowCache.flows.length === 0) {
@@ -817,15 +818,44 @@ export async function startRunFromCron(): Promise<void> {
         continue;
       }
 
-      // Prevent duplicate runs within the same minute
-      const runKey = `${flow.id}:${nodeId}`;
-      const lastRun = lastCronRuns.get(runKey) || 0;
+      // Use minute-level key to prevent duplicates even after server restart
+      const runKey = `${flow.id}:${nodeId}:${currentMinute}`;
       
-      if (now - lastRun < 60000) {
-        continue; // Already ran within the last minute
+      // Check in-memory first (fast path)
+      if (lastCronRuns.has(runKey)) {
+        continue; // Already ran this minute
       }
       
+      // Check database for recent runs (handles server restarts)
+      try {
+        const fiveMinutesAgo = new Date(now - 5 * 60 * 1000).toISOString();
+        const recentRuns = await pb.collection('runs').getList(1, 1, {
+          filter: `flow_id = "${flow.id}" && trigger_type = "cron" && started_at >= "${fiveMinutesAgo}"`,
+          sort: '-started_at',
+          $autoCancel: false,
+        });
+        
+        if (recentRuns.items.length > 0) {
+          const lastRunTime = new Date(recentRuns.items[0].started_at).getTime();
+          if (now - lastRunTime < 60000) {
+            // Already ran within the last minute (from DB)
+            lastCronRuns.set(runKey, now); // Cache it
+            continue;
+          }
+        }
+      } catch (dbError) {
+        // If DB check fails, rely on in-memory check only
+        console.warn(`[cron] DB check failed for flow ${flow.id}, using memory only`);
+      }
+      
+      // Mark as run BEFORE executing to prevent race conditions
       lastCronRuns.set(runKey, now);
+      
+      // Clean up old entries (keep only last 100)
+      if (lastCronRuns.size > 100) {
+        const oldestKey = lastCronRuns.keys().next().value;
+        if (oldestKey) lastCronRuns.delete(oldestKey);
+      }
 
       console.log(`[cron] Triggering flow ${flow.id} (cron: ${cronExpression})`);
 

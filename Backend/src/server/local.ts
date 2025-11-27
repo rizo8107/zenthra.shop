@@ -19,25 +19,42 @@ const savePortInfo = (port: number) => {
   }
 };
 
-// Start cron scheduler - runs every minute
+// Start cron scheduler - runs every minute, aligned to clock
 let cronInterval: NodeJS.Timeout | null = null;
+let cronRunning = false; // Prevent concurrent runs
 
 const startCronScheduler = () => {
-  console.log('[cron] Starting automation cron scheduler (every minute)');
+  console.log('[cron] Starting automation cron scheduler');
   
-  // Run immediately on startup
+  const runCronCheck = async () => {
+    // Prevent concurrent runs
+    if (cronRunning) {
+      console.log('[cron] Skipping - previous check still running');
+      return;
+    }
+    
+    cronRunning = true;
+    try {
+      await startRunFromCron();
+    } catch (err) {
+      console.error('[cron] Check failed:', err);
+    } finally {
+      cronRunning = false;
+    }
+  };
+  
+  // Calculate delay to next minute boundary (aligned to clock)
+  const now = new Date();
+  const msUntilNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
+  
+  console.log(`[cron] First check in ${Math.round(msUntilNextMinute / 1000)}s (at next minute)`);
+  
+  // Start at next minute boundary, then every 60 seconds
   setTimeout(() => {
-    startRunFromCron().catch(err => {
-      console.error('[cron] Initial cron check failed:', err);
-    });
-  }, 5000); // Wait 5 seconds for server to fully start
-  
-  // Then run every minute
-  cronInterval = setInterval(() => {
-    startRunFromCron().catch(err => {
-      console.error('[cron] Scheduled cron check failed:', err);
-    });
-  }, 60000); // Every 60 seconds
+    runCronCheck(); // First run at minute boundary
+    
+    cronInterval = setInterval(runCronCheck, 60000); // Then every 60 seconds
+  }, msUntilNextMinute);
 };
 
 const startServer = (port: number): Promise<number> => {
@@ -88,19 +105,16 @@ const tryPorts = async () => {
 };
 
 // Cleanup on shutdown
+
 process.on('SIGINT', () => {
   console.log('[cron] Stopping cron scheduler...');
-  if (cronInterval) {
-    clearInterval(cronInterval);
-  }
+  if (cronInterval) clearInterval(cronInterval);
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
   console.log('[cron] Stopping cron scheduler...');
-  if (cronInterval) {
-    clearInterval(cronInterval);
-  }
+  if (cronInterval) clearInterval(cronInterval);
   process.exit(0);
 });
 
