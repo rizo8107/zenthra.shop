@@ -225,73 +225,73 @@ const DashboardPage: React.FC = () => {
           </TabsList>
         </div>
 
-        <TabsContent value="overview" className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <TabsContent value="overview" className="space-y-4 sm:space-y-6">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 xl:grid-cols-3">
             <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-primary via-primary/90 to-purple-600 text-primary-foreground shadow-lg">
               <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
-              <CardHeader className="pb-2">
-                <CardDescription className="text-white/70">Total Orders</CardDescription>
-                <CardTitle className="text-3xl font-semibold text-white flex items-center gap-2">
-                  <ShoppingBag className="h-5 w-5 opacity-90" />
+              <CardHeader className="pb-1 sm:pb-2 px-4 sm:px-6 pt-3 sm:pt-4">
+                <CardDescription className="text-xs sm:text-sm text-white/70">Total Orders</CardDescription>
+                <CardTitle className="text-2xl sm:text-3xl font-semibold text-white flex items-center gap-2">
+                  <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 opacity-80" />
                   {metrics ? metrics.total_orders : '—'}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-white/80">All time orders</CardContent>
+              <CardContent className="px-4 sm:px-6 pb-3 sm:pb-4 text-[11px] sm:text-xs text-white/80">All time orders</CardContent>
             </Card>
 
             <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-500 text-white shadow-lg">
-              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
-                <Clock className="h-5 w-5" />
+              <div className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-full bg-white/15 p-1.5 sm:p-2">
+                <Clock className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-white/70">Pending Orders</CardDescription>
-                <CardTitle className="text-3xl font-semibold">{metrics ? metrics.pending_orders : '—'}</CardTitle>
+              <CardHeader className="pb-1 sm:pb-2 px-4 sm:px-6 pt-3 sm:pt-4">
+                <CardDescription className="text-xs sm:text-sm text-white/70">Pending Orders</CardDescription>
+                <CardTitle className="text-2xl sm:text-3xl font-semibold">{metrics ? metrics.pending_orders : '—'}</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-white/80">Need attention</CardContent>
+              <CardContent className="px-4 sm:px-6 pb-3 sm:pb-4 text-[11px] sm:text-xs text-white/80">Need attention</CardContent>
             </Card>
 
             <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-lg">
-              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
-                <Check className="h-5 w-5" />
+              <div className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-full bg-white/15 p-1.5 sm:p-2">
+                <Check className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-white/70">Completed Orders</CardDescription>
-                <CardTitle className="text-3xl font-semibold">{metrics ? metrics.completed_orders : '—'}</CardTitle>
+              <CardHeader className="pb-1 sm:pb-2 px-4 sm:px-6 pt-3 sm:pt-4">
+                <CardDescription className="text-xs sm:text-sm text-white/70">Completed Orders</CardDescription>
+                <CardTitle className="text-2xl sm:text-3xl font-semibold">{metrics ? metrics.completed_orders : '—'}</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-white/80">Successfully delivered</CardContent>
+              <CardContent className="px-4 sm:px-6 pb-3 sm:pb-4 text-[11px] sm:text-xs text-white/80">Successfully delivered</CardContent>
             </Card>
 
             <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-indigo-500 via-violet-500 to-fuchsia-600 text-white shadow-lg">
-              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
-                <DollarSign className="h-5 w-5" />
+              <div className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-full bg-white/15 p-1.5 sm:p-2">
+                <DollarSign className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-white/70">Total Revenue</CardDescription>
-                <CardTitle className="text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.total_revenue) : '—'}</CardTitle>
+              <CardHeader className="pb-1 sm:pb-2 px-4 sm:px-6 pt-3 sm:pt-4">
+                <CardDescription className="text-xs sm:text-sm text-white/70">Total Revenue</CardDescription>
+                <CardTitle className="text-2xl sm:text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.total_revenue) : '—'}</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-white/80">vs last month</CardContent>
+              <CardContent className="px-4 sm:px-6 pb-3 sm:pb-4 text-[11px] sm:text-xs text-white/80">vs last month</CardContent>
             </Card>
 
             <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-teal-500 via-cyan-500 to-sky-500 text-white shadow-lg">
-              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
-                <TrendingUp className="h-5 w-5" />
+              <div className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-full bg-white/15 p-1.5 sm:p-2">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-white/70">Average Order Value</CardDescription>
-                <CardTitle className="text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.average_order_value) : '—'}</CardTitle>
+              <CardHeader className="pb-1 sm:pb-2 px-4 sm:px-6 pt-3 sm:pt-4">
+                <CardDescription className="text-xs sm:text-sm text-white/70">Average Order Value</CardDescription>
+                <CardTitle className="text-2xl sm:text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.average_order_value) : '—'}</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-white/80">vs last month</CardContent>
+              <CardContent className="px-4 sm:px-6 pb-3 sm:pb-4 text-[11px] sm:text-xs text-white/80">vs last month</CardContent>
             </Card>
 
             <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-sky-500 via-blue-500 to-indigo-600 text-white shadow-lg">
-              <div className="absolute right-4 top-4 rounded-full bg-white/15 p-2">
-                <Calendar className="h-5 w-5" />
+              <div className="absolute right-3 top-3 sm:right-4 sm:top-4 rounded-full bg-white/15 p-1.5 sm:p-2">
+                <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-white/70">Revenue Today</CardDescription>
-                <CardTitle className="text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.revenue_today) : '—'}</CardTitle>
+              <CardHeader className="pb-1 sm:pb-2 px-4 sm:px-6 pt-3 sm:pt-4">
+                <CardDescription className="text-xs sm:text-sm text-white/70">Revenue Today</CardDescription>
+                <CardTitle className="text-2xl sm:text-3xl font-semibold">{metrics ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(metrics.revenue_today) : '—'}</CardTitle>
               </CardHeader>
-              <CardContent className="text-xs text-white/80">From today's orders</CardContent>
+              <CardContent className="px-4 sm:px-6 pb-3 sm:pb-4 text-[11px] sm:text-xs text-white/80">From today's orders</CardContent>
             </Card>
           </div>
 
@@ -340,29 +340,31 @@ const DashboardPage: React.FC = () => {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="h-80">
-                {isRevenueLoading ? (
-                  <div className="flex h-full items-center justify-center">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                  </div>
-                ) : revenueData.length === 0 ? (
-                  <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
-                    No revenue data for the selected range.
-                  </div>
-                ) : (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={revenueData}
-                      margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="label" />
-                      <YAxis />
-                      <Tooltip formatter={(value) => [`₹${value}`, 'Revenue']} />
-                      <Bar dataKey="revenue" fill="#0c8ee8" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                )}
+              <div className="overflow-x-auto">
+                <div className="h-80 min-w-[600px]">
+                  {isRevenueLoading ? (
+                    <div className="flex h-full items-center justify-center">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : revenueData.length === 0 ? (
+                    <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
+                      No revenue data for the selected range.
+                    </div>
+                  ) : (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={revenueData}
+                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="label" />
+                        <YAxis />
+                        <Tooltip formatter={(value) => [`₹${value}`, 'Revenue']} />
+                        <Bar dataKey="revenue" fill="#0c8ee8" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  )}
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -503,25 +505,25 @@ const DashboardPage: React.FC = () => {
               <CardTitle>Units Sold by Product</CardTitle>
               <CardDescription>Visual breakdown of quantities sold</CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pb-4">
               {isProductLoading ? (
                 <div className="flex h-48 items-center justify-center">
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
               ) : visibleProductItems.length > 0 ? (
-                <div className="h-[480px]">
+                <div className="h-[320px] sm:h-[420px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart
                       data={visibleProductItems}
                       layout="vertical"
-                      margin={{ top: 20, right: 30, left: 20, bottom: 20 }}
+                      margin={{ top: 20, right: 24, left: 16, bottom: 16 }}
                     >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis type="number" allowDecimals={false} />
                       <YAxis
                         type="category"
                         dataKey="name"
-                        width={200}
+                        width={120}
                         tick={{ fontSize: 12 }}
                       />
                       <Tooltip

@@ -20,6 +20,11 @@ const OrdersPage: React.FC = () => {
 
   const { orders, isLoading, error, createOrder, updateOrder, refetch } = useOrders();
 
+  const formatCurrency = (amount?: number | null) =>
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
+      amount ?? 0
+    );
+
   const handleViewOrder = (order: Order) => {
     setSelectedOrder(order);
     setIsViewDialogOpen(true);
@@ -99,30 +104,17 @@ const OrdersPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Content */}
-      <div className="mx-auto w-full max-w-7xl px-4 pb-24 pt-4">
-        {/* Table / list container */}
-        <Card className="overflow-hidden">
-          <CardContent className="p-0">
-            <OrdersTable
-              orders={filteredOrders}
-              isLoading={isLoading}
-              onViewOrder={handleViewOrder}
-              onUpdateStatus={(orderId, status) => {
-                updateOrder.mutate({ id: orderId, data: { status } });
-              }}
-            />
-            {/* Empty state */}
-            {!isLoading && filteredOrders?.length === 0 && (
-              <div className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-                <div className="text-sm text-muted-foreground">No orders found{query ? " for your search." : "."}</div>
-                <Button onClick={() => setIsCreateDialogOpen(true)} size="sm">
-                  <PlusIcon className="mr-2 h-4 w-4" /> Create your first order
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+      {/* Content - Use OrdersTable for both desktop and mobile (it has its own responsive views with filters) */}
+      <div className="mx-auto w-full max-w-7xl px-2 sm:px-4 pb-24 pt-4">
+        <OrdersTable
+          orders={filteredOrders}
+          isLoading={isLoading}
+          onViewOrder={handleViewOrder}
+          onUpdateStatus={(orderId, status) => {
+            updateOrder.mutate({ id: orderId, data: { status } });
+          }}
+          onRefresh={() => refetch?.()}
+        />
       </div>
 
       {/* FAB for mobile */}

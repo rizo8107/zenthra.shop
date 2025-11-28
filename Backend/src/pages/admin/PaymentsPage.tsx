@@ -205,7 +205,7 @@ const PaymentsPage = () => {
           {/* Payment Links Tab */}
           <TabsContent value="links" className="space-y-4">
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2">
                     <Link2 className="h-5 w-5" />
@@ -215,7 +215,7 @@ const PaymentsPage = () => {
                     Create and manage shareable payment links for customers
                   </CardDescription>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2 sm:justify-end">
                   <Button variant="outline" size="sm" onClick={loadPaymentLinks}>
                     <RefreshCw className={`h-4 w-4 mr-1 ${loadingLinks ? 'animate-spin' : ''}`} />
                     Refresh
@@ -241,81 +241,153 @@ const PaymentsPage = () => {
                     </Button>
                   </div>
                 ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Amount</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Created</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {paymentLinks.map((link) => (
-                        <TableRow key={link.id}>
-                          <TableCell>
-                            <div>
-                              <p className="font-medium">{link.title}</p>
-                              <p className="text-xs text-muted-foreground font-mono">{link.link_code}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell className="font-medium">
-                            ₹{link.total.toLocaleString('en-IN')}
-                          </TableCell>
-                          <TableCell>
-                            {link.prefill_name || link.prefill_phone || link.prefill_email ? (
-                              <div className="text-sm">
-                                {link.prefill_name && <p>{link.prefill_name}</p>}
-                                {link.prefill_phone && <p className="text-muted-foreground">{link.prefill_phone}</p>}
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {getStatusBadge(link.status, link.expires_at)}
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">
-                            {format(new Date(link.created), 'dd MMM yyyy, h:mm a')}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => copyLink(link.link_code)}>
-                                  <Copy className="h-4 w-4 mr-2" />
-                                  Copy Link
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => window.open(getPaymentLinkUrl(link.link_code), '_blank')}>
-                                  <ExternalLink className="h-4 w-4 mr-2" />
-                                  Open Link
-                                </DropdownMenuItem>
-                                {link.order_id && (
-                                  <DropdownMenuItem onClick={() => window.location.href = `/admin/orders?id=${link.order_id}`}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    View Order
-                                  </DropdownMenuItem>
+                  <>
+                    {/* Desktop table */}
+                    <div className="hidden md:block overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Title</TableHead>
+                            <TableHead>Amount</TableHead>
+                            <TableHead>Customer</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Created</TableHead>
+                            <TableHead className="text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paymentLinks.map((link) => (
+                            <TableRow key={link.id}>
+                              <TableCell>
+                                <div>
+                                  <p className="font-medium">{link.title}</p>
+                                  <p className="text-xs text-muted-foreground font-mono">{link.link_code}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="font-medium">
+                                ₹{link.total.toLocaleString('en-IN')}
+                              </TableCell>
+                              <TableCell>
+                                {link.prefill_name || link.prefill_phone || link.prefill_email ? (
+                                  <div className="text-sm">
+                                    {link.prefill_name && <p>{link.prefill_name}</p>}
+                                    {link.prefill_phone && (
+                                      <p className="text-muted-foreground">{link.prefill_phone}</p>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground">-</span>
                                 )}
-                                <DropdownMenuItem 
-                                  onClick={() => deletePaymentLink(link.id)}
-                                  className="text-destructive"
-                                >
-                                  <Trash2 className="h-4 w-4 mr-2" />
-                                  Delete
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                              </TableCell>
+                              <TableCell>{getStatusBadge(link.status, link.expires_at)}</TableCell>
+                              <TableCell className="text-muted-foreground">
+                                {format(new Date(link.created), 'dd MMM yyyy, h:mm a')}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="sm">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => copyLink(link.link_code)}>
+                                      <Copy className="h-4 w-4 mr-2" />
+                                      Copy Link
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => window.open(getPaymentLinkUrl(link.link_code), '_blank')}
+                                    >
+                                      <ExternalLink className="h-4 w-4 mr-2" />
+                                      Open Link
+                                    </DropdownMenuItem>
+                                    {link.order_id && (
+                                      <DropdownMenuItem
+                                        onClick={() => (window.location.href = `/admin/orders?id=${link.order_id}`)}
+                                      >
+                                        <Eye className="h-4 w-4 mr-2" />
+                                        View Order
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuItem
+                                      onClick={() => deletePaymentLink(link.id)}
+                                      className="text-destructive"
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+
+                    {/* Mobile card list */}
+                    <div className="md:hidden flex flex-col gap-3">
+                      {paymentLinks.map((link) => (
+                        <div
+                          key={link.id}
+                          className="rounded-lg border border-border bg-card px-3 py-3 text-sm shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium truncate">{link.title}</p>
+                              <p className="text-[11px] text-muted-foreground font-mono truncate">
+                                {link.link_code}
+                              </p>
+                              <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                <span>₹{link.total.toLocaleString('en-IN')}</span>
+                                {link.prefill_name && <span>• {link.prefill_name}</span>}
+                              </div>
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                {format(new Date(link.created), 'dd MMM yyyy, h:mm a')}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-1">
+                              {getStatusBadge(link.status, link.expires_at)}
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={() => copyLink(link.link_code)}>
+                                    <Copy className="h-4 w-4 mr-2" />
+                                    Copy Link
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    onClick={() => window.open(getPaymentLinkUrl(link.link_code), '_blank')}
+                                  >
+                                    <ExternalLink className="h-4 w-4 mr-2" />
+                                    Open Link
+                                  </DropdownMenuItem>
+                                  {link.order_id && (
+                                    <DropdownMenuItem
+                                      onClick={() => (window.location.href = `/admin/orders?id=${link.order_id}`)}
+                                    >
+                                      <Eye className="h-4 w-4 mr-2" />
+                                      View Order
+                                    </DropdownMenuItem>
+                                  )}
+                                  <DropdownMenuItem
+                                    onClick={() => deletePaymentLink(link.id)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </div>
+                        </div>
                       ))}
-                    </TableBody>
-                  </Table>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>

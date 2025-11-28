@@ -735,24 +735,28 @@ export default function WhatsAppConfigPage() {
         </div>
 
         <Tabs defaultValue="connection" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="connection" className="gap-2">
+          <TabsList className="flex flex-wrap gap-2">
+            <TabsTrigger value="connection" className="gap-2 flex-1 min-w-[120px] justify-center">
               <QrCode className="h-4 w-4" />
               Connection
             </TabsTrigger>
-            <TabsTrigger value="templates" className="gap-2">
+            <TabsTrigger value="templates" className="gap-2 flex-1 min-w-[120px] justify-center">
               <Edit className="h-4 w-4" />
               Templates
             </TabsTrigger>
-            <TabsTrigger value="test" className="gap-2">
+            <TabsTrigger value="test" className="gap-2 flex-1 min-w-[120px] justify-center">
               <Send className="h-4 w-4" />
               Test
             </TabsTrigger>
-            <TabsTrigger value="activity" className="gap-2" onClick={loadActivities}>
+            <TabsTrigger
+              value="activity"
+              className="gap-2 flex-1 min-w-[120px] justify-center"
+              onClick={loadActivities}
+            >
               <Activity className="h-4 w-4" />
               Activity
             </TabsTrigger>
-            <TabsTrigger value="settings" className="gap-2">
+            <TabsTrigger value="settings" className="gap-2 flex-1 min-w-[120px] justify-center">
               <Settings className="h-4 w-4" />
               Settings
             </TabsTrigger>

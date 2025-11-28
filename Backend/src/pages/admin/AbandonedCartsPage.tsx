@@ -262,7 +262,7 @@ const AbandonedCartsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-rose-500 via-pink-500 to-purple-500 text-white shadow-lg">
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
             <CardHeader className="pb-2">
@@ -358,7 +358,8 @@ const AbandonedCartsPage: React.FC = () => {
                 <div className="py-6 text-center text-sm text-muted-foreground">No customers match the current filters.</div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
                         <tr>
@@ -393,6 +394,35 @@ const AbandonedCartsPage: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Mobile card list */}
+                  <div className="md:hidden flex flex-col gap-3 px-3 py-3">
+                    {paginatedCustomers.map((customer) => (
+                      <button
+                        key={customer.userId}
+                        type="button"
+                        onClick={() => setSelectedCustomerId(customer.userId)}
+                        className={`w-full rounded-lg border border-border bg-card px-3 py-3 text-left text-sm shadow-sm ${
+                          selectedSummary?.userId === customer.userId ? 'border-rose-500 bg-rose-500/5' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{customer.name}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{customer.email || '—'}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span>{customer.pendingOrders} pending</span>
+                              <span>• {formatCurrency(customer.totalValue)}</span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              Last pending: {formatDate(customer.lastPendingDate)} • Days since {formatDays(customer.daysSinceLastPending)}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="flex items-center justify-between border-t px-4 py-3 text-xs text-muted-foreground">
                     <span>
                       Showing {(paginatedCustomers.length > 0 ? (page - 1) * pageSize + 1 : 0)}-

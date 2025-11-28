@@ -382,7 +382,7 @@ const CustomersPage = () => {
           </div>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 xl:grid-cols-4">
           <Card className="relative overflow-hidden border-0 bg-gradient-to-br from-primary via-primary/90 to-purple-600 text-primary-foreground shadow-lg">
             <div className="absolute -right-6 -top-6 h-24 w-24 rounded-full bg-white/10" />
             <CardHeader className="pb-2">
@@ -480,7 +480,8 @@ const CustomersPage = () => {
                 <div className="py-6 text-center text-sm text-muted-foreground">No customers match the current filters.</div>
               ) : (
                 <>
-                  <div className="overflow-x-auto">
+                  {/* Desktop table */}
+                  <div className="hidden md:block overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
                         <tr>
@@ -515,6 +516,35 @@ const CustomersPage = () => {
                       </tbody>
                     </table>
                   </div>
+
+                  {/* Mobile card list */}
+                  <div className="md:hidden flex flex-col gap-3 px-3 py-3">
+                    {paginatedCustomers.map((customer) => (
+                      <button
+                        key={customer.userId}
+                        type="button"
+                        onClick={() => setSelectedCustomerId(customer.userId)}
+                        className={`w-full rounded-lg border border-border bg-card px-3 py-3 text-left text-sm shadow-sm ${
+                          selectedSummary?.userId === customer.userId ? 'border-primary bg-primary/5' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium truncate">{customer.name}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{customer.email || '—'}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span>{customer.totalOrders} orders</span>
+                              <span>• {formatCurrency(customer.totalSpend)}</span>
+                            </div>
+                            <p className="mt-1 text-[11px] text-muted-foreground">
+                              Last order: {formatDate(customer.lastOrderDate)} • Gap {formatDays(customer.averageGapDays)}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+
                   <div className="flex items-center justify-between border-t px-4 py-3 text-xs text-muted-foreground">
                     <span>
                       Showing {(paginatedCustomers.length > 0 ? (page - 1) * pageSize + 1 : 0)}-
@@ -641,45 +671,82 @@ const CustomersPage = () => {
             ) : error ? (
               <div className="py-6 text-center text-sm text-destructive">Error loading users</div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
-                    <tr>
-                      <th className="px-4 py-3 text-left font-medium">Name</th>
-                      <th className="px-4 py-3 text-left font-medium">Email</th>
-                      <th className="px-4 py-3 text-left font-medium">Status</th>
-                      <th className="px-4 py-3 text-left font-medium">Created</th>
-                      <th className="px-4 py-3 text-right font-medium">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {users.map((user) => (
-                      <tr key={user.id} className="border-b last:border-0">
-                        <td className="px-4 py-3 font-medium">{user.name}</td>
-                        <td className="px-4 py-3">{user.email}</td>
-                        <td className="px-4 py-3">
+              <>
+                {/* Desktop table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/60 text-xs uppercase text-muted-foreground">
+                      <tr>
+                        <th className="px-4 py-3 text-left font-medium">Name</th>
+                        <th className="px-4 py-3 text-left font-medium">Email</th>
+                        <th className="px-4 py-3 text-left font-medium">Status</th>
+                        <th className="px-4 py-3 text-left font-medium">Created</th>
+                        <th className="px-4 py-3 text-right font-medium">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map((user) => (
+                        <tr key={user.id} className="border-b last:border-0">
+                          <td className="px-4 py-3 font-medium">{user.name}</td>
+                          <td className="px-4 py-3">{user.email}</td>
+                          <td className="px-4 py-3">
+                            <Badge variant={user.verified ? 'secondary' : 'outline'}>
+                              {user.verified ? 'Verified' : 'Pending'}
+                            </Badge>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-muted-foreground">
+                            {new Date(user.created).toLocaleDateString()}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(user.id)}
+                              disabled={deleteUser.isPending}
+                            >
+                              Remove
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile card list */}
+                <div className="md:hidden flex flex-col gap-3">
+                  {users.map((user) => (
+                    <div
+                      key={user.id}
+                      className="rounded-lg border border-border bg-card px-3 py-3 text-sm shadow-sm"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium truncate">{user.name}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            Joined {new Date(user.created).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
                           <Badge variant={user.verified ? 'secondary' : 'outline'}>
                             {user.verified ? 'Verified' : 'Pending'}
                           </Badge>
-                        </td>
-                        <td className="px-4 py-3 text-sm text-muted-foreground">
-                          {new Date(user.created).toLocaleDateString()}
-                        </td>
-                        <td className="px-4 py-3 text-right">
                           <Button
                             variant="ghost"
                             size="sm"
+                            className="h-7 px-2 text-xs"
                             onClick={() => handleDelete(user.id)}
                             disabled={deleteUser.isPending}
                           >
                             Remove
                           </Button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </CardContent>
         </Card>

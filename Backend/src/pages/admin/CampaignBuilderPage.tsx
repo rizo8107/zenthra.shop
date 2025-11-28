@@ -653,7 +653,7 @@ export default function CampaignBuilderPage() {
       
       <div className="mx-auto max-w-5xl px-4 py-6 space-y-6">
         {/* Progress Steps */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center gap-2">
           {steps.map((step, index) => {
             const Icon = step.icon;
             const isActive = currentStep === step.id;
@@ -663,7 +663,7 @@ export default function CampaignBuilderPage() {
               <React.Fragment key={step.id}>
                 <button
                   onClick={() => setCurrentStep(step.id)}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors flex-1 min-w-[140px] justify-center ${
                     isActive
                       ? 'bg-primary text-primary-foreground'
                       : isCompleted
@@ -679,7 +679,11 @@ export default function CampaignBuilderPage() {
                   <span className="font-medium text-sm">{step.name}</span>
                 </button>
                 {index < steps.length - 1 && (
-                  <div className={`flex-1 h-0.5 mx-2 ${isCompleted ? 'bg-green-500' : 'bg-muted'}`} />
+                  <div
+                    className={`hidden sm:block flex-1 h-0.5 mx-2 ${
+                      isCompleted ? 'bg-green-500' : 'bg-muted'
+                    }`}
+                  />
                 )}
               </React.Fragment>
             );

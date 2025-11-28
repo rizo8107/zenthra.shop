@@ -212,7 +212,6 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </span>
           </DialogTitle>
         </DialogHeader>
-        
         <Tabs defaultValue="items">
           <TabsList className="grid grid-cols-5 mb-4">
             <TabsTrigger value="items" className="flex items-center">

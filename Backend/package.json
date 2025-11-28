@@ -13,9 +13,19 @@
     "start:server": "tsx src/server/local.ts",
     "init:webhooks": "tsx scripts/init-webhooks-collections.ts",
     "dev:all": "npm run dev",
-    "build:all": "npm run build && npm run build:server"
+    "build:all": "npm run build && npm run build:server",
+    "cap:sync": "npx cap sync",
+    "cap:build": "npm run build && npx cap sync android",
+    "cap:open": "npx cap open android",
+    "cap:run": "npx cap run android"
   },
   "dependencies": {
+    "@capacitor/android": "^7.4.4",
+    "@capacitor/cli": "^7.4.4",
+    "@capacitor/core": "^7.4.4",
+    "@capacitor/push-notifications": "^7.0.3",
+    "@capacitor/splash-screen": "^7.0.3",
+    "@capacitor/status-bar": "^7.0.3",
     "@google/generative-ai": "^0.24.0",
     "@hookform/resolvers": "^3.9.0",
     "@measured/puck": "^0.20.2",

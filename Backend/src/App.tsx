@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { initPushNotifications, isNativePlatform } from "@/lib/capacitor-push";
 import DashboardPage from "./pages/admin/DashboardPage";
 import OrdersPage from "./pages/admin/OrdersPage";
 import PaymentsPage from "./pages/admin/PaymentsPage";
@@ -53,16 +54,22 @@ const queryClient = new QueryClient({
 
 const App = () => {
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-          .then(registration => {
-            console.log('Service Worker registered: ', registration);
-          })
-          .catch(registrationError => {
-            console.log('Service Worker registration failed: ', registrationError);
-          });
-      });
+    // Initialize Capacitor push notifications on native platforms
+    if (isNativePlatform()) {
+      initPushNotifications();
+    } else {
+      // Web: register service worker for PWA
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(registration => {
+              console.log('Service Worker registered: ', registration);
+            })
+            .catch(registrationError => {
+              console.log('Service Worker registration failed: ', registrationError);
+            });
+        });
+      }
     }
   }, []);
 

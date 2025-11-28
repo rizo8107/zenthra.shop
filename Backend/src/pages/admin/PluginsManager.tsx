@@ -1835,14 +1835,6 @@ export default function PluginsManager() {
         </div>
 
         <Tabs defaultValue="all" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="all">All Plugins</TabsTrigger>
-            <TabsTrigger value="communication">Communication</TabsTrigger>
-            <TabsTrigger value="marketing">Marketing</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="advanced">Advanced</TabsTrigger>
-          </TabsList>
-
           <TabsContent value="all" className="space-y-4">
             {/* Icon grid of all plugins */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -1888,53 +1880,6 @@ export default function PluginsManager() {
             {/* Config Editor below grid */}
             <div>{renderConfigEditor()}</div>
           </TabsContent>
-
-          {['communication', 'marketing', 'analytics', 'advanced'].map((category) => (
-            <TabsContent key={category} value={category} className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-                {groupedPlugins[category]?.map((item) => {
-                  const Icon = item.icon;
-                  const isSelected = selectedPlugin?.key === item.key;
-                  return (
-                    <Card
-                      key={item.key}
-                      className={`relative cursor-pointer overflow-hidden border border-border/40 bg-card/70 hover:bg-card transition-colors h-32 flex items-center justify-center ${
-                        isSelected ? 'ring-2 ring-primary' : ''
-                      }`}
-                      onClick={() => item.plugin && setSelectedPlugin(item.plugin)}
-                    >
-                      <CardContent className="flex flex-col items-center justify-center gap-2 p-4 text-center">
-                        <Icon className="h-7 w-7 text-primary" />
-                        <span className="text-xs font-medium truncate w-full">
-                          {item.name}
-                        </span>
-                      </CardContent>
-                      <div className="absolute top-2 left-2 flex items-center gap-1">
-                        <Switch
-                          checked={item.enabled}
-                          onCheckedChange={(checked) => togglePlugin(item.key, checked)}
-                          disabled={saving}
-                        />
-                      </div>
-                      {item.hasConfig && item.enabled && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="absolute bottom-2 right-2 h-7 px-2 text-[11px]"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            item.plugin && setSelectedPlugin(item.plugin);
-                          }}
-                        >
-                          Configure
-                        </Button>
-                      )}
-                    </Card>
-                  );
-                })}
-              </div>
-            </TabsContent>
-          ))}
         </Tabs>
       </div>
 

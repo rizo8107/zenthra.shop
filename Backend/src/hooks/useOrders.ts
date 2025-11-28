@@ -105,6 +105,32 @@ export function useOrders() {
       } catch (whatsappError) {
         console.error('Error sending WhatsApp notification:', whatsappError);
       }
+
+      // Trigger mobile push notification via backend (FCM)
+      try {
+        const order = data as unknown as Order;
+        const pushTitle = `New order #${order.id.slice(0, 8)}`;
+        const pushBody = order.customer_name
+          ? `${order.customer_name} placed an order for ₹${order.total}`
+          : `New order for ₹${order.total}`;
+
+        void fetch('/api/notifications/order', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            orderId: order.id,
+            title: pushTitle,
+            body: pushBody,
+            total: order.total,
+          }),
+        }).catch(err => {
+          console.error('Failed to trigger mobile push notification:', err);
+        });
+      } catch (pushError) {
+        console.error('Error preparing mobile push notification:', pushError);
+      }
     },
     onError: (error: Error) => {
       toast.error('Failed to create order: ' + error.message);

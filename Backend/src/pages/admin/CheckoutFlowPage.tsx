@@ -278,11 +278,19 @@ const CheckoutFlowPage: React.FC = () => {
         </div>
 
         <Tabs defaultValue="flows" className="space-y-4">
-          <TabsList>
-            <TabsTrigger value="flows">Checkout Flows</TabsTrigger>
-            <TabsTrigger value="payments">Payment Methods</TabsTrigger>
-            <TabsTrigger value="conditions">Conditions</TabsTrigger>
-            <TabsTrigger value="preview">Preview</TabsTrigger>
+          <TabsList className="flex flex-wrap gap-2">
+            <TabsTrigger value="flows" className="flex-1 min-w-[140px] justify-center">
+              Checkout Flows
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="flex-1 min-w-[140px] justify-center">
+              Payment Methods
+            </TabsTrigger>
+            <TabsTrigger value="conditions" className="flex-1 min-w-[140px] justify-center">
+              Conditions
+            </TabsTrigger>
+            <TabsTrigger value="preview" className="flex-1 min-w-[140px] justify-center">
+              Preview
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="flows" className="space-y-4">
