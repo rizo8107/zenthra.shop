@@ -337,19 +337,18 @@ export default function PaymentLink() {
       });
       
       // Verify payment
-      const verificationSuccess = await verifyRazorpayPayment(
+      const verificationResult = await verifyRazorpayPayment(
         razorpayOrder.id,
         response.razorpay_payment_id || '',
         response.razorpay_signature || ''
       );
+
+      if (!verificationResult.success) {
+        throw new Error(verificationResult.error || "Payment verification failed");
+      }
       
-      // Capture payment - use amount from order (already in paise)
-      const captureSuccess = await captureRazorpayPayment(
-        response.razorpay_payment_id,
-        razorpayOrder.amount
-      );
-      
-      // Update order with payment details
+      // CRITICAL: Update order immediately after verification to prevent "pending" state
+      // even if capture fails or connection drops
       await pocketbase.collection('orders').update(order.id, {
         payment_status: "paid",
         status: "processing",
@@ -357,7 +356,7 @@ export default function PaymentLink() {
         razorpay_signature: response.razorpay_signature,
         payment_method: "razorpay",
         payment_date: new Date().toISOString(),
-        notes: `Payment received via Razorpay. Payment ID: ${response.razorpay_payment_id}. Verified: ${verificationSuccess ? "Yes" : "No"}. Captured: ${captureSuccess ? "Yes" : "Pending"}`,
+        notes: `Payment received via Razorpay. Payment ID: ${response.razorpay_payment_id}. Verified: Yes. Capture Status: Pending...`,
       });
       
       // Mark payment link as used
@@ -365,9 +364,24 @@ export default function PaymentLink() {
         status: 'used',
         order_id: order.id,
       });
+
+      // Capture payment - use amount from order (already in paise)
+      const captureResult = await captureRazorpayPayment(
+        response.razorpay_payment_id,
+        razorpayOrder.amount
+      );
       
-      // Send webhook
-      await sendWebhookEvent({
+      // Update notes with capture result (best effort)
+      try {
+        await pocketbase.collection('orders').update(order.id, {
+          notes: `Payment received via Razorpay. Payment ID: ${response.razorpay_payment_id}. Verified: Yes. Captured: ${captureResult.success ? "Yes" : "Failed (" + captureResult.error + ")"}`,
+        });
+      } catch (e) {
+        console.error("Failed to update capture status note", e);
+      }
+      
+      // Send webhook (non-blocking)
+      sendWebhookEvent({
         type: 'payment.succeeded',
         data: {
           event: "payment.captured",
@@ -377,8 +391,8 @@ export default function PaymentLink() {
                 id: response.razorpay_payment_id,
                 order_id: razorpayOrder.id,
                 currency: "INR",
-                status: "captured",
-                captured: true,
+                status: captureResult.success ? "captured" : "authorized",
+                captured: captureResult.success,
               },
             },
             metadata: {
@@ -388,7 +402,7 @@ export default function PaymentLink() {
           },
         },
         metadata: { page: 'payment-link' }
-      });
+      }).catch(err => console.error("Webhook send failed", err));
       
       setOrderId(order.id);
       setOrderSuccess(true);
