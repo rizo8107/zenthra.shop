@@ -298,10 +298,10 @@ export default function PaymentLink() {
       
       // Open Razorpay checkout
       // Get shop name from site settings or use default
-      let shopName = "Viruthi Gold";
+      let shopName = "Karigai";
       try {
         const settings = await pocketbase.collection('site_settings').getFirstListItem('');
-        shopName = settings.site_name || settings.brand_name || shopName;
+        shopName = settings.siteTitle || shopName;
       } catch {
         // Use default if settings not found
       }
@@ -320,7 +320,7 @@ export default function PaymentLink() {
             contact: cleanPhone,
           },
           theme: {
-            color: "#166534", // Green theme to match Viruthi Gold
+            color: "#166534", // Green theme
           },
           handler: function(response: RazorpayResponse) {
             resolve(response);
