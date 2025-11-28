@@ -6,10 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { LockKeyhole, Mail, LogIn } from 'lucide-react';
+import { LockKeyhole, Mail, LogIn, Settings } from 'lucide-react';
 import { authenticateAdmin } from '@/lib/pocketbase';
 import { useTheme } from '@/components/theme/theme-provider';
 import { debugEnvironment } from '@/utils/env-debug';
+import { isNativeApp } from '@/lib/app-config';
 
 
 
@@ -162,8 +163,19 @@ const LoginPage: React.FC = () => {
 
         <CardFooter className="flex flex-col gap-4">
           <Separator className="bg-border/80" />
-          <div className="text-center text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Zenthra Shop
+          <div className="flex items-center justify-between w-full text-xs text-muted-foreground">
+            <span>© {new Date().getFullYear()} Zenthra Shop</span>
+            {isNativeApp() && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 px-2 text-muted-foreground"
+                onClick={() => navigate('/configure')}
+              >
+                <Settings className="h-4 w-4 mr-1" />
+                Backend
+              </Button>
+            )}
           </div>
         </CardFooter>
       </Card>

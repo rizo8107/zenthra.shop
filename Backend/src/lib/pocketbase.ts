@@ -1,4 +1,6 @@
 import PocketBase from 'pocketbase';
+import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import type {
   ProductSalesSummary,
   ProductSalesMetric,
@@ -19,37 +21,64 @@ const VITE_ENV = (() => {
   }
 })();
 
-// Try multiple environment variable sources
-let POCKETBASE_URL = 
+// Default URL from environment
+const DEFAULT_POCKETBASE_URL = 
   (VITE_ENV as any).VITE_POCKETBASE_URL ||
   (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
-  (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_POCKETBASE_URL);
+  (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_POCKETBASE_URL) ||
+  'https://backend.viruthigold.in';
 
-// Debug logging
-console.log('='.repeat(60));
-console.log('PocketBase Environment Check:');
-console.log('All import.meta.env keys:', Object.keys(VITE_ENV));
-console.log('import.meta.env.VITE_POCKETBASE_URL:', (VITE_ENV as any).VITE_POCKETBASE_URL);
-console.log('import.meta.env.MODE:', (VITE_ENV as any).MODE);
-console.log('import.meta.env.DEV:', (VITE_ENV as any).DEV);
+// Get stored URL for native apps
+let POCKETBASE_URL = DEFAULT_POCKETBASE_URL;
 
-// TEMPORARY WORKAROUND: Hard-code as fallback if env is not working
-if (!POCKETBASE_URL) {
-  console.warn('⚠️  VITE_POCKETBASE_URL not found in environment!');
-  console.warn('⚠️  Using temporary fallback. Please fix your .env configuration!');
-  console.warn('⚠️  Add VITE_POCKETBASE_URL=https://backend.viruthigold.in to your .env file');
-  
-  // TEMPORARY: Remove this after fixing env
-  POCKETBASE_URL = 'https://backend.viruthigold.in';
+// For native apps, try to get stored URL synchronously from localStorage as fallback
+// (Preferences is async, so we use localStorage for initial load)
+if (Capacitor.isNativePlatform() && typeof localStorage !== 'undefined') {
+  const storedUrl = localStorage.getItem('zenthra_pocketbase_url');
+  if (storedUrl) {
+    POCKETBASE_URL = storedUrl;
+    console.log('✓ Using stored PocketBase URL:', POCKETBASE_URL);
+  }
 }
 
-console.log('✓ Final PocketBase URL:', POCKETBASE_URL);
-console.log('='.repeat(60));
+console.log('✓ PocketBase URL:', POCKETBASE_URL);
 
 export const pb = new PocketBase(POCKETBASE_URL);
 
 // Disable auto-cancellation of requests which is causing issues
 pb.autoCancellation(false);
+
+/**
+ * Update PocketBase URL dynamically (for native app configuration)
+ */
+export async function updatePocketBaseUrl(newUrl: string): Promise<void> {
+  const cleanUrl = newUrl.trim().replace(/\/$/, '');
+  
+  // Update the PocketBase instance
+  (pb as any).baseUrl = cleanUrl;
+  
+  // Store in localStorage for sync access on next load
+  if (typeof localStorage !== 'undefined') {
+    localStorage.setItem('zenthra_pocketbase_url', cleanUrl);
+  }
+  
+  // Also store in Capacitor Preferences
+  if (Capacitor.isNativePlatform()) {
+    await Preferences.set({
+      key: 'zenthra_pocketbase_url',
+      value: cleanUrl,
+    });
+  }
+  
+  console.log('✓ PocketBase URL updated to:', cleanUrl);
+}
+
+/**
+ * Get current PocketBase URL
+ */
+export function getPocketBaseUrl(): string {
+  return (pb as any).baseUrl || POCKETBASE_URL;
+}
 
 // Ensure a user is authenticated (no auto-admin)
 export const ensureAdminAuth = async () => {

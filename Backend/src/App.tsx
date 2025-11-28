@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { initPushNotifications, isNativePlatform } from "@/lib/capacitor-push";
+import { isNativeApp } from "@/lib/app-config";
 import DashboardPage from "./pages/admin/DashboardPage";
 import OrdersPage from "./pages/admin/OrdersPage";
 import PaymentsPage from "./pages/admin/PaymentsPage";
@@ -33,6 +34,7 @@ import ProductPageEditor from "./pages/admin/ProductPageEditor";
 import WhatsAppConfigPage from "./pages/admin/WhatsAppConfigPage";
 import CampaignBuilderPage from "./pages/admin/CampaignBuilderPage";
 import CampaignsPage from "./pages/admin/CampaignsPage";
+import ConfigureBackendPage from "./pages/ConfigureBackendPage";
 
 // Set PocketBase URL from environment variable
 if (import.meta.env.VITE_POCKETBASE_URL) {
@@ -83,7 +85,12 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               {/* Public routes */}
-              <Route path="/" element={<Navigate to="/login" />} />
+              <Route path="/" element={
+                isNativeApp() 
+                  ? <Navigate to="/configure" /> 
+                  : <Navigate to="/login" />
+              } />
+              <Route path="/configure" element={<ConfigureBackendPage />} />
               <Route path="/login" element={<LoginPage />} />
 
               {/* Admin routes */}

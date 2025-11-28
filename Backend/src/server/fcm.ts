@@ -1,5 +1,8 @@
 import express, { Request, Response } from 'express';
+import admin from 'firebase-admin';
 import dotenv from 'dotenv';
+import path from 'path';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -8,28 +11,79 @@ const router = express.Router();
 // In-memory store of device tokens (per server instance)
 const deviceTokens = new Set<string>();
 
-const FCM_ENDPOINT = 'https://fcm.googleapis.com/fcm/send';
-const FCM_SERVER_KEY = process.env.FIREBASE_SERVER_KEY;
+// Initialize Firebase Admin SDK
+let firebaseInitialized = false;
 
-if (!FCM_SERVER_KEY) {
-  console.warn('[FCM] FIREBASE_SERVER_KEY is not set. Mobile push notifications will be disabled.');
+function initFirebase() {
+  if (firebaseInitialized) return true;
+
+  try {
+    // Try to load service account from file
+    const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH || 
+      path.join(process.cwd(), 'firebase-service-account.json');
+    
+    if (fs.existsSync(serviceAccountPath)) {
+      const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf8'));
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      firebaseInitialized = true;
+      console.log('[FCM] Firebase Admin initialized with service account file');
+      return true;
+    }
+
+    // Try to load from environment variable (JSON string)
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount),
+      });
+      firebaseInitialized = true;
+      console.log('[FCM] Firebase Admin initialized with env variable');
+      return true;
+    }
+
+    console.warn('[FCM] No Firebase service account found. Push notifications disabled.');
+    console.warn('[FCM] To enable: Download service account JSON from Firebase Console → Project Settings → Service Accounts');
+    return false;
+  } catch (err) {
+    console.error('[FCM] Failed to initialize Firebase:', err);
+    return false;
+  }
 }
 
-async function sendFcmMessage(payload: unknown) {
-  if (!FCM_SERVER_KEY) return;
+// Initialize on module load
+initFirebase();
 
-  const res = await fetch(FCM_ENDPOINT, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `key=${FCM_SERVER_KEY}`,
-    },
-    body: JSON.stringify(payload),
-  });
+async function sendFcmMessage(token: string, notification: { title: string; body: string }, data?: Record<string, string>) {
+  if (!firebaseInitialized) {
+    console.warn('[FCM] Firebase not initialized, skipping notification');
+    return false;
+  }
 
-  if (!res.ok) {
-    const text = await res.text();
-    console.error('[FCM] Error sending message:', res.status, text);
+  try {
+    const message: admin.messaging.Message = {
+      token,
+      notification: {
+        title: notification.title,
+        body: notification.body,
+      },
+      data: data || {},
+      android: {
+        priority: 'high',
+        notification: {
+          sound: 'default',
+          channelId: 'orders',
+        },
+      },
+    };
+
+    const response = await admin.messaging().send(message);
+    console.log('[FCM] Message sent:', response);
+    return true;
+  } catch (err) {
+    console.error('[FCM] Error sending message:', err);
+    return false;
   }
 }
 
@@ -75,33 +129,77 @@ router.post('/notifications/order', async (req: Request, res: Response) => {
     const notificationTitle = title || `New order #${String(orderId).slice(0, 8)}`;
     const notificationBody = body || 'A new order has been placed.';
 
-    const payloadBase = {
-      data: {
-        type: 'new_order',
-        order_id: String(orderId),
-        title: notificationTitle,
-        body: notificationBody,
-        total: total != null ? String(total) : undefined,
-      },
-    };
-
     const tokens = Array.from(deviceTokens);
+    let sentCount = 0;
+    
     await Promise.all(
-      tokens.map((token) =>
-        sendFcmMessage({
-          to: token,
-          ...payloadBase,
-        })
-      )
+      tokens.map(async (token) => {
+        const success = await sendFcmMessage(
+          token,
+          { title: notificationTitle, body: notificationBody },
+          {
+            type: 'new_order',
+            order_id: String(orderId),
+            total: total != null ? String(total) : '',
+          }
+        );
+        if (success) sentCount++;
+      })
     );
 
-    console.log(`[FCM] Sent new_order notification for order ${orderId} to ${tokens.length} devices.`);
-    return res.json({ ok: true, sent: tokens.length });
+    console.log(`[FCM] Sent new_order notification for order ${orderId} to ${sentCount} devices.`);
+    return res.json({ ok: true, sent: sentCount });
   } catch (err) {
     const e = err as Error;
     console.error('[FCM] Failed to send order notification:', e.message);
     return res.status(500).json({ error: e.message || 'Failed to send order notification' });
   }
+});
+
+// Test notification endpoint
+router.post('/notifications/test', async (req: Request, res: Response) => {
+  try {
+    if (deviceTokens.size === 0) {
+      return res.status(400).json({ 
+        error: 'No devices registered', 
+        message: 'Open the app on your Android device first to register for notifications.',
+        firebaseInitialized,
+      });
+    }
+
+    const notificationTitle = 'Test Notification 🔔';
+    const notificationBody = 'This is a test notification from Zenthra Shop!';
+
+    const tokens = Array.from(deviceTokens);
+    let sentCount = 0;
+    
+    await Promise.all(
+      tokens.map(async (token) => {
+        const success = await sendFcmMessage(
+          token,
+          { title: notificationTitle, body: notificationBody },
+          { type: 'test' }
+        );
+        if (success) sentCount++;
+      })
+    );
+
+    console.log(`[FCM] Sent test notification to ${tokens.length} devices.`);
+    return res.json({ 
+      ok: true, 
+      sent: tokens.length,
+      message: `Test notification sent to ${tokens.length} device(s)` 
+    });
+  } catch (err) {
+    const e = err as Error;
+    console.error('[FCM] Failed to send test notification:', e.message);
+    return res.status(500).json({ error: e.message || 'Failed to send test notification' });
+  }
+});
+
+// Get registered devices count
+router.get('/devices/count', (req: Request, res: Response) => {
+  return res.json({ count: deviceTokens.size });
 });
 
 export default router;

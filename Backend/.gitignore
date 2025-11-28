@@ -25,3 +25,7 @@ dist-ssr
 
 .env
 .history/
+
+# Firebase service account (keep secret!)
+firebase-service-account.json
+*-firebase-adminsdk-*.json
