@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import {
@@ -80,7 +80,26 @@ interface SidebarProps {
 export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
   const location = useLocation();
   const isMobile = useIsMobile();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(true);
+  const hoverTimeoutRef = useRef<number | null>(null);
+
+  // Ensure correct default per device and keep mobile always expanded
+  useEffect(() => {
+    if (isMobile) {
+      setCollapsed(false);
+    } else {
+      setCollapsed(true);
+    }
+  }, [isMobile]);
+
+  // Cleanup hover timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverTimeoutRef.current !== null) {
+        window.clearTimeout(hoverTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const items = [
     { title: 'Dashboard', path: '/admin', icon: LayoutDashboard },
@@ -110,6 +129,28 @@ export const Sidebar: React.FC<SidebarProps> = ({ onNavigate }) => {
         collapsed ? "w-16" : "w-64",
         isMobile ? "w-full" : ""
       )}
+      onMouseEnter={() => {
+        if (!isMobile) {
+          // Cancel any pending collapse and expand immediately
+          if (hoverTimeoutRef.current !== null) {
+            window.clearTimeout(hoverTimeoutRef.current);
+            hoverTimeoutRef.current = null;
+          }
+          setCollapsed(false);
+        }
+      }}
+      onMouseLeave={() => {
+        if (!isMobile) {
+          // Add a small delay before collapsing to avoid jitter
+          if (hoverTimeoutRef.current !== null) {
+            window.clearTimeout(hoverTimeoutRef.current);
+          }
+          hoverTimeoutRef.current = window.setTimeout(() => {
+            setCollapsed(true);
+            hoverTimeoutRef.current = null;
+          }, 200);
+        }
+      }}
     >
       {/* Logo */}
       <div className={cn(

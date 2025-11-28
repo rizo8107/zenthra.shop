@@ -55,7 +55,7 @@ const SidebarProvider = React.forwardRef<
 >(
   (
     {
-      defaultOpen = true,
+      defaultOpen = false,
       open: openProp,
       onOpenChange: setOpenProp,
       className,
@@ -143,6 +143,16 @@ const SidebarProvider = React.forwardRef<
               className
             )}
             ref={ref}
+            onMouseEnter={() => {
+              if (!isMobile) {
+                setOpen(true)
+              }
+            }}
+            onMouseLeave={() => {
+              if (!isMobile) {
+                setOpen(false)
+              }
+            }}
             {...props}
           >
             {children}
