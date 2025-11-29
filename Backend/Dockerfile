@@ -37,6 +37,7 @@ ARG VITE_POCKETBASE_ADMIN_PASSWORD
 ARG WEBHOOKS_ADMIN_API_KEY
 ARG WEBHOOKS_COLLECTION
 ARG WEBHOOKS_FAILURES_COLLECTION
+ARG FIREBASE_SERVICE_ACCOUNT
 
 # Set environment variables (only VITE_* are consumed by Vite at build)
 ENV VITE_POCKETBASE_URL=$VITE_POCKETBASE_URL
@@ -71,6 +72,7 @@ ENV VITE_POCKETBASE_ADMIN_PASSWORD=$VITE_POCKETBASE_ADMIN_PASSWORD
 ENV WEBHOOKS_ADMIN_API_KEY=$WEBHOOKS_ADMIN_API_KEY
 ENV WEBHOOKS_COLLECTION=$WEBHOOKS_COLLECTION
 ENV WEBHOOKS_FAILURES_COLLECTION=$WEBHOOKS_FAILURES_COLLECTION
+ENV FIREBASE_SERVICE_ACCOUNT=$FIREBASE_SERVICE_ACCOUNT
 
 # Copy package.json and package-lock.json
 COPY package*.json ./
@@ -94,10 +96,9 @@ RUN chmod +x docker-entrypoint.sh
 # Runtime environment
 ENV NODE_ENV=production
 ENV PORT=8080
-ENV SERVER_PORT=3001
 
-# Expose static + API ports (static served on 8080, API on 3001)
-EXPOSE 8080 3001
+# Expose single port (serves both static files and API)
+EXPOSE 8080
 
-# Run both static site and API (trap signals for graceful shutdown)
-ENTRYPOINT ["./docker-entrypoint.sh"]
+# Run the unified production server
+CMD ["node", "dist-server/server/production.js"]

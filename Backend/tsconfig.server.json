@@ -12,6 +12,7 @@
     "src/server/**/*",
     "src/types/**/*",
     "src/features/automation/flowExecutor.ts",
+    "src/features/automation/engine.ts",
     "src/features/automation/api.ts",
     "src/features/automation/types.ts",
     "src/lib/pocketbase.ts",

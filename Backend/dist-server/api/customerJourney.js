@@ -1,6 +1,54 @@
 import express from 'express';
 import crypto from 'crypto';
-import { pb, ensureAdminAuth } from '../lib/pocketbase.js';
+import { pb } from '../lib/pocketbase.js';
+import { emitEvent } from '../server/webhookDispatcher.js';
+import { startRunFromJourneyEvent } from '../features/automation/engine.js';
+import dotenv from 'dotenv';
+// Load env from the project root (../.env) so we pick up the same vars Vite sees
+dotenv.config({ path: '../.env' });
+// PocketBase admin credentials for auto-authentication (support both VITE_ and non-VITE env names)
+const POCKETBASE_ADMIN_EMAIL = process.env.VITE_POCKETBASE_ADMIN_EMAIL ||
+    process.env.POCKETBASE_ADMIN_EMAIL ||
+    '';
+const POCKETBASE_ADMIN_PASSWORD = process.env.VITE_POCKETBASE_ADMIN_PASSWORD ||
+    process.env.POCKETBASE_ADMIN_PASSWORD ||
+    '';
+// Try to authenticate with PocketBase admin credentials
+const tryAdminAuth = async () => {
+    try {
+        // Already authenticated?
+        if (pb.authStore.isValid) {
+            return true;
+        }
+        // No credentials configured
+        if (!POCKETBASE_ADMIN_EMAIL || !POCKETBASE_ADMIN_PASSWORD) {
+            console.log('PocketBase admin credentials not configured, using in-memory storage');
+            return false;
+        }
+        // Try admin auth first
+        try {
+            await pb.admins.authWithPassword(POCKETBASE_ADMIN_EMAIL, POCKETBASE_ADMIN_PASSWORD);
+            console.log('✅ PocketBase admin auth successful');
+            return true;
+        }
+        catch (adminErr) {
+            // Fall back to user auth
+            try {
+                await pb.collection('users').authWithPassword(POCKETBASE_ADMIN_EMAIL, POCKETBASE_ADMIN_PASSWORD);
+                console.log('✅ PocketBase user auth successful');
+                return true;
+            }
+            catch (userErr) {
+                console.warn('PocketBase auth failed:', userErr instanceof Error ? userErr.message : userErr);
+                return false;
+            }
+        }
+    }
+    catch (error) {
+        console.warn('PocketBase auth error:', error instanceof Error ? error.message : error);
+        return false;
+    }
+};
 const router = express.Router();
 // In-memory storage for demo purposes (replace with database in production)
 let journeyEvents = [];
@@ -153,67 +201,69 @@ router.post('/webhook/customer-journey', async (req, res) => {
         // Update customer data
         const customer = updateCustomerData(event);
         // Try to store in PocketBase if available
-        try {
-            await ensureAdminAuth();
-            // Check if customer_journey_events collection exists, create if not
+        const isAuthenticated = await tryAdminAuth();
+        if (isAuthenticated) {
             try {
-                await pb.collection('customer_journey_events').getList(1, 1);
-            }
-            catch (collectionError) {
-                // Collection doesn't exist, create it
-                await pb.collections.create({
-                    name: 'customer_journey_events',
-                    schema: [
-                        {
-                            name: 'customer_id',
-                            type: 'text',
-                            required: true,
-                        },
-                        {
-                            name: 'event',
-                            type: 'text',
-                            required: true,
-                        },
-                        {
-                            name: 'stage',
-                            type: 'text',
-                            required: true,
-                        },
-                        {
-                            name: 'timestamp',
-                            type: 'date',
-                            required: true,
-                        },
-                        {
-                            name: 'metadata',
-                            type: 'json',
-                        },
-                        {
-                            name: 'customer_name',
-                            type: 'text',
-                        },
-                        {
-                            name: 'customer_email',
-                            type: 'text',
-                        },
-                    ],
+                // Check if customer_journey_events collection exists, create if not
+                try {
+                    await pb.collection('customer_journey_events').getList(1, 1);
+                }
+                catch (collectionError) {
+                    // Collection doesn't exist, create it
+                    await pb.collections.create({
+                        name: 'customer_journey_events',
+                        schema: [
+                            {
+                                name: 'customer_id',
+                                type: 'text',
+                                required: true,
+                            },
+                            {
+                                name: 'event',
+                                type: 'text',
+                                required: true,
+                            },
+                            {
+                                name: 'stage',
+                                type: 'text',
+                                required: true,
+                            },
+                            {
+                                name: 'timestamp',
+                                type: 'date',
+                                required: true,
+                            },
+                            {
+                                name: 'metadata',
+                                type: 'json',
+                            },
+                            {
+                                name: 'customer_name',
+                                type: 'text',
+                            },
+                            {
+                                name: 'customer_email',
+                                type: 'text',
+                            },
+                        ],
+                    });
+                    console.log('Created customer_journey_events collection');
+                }
+                // Store event in PocketBase
+                await pb.collection('customer_journey_events').create({
+                    customer_id: event.customer_id,
+                    event: event.event,
+                    stage: event.stage,
+                    timestamp: event.timestamp,
+                    metadata: event.metadata,
+                    customer_name: event.customer_name,
+                    customer_email: event.customer_email
                 });
-                console.log('Created customer_journey_events collection');
+                console.log('Event stored in PocketBase successfully');
             }
-            // Store event in PocketBase
-            await pb.collection('customer_journey_events').create({
-                customer_id: event.customer_id,
-                event: event.event,
-                stage: event.stage,
-                timestamp: event.timestamp,
-                metadata: event.metadata,
-                customer_name: event.customer_name,
-                customer_email: event.customer_email
-            });
-            console.log('Event stored in PocketBase successfully');
-        }
-        catch (pbError) {
-            console.warn('Failed to store in PocketBase, using in-memory storage:', pbError);
+            catch (pbError) {
+                console.warn('Failed to store in PocketBase, using in-memory storage:', pbError);
+            }
         }
         // Log successful processing
         console.log('Processed customer journey event:', {
@@ -222,6 +272,44 @@ router.post('/webhook/customer-journey', async (req, res) => {
             stage: event.stage,
             timestamp: event.timestamp
         });
+        // Emit automation/webhook event for subscribed flows (non-blocking)
+        try {
+            await emitEvent({
+                id: event.id,
+                type: `customer_journey.${event.event}`,
+                timestamp: event.timestamp,
+                source: 'customer_journey',
+                data: {
+                    customer,
+                    event,
+                },
+                metadata: {
+                    stage: event.stage,
+                    customer_id: event.customer_id,
+                    customer_email: event.customer_email,
+                    customer_name: event.customer_name,
+                },
+            });
+        }
+        catch (emitError) {
+            console.warn('Webhook emit warning for customer journey event (non-fatal):', emitError instanceof Error ? emitError.message : emitError);
+        }
+        // Start automation flow runs for journey events (non-blocking)
+        try {
+            // Construct payload for automation engine
+            const automationPayload = {
+                ...event,
+                customer,
+                phone: event.metadata.phone || customer.phone,
+                customer_name: event.customer_name,
+                customer_email: event.customer_email,
+            };
+            // Start flows in background
+            void startRunFromJourneyEvent(automationPayload);
+        }
+        catch (automationError) {
+            console.warn('Automation engine warning (non-fatal):', automationError instanceof Error ? automationError.message : automationError);
+        }
         // Return success response
         res.status(200).json({
             success: true,
@@ -244,59 +332,61 @@ router.post('/webhook/customer-journey', async (req, res) => {
 router.get('/customer-journey/data', async (req, res) => {
     try {
         // Try to load from PocketBase first
-        try {
-            await ensureAdminAuth();
-            const pbEvents = await pb.collection('customer_journey_events').getList(1, 100, {
-                sort: '-timestamp'
-            });
-            // Convert PocketBase events to our format
-            const convertedEvents = pbEvents.items.map(item => ({
-                id: item.id,
-                customer_id: item.customer_id,
-                event: item.event,
-                stage: item.stage,
-                timestamp: item.timestamp,
-                metadata: item.metadata || {},
-                customer_name: item.customer_name,
-                customer_email: item.customer_email
-            }));
-            // Rebuild customer data from events
-            const customerMap = new Map();
-            convertedEvents.forEach(event => {
-                let customer = customerMap.get(event.customer_id);
-                if (!customer) {
-                    customer = {
-                        id: event.customer_id,
-                        name: event.customer_name || `Customer ${event.customer_id}`,
-                        email: event.customer_email || '',
-                        currentStage: event.stage,
-                        totalValue: event.metadata.value || 0,
-                        firstSeen: event.timestamp,
-                        lastActivity: event.timestamp,
-                        events: [event]
-                    };
-                    customerMap.set(event.customer_id, customer);
-                }
-                else {
-                    customer.events.push(event);
-                    customer.lastActivity = event.timestamp;
-                    if (new Date(event.timestamp) > new Date(customer.lastActivity)) {
-                        customer.currentStage = event.stage;
+        const isAuthenticated = await tryAdminAuth();
+        if (isAuthenticated) {
+            try {
+                const pbEvents = await pb.collection('customer_journey_events').getList(1, 100, {
+                    sort: '-timestamp'
+                });
+                // Convert PocketBase events to our format
+                const convertedEvents = pbEvents.items.map((item) => ({
+                    id: item.id,
+                    customer_id: item.customer_id,
+                    event: item.event,
+                    stage: item.stage,
+                    timestamp: item.timestamp,
+                    metadata: item.metadata || {},
+                    customer_name: item.customer_name,
+                    customer_email: item.customer_email
+                }));
+                // Rebuild customer data from events
+                const customerMap = new Map();
+                convertedEvents.forEach(event => {
+                    let customer = customerMap.get(event.customer_id);
+                    if (!customer) {
+                        customer = {
+                            id: event.customer_id,
+                            name: event.customer_name || `Customer ${event.customer_id}`,
+                            email: event.customer_email || '',
+                            currentStage: event.stage,
+                            totalValue: event.metadata.value || 0,
+                            firstSeen: event.timestamp,
+                            lastActivity: event.timestamp,
+                            events: [event]
+                        };
+                        customerMap.set(event.customer_id, customer);
                     }
-                    if (event.metadata.value) {
-                        customer.totalValue += event.metadata.value;
+                    else {
+                        customer.events.push(event);
+                        customer.lastActivity = event.timestamp;
+                        if (new Date(event.timestamp) > new Date(customer.lastActivity)) {
+                            customer.currentStage = event.stage;
+                        }
+                        if (event.metadata.value) {
+                            customer.totalValue += event.metadata.value;
+                        }
                     }
-                }
-            });
-            const pbCustomers = Array.from(customerMap.values());
-            return res.json({
-                success: true,
-                customers: pbCustomers,
-                events: convertedEvents
-            });
-        }
-        catch (pbError) {
-            console.warn('PocketBase not available, using in-memory data:', pbError);
+                });
+                const pbCustomers = Array.from(customerMap.values());
+                return res.json({
+                    success: true,
+                    customers: pbCustomers,
+                    events: convertedEvents
+                });
+            }
+            catch (pbError) {
+                console.warn('PocketBase not available, using in-memory data:', pbError);
+            }
         }
         // Fallback to in-memory data
         res.json({

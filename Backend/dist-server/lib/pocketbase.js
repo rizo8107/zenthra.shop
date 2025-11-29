@@ -1,4 +1,6 @@
 import PocketBase from 'pocketbase';
+import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 // Initialize PocketBase with the URL from environment variables (supports Vite and Node)
 const VITE_ENV = (() => {
     try {
@@ -8,11 +10,87 @@ const VITE_ENV = (() => {
         return {};
     }
 })();
-const POCKETBASE_URL = VITE_ENV.VITE_POCKETBASE_URL ||
-    (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||;
+// Default URL from environment
+const DEFAULT_POCKETBASE_URL = VITE_ENV.VITE_POCKETBASE_URL ||
+    (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
+    (typeof window !== 'undefined' && window.__ENV__?.VITE_POCKETBASE_URL) ||
+    'https://backend.viruthigold.in';
+// Get stored URL for native apps
+let POCKETBASE_URL = DEFAULT_POCKETBASE_URL;
+// For native apps, try to get stored URL synchronously from localStorage as fallback
+// (Preferences is async, so we use localStorage for initial load)
+if (Capacitor.isNativePlatform() && typeof localStorage !== 'undefined') {
+    const storedUrl = localStorage.getItem('zenthra_pocketbase_url');
+    if (storedUrl) {
+        POCKETBASE_URL = storedUrl;
+        console.log('✓ Using stored PocketBase URL:', POCKETBASE_URL);
+    }
+}
+console.log('✓ PocketBase URL:', POCKETBASE_URL);
 export const pb = new PocketBase(POCKETBASE_URL);
 // Disable auto-cancellation of requests which is causing issues
 pb.autoCancellation(false);
+/**
+ * Update PocketBase URL dynamically (for native app configuration)
+ */
+export async function updatePocketBaseUrl(newUrl) {
+    const cleanUrl = newUrl.trim().replace(/\/$/, '');
+    // Update the PocketBase instance
+    pb.baseUrl = cleanUrl;
+    // Store in localStorage for sync access on next load
+    if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('zenthra_pocketbase_url', cleanUrl);
+    }
+    // Also store in Capacitor Preferences
+    if (Capacitor.isNativePlatform()) {
+        await Preferences.set({
+            key: 'zenthra_pocketbase_url',
+            value: cleanUrl,
+        });
+    }
+    console.log('✓ PocketBase URL updated to:', cleanUrl);
+}
+/**
+ * Get current PocketBase URL
+ */
+export function getPocketBaseUrl() {
+    return pb.baseUrl || POCKETBASE_URL;
+}
+/**
+ * Derive the public storefront base URL from the current backend / PocketBase URL.
+ *
+ * Examples:
+ *  - https://backend.karigaistore.in -> https://karigaistore.in
+ *  - https://admin.mystore.com       -> https://mystore.com
+ *  - https://api.shop.example.com    -> https://shop.example.com
+ *
+ * On native apps, this uses the dynamically configured PocketBase URL
+ * (whatever the user entered on the Configure Backend screen).
+ * On web, if VITE_ZENTHRA_FRONTEND_URL is set, that is preferred.
+ */
+export function getStorefrontBaseUrl() {
+    // Prefer explicit frontend URL on web
+    const envFrontend = VITE_ENV.VITE_ZENTHRA_FRONTEND_URL;
+    if (!Capacitor.isNativePlatform() && envFrontend) {
+        return envFrontend.replace(/\/$/, '');
+    }
+    const rawBase = getPocketBaseUrl();
+    try {
+        const url = new URL(rawBase);
+        const hostParts = url.hostname.split('.');
+        if (hostParts.length > 2) {
+            const sub = hostParts[0].toLowerCase();
+            if (['backend', 'admin', 'api', 'app'].includes(sub)) {
+                hostParts.shift();
+                url.hostname = hostParts.join('.');
+            }
+        }
+        return url.origin.replace(/\/$/, '');
+    }
+    catch {
+        return rawBase.replace(/\/$/, '');
+    }
+}
 // Ensure a user is authenticated (no auto-admin)
 export const ensureAdminAuth = async () => {
     try {
@@ -430,11 +508,27 @@ export const getAbandonedCartAnalytics = async () => {
 // User login using default PocketBase users collection
 export const authenticateAdmin = async (email, password) => {
     try {
+        console.log('Attempting authentication with PocketBase at:', POCKETBASE_URL);
+        // Clear any existing auth before attempting new login
+        pb.authStore.clear();
         const authData = await pb.collection('users').authWithPassword(email, password);
+        console.log('Authentication successful:', authData.record?.email);
         return authData;
     }
     catch (error) {
         console.error('Authentication error:', error);
+        // Provide more specific error messages
+        if (error instanceof Error) {
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error('Cannot connect to PocketBase server. Please check if PocketBase is running and the URL is correct.');
+            }
+            else if (error.message.includes('400')) {
+                throw new Error('Invalid email or password.');
+            }
+            else if (error.message.includes('CORS')) {
+                throw new Error('CORS error: Please check PocketBase CORS settings.');
+            }
+        }
         throw error;
     }
 };
@@ -499,8 +593,9 @@ export const getDashboardMetrics = async () => {
     try {
         await ensureAdminAuth();
         // Get all orders to calculate metrics
-        const ordersResult = await pb.collection('orders').getFullList({
+        const ordersResult = await pb.collection('orders').getFullList(200, {
             sort: '-created',
+            fields: 'payment_status,status,total,created',
         });
         // Calculate the metrics using ONLY paid orders
         const paidOrders = ordersResult.filter(order => order.payment_status === 'paid');
@@ -537,45 +632,123 @@ export const getDashboardMetrics = async () => {
         throw error;
     }
 };
-// Get revenue data for chart (monthly revenue)
-export const getMonthlyRevenueData = async () => {
+// Get revenue data for chart, with optional date range and grouping
+export const getMonthlyRevenueData = async (params) => {
     try {
         await ensureAdminAuth();
-        // Get all orders
-        const ordersResult = await pb.collection('orders').getFullList({
+        const { startDate, endDate, groupBy = 'month' } = params ?? {};
+        const filterParts = [];
+        if (startDate) {
+            filterParts.push(`created >= "${startDate}"`);
+        }
+        if (endDate) {
+            filterParts.push(`created <= "${endDate}"`);
+        }
+        const filter = filterParts.length > 0 ? filterParts.join(' && ') : undefined;
+        const ordersResult = await pb.collection('orders').getFullList(500, {
             sort: 'created',
+            fields: 'total,created',
+            filter,
         });
-        // Get current year
-        const currentYear = new Date().getFullYear();
-        // Create an object to store monthly revenue
-        const monthlyRevenue = {
-            'Jan': 0, 'Feb': 0, 'Mar': 0, 'Apr': 0, 'May': 0, 'Jun': 0,
-            'Jul': 0, 'Aug': 0, 'Sep': 0, 'Oct': 0, 'Nov': 0, 'Dec': 0
+        const buckets = new Map();
+        const normalizeDate = (input) => {
+            const value = typeof input === 'string' || typeof input === 'number' || input instanceof Date
+                ? new Date(input)
+                : null;
+            return value && !Number.isNaN(value.getTime()) ? value : null;
         };
-        // Calculate revenue for each month
-        ordersResult.forEach(order => {
-            const orderDate = new Date(order.created);
-            // Only include orders from current year
-            if (orderDate.getFullYear() === currentYear) {
-                const month = orderDate.toLocaleString('default', { month: 'short' });
-                monthlyRevenue[month] += (order.total || 0);
+        ordersResult.forEach((order) => {
+            const created = normalizeDate(order.created);
+            if (!created) {
+                console.warn('Skipping order with invalid created date when aggregating revenue:', order?.id, order?.created);
+                return;
             }
+            const total = Number(order.total || 0);
+            let key;
+            if (groupBy === 'day') {
+                key = created.toISOString().slice(0, 10); // YYYY-MM-DD
+            }
+            else if (groupBy === 'week') {
+                const d = new Date(Date.UTC(created.getFullYear(), created.getMonth(), created.getDate()));
+                const dayNum = d.getUTCDay() || 7;
+                d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+                const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+                const weekNo = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+                key = `${d.getUTCFullYear()}-W${String(weekNo).padStart(2, '0')}`;
+            }
+            else {
+                key = created.toLocaleString('default', { month: 'short', year: 'numeric' });
+            }
+            buckets.set(key, (buckets.get(key) || 0) + total);
         });
-        // Convert to array format expected by chart
-        return Object.entries(monthlyRevenue).map(([month, revenue]) => ({
-            month,
-            revenue
+        const entries = Array.from(buckets.entries()).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+        return entries.map(([label, revenue]) => ({
+            label,
+            revenue,
         }));
     }
     catch (error) {
-        console.error('Error fetching monthly revenue data:', error);
+        console.error('Error fetching revenue data:', error);
         throw error;
     }
 };
+export const listNavbarConfigs = async () => {
+    await ensureAdminAuth();
+    const items = await pb.collection('navbar_config').getFullList({ sort: '-created' });
+    return items;
+};
+export const getActiveNavbarConfig = async () => {
+    await ensureAdminAuth();
+    const res = await pb.collection('navbar_config').getList(1, 1, { filter: 'is_active = true', sort: '-created' });
+    return res.items?.[0] ?? null;
+};
+export const createNavbarConfig = async (data) => {
+    await ensureAdminAuth();
+    // If setting active, deactivate others first
+    if (data.is_active) {
+        const all = await pb.collection('navbar_config').getFullList({});
+        await Promise.all(all.map((it) => it.is_active ? pb.collection('navbar_config').update(it.id, { is_active: false }) : Promise.resolve()));
+    }
+    const rec = await pb.collection('navbar_config').create(data);
+    return rec;
+};
+export const updateNavbarConfig = async (id, data) => {
+    await ensureAdminAuth();
+    if (data.is_active) {
+        const all = await pb.collection('navbar_config').getFullList({});
+        await Promise.all(all.filter((it) => it.id !== id).map((it) => it.is_active ? pb.collection('navbar_config').update(it.id, { is_active: false }) : Promise.resolve()));
+    }
+    const rec = await pb.collection('navbar_config').update(id, data);
+    return rec;
+};
+export const activateNavbarConfig = async (id) => {
+    await ensureAdminAuth();
+    const all = await pb.collection('navbar_config').getFullList({});
+    await Promise.all(all.map((it) => pb.collection('navbar_config').update(it.id, { is_active: it.id === id })));
+    const rec = await pb.collection('navbar_config').getOne(id);
+    return rec;
+};
+export const deleteNavbarConfig = async (id) => {
+    await ensureAdminAuth();
+    await pb.collection('navbar_config').delete(id);
+    return true;
+};
+export const listPagesLite = async () => {
+    await ensureAdminAuth();
+    const items = await pb.collection('pages').getFullList({
+        sort: '-updated',
+        fields: 'id,title,slug,published,updated'
+    });
+    return items;
+};
 export const getImageUrl = (collectionId, recordId, fileName) => {
+    const placeholder = 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
     if (!collectionId || !recordId || !fileName) {
         console.warn('Missing parameters for getImageUrl', { collectionId, recordId, fileName });
-        return 'https://placehold.co/400x400/e2e8f0/64748b?text=No+Image';
+        return placeholder;
+    }
+    if (typeof fileName === 'string' && /^https?:\/\//i.test(fileName)) {
+        return fileName;
     }
     const envBase = (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined)
         || import.meta?.env?.VITE_POCKETBASE_URL;
@@ -583,8 +756,46 @@ export const getImageUrl = (collectionId, recordId, fileName) => {
         || import.meta?.env?.VITE_PB_FALLBACK_URL
         || (typeof process !== 'undefined' ? process.env?.PUBLIC_PB_URL : undefined)
         || import.meta?.env?.PUBLIC_PB_URL;
-    // Last-resort hardcoded fallback (update if backend host changes)
+    // Prefer the PocketBase client's current base URL, then envs, then hardcoded legacy
     const hardcoded = 'https://backend-pocketbase.p3ibd8.easypanel.host';
-    const base = envBase || fallbackEnv || hardcoded;
-    return `${base}/api/files/${collectionId}/${recordId}/${fileName}`;
+    const base = (pb?.baseUrl && typeof pb.baseUrl === 'string' ? pb.baseUrl : undefined)
+        || envBase
+        || fallbackEnv
+        || hardcoded;
+    // Normalise file names that may already include recordId or leading slashes
+    const normalised = String(fileName).replace(/^\/+/, '');
+    let relativePath = `${recordId}/${normalised}`;
+    if (normalised.startsWith(`${recordId}/`)) {
+        relativePath = normalised;
+    }
+    else if (normalised.includes('/')) {
+        // If another path segment is included (e.g. generated/id/filename), use the last segment
+        relativePath = `${recordId}/${normalised.split('/').pop()}`;
+    }
+    return `${base.replace(/\/+$/, '')}/api/files/${collectionId}/${relativePath}`;
+};
+export const getSiteSettingsRecord = async () => {
+    await ensureAdminAuth();
+    const res = await pb.collection('site_settings').getList(1, 1, {
+        sort: '-created',
+    });
+    const rec = res.items?.[0];
+    return rec ?? null;
+};
+export const createSiteSettingsRecord = async (data) => {
+    await ensureAdminAuth();
+    const rec = await pb.collection('site_settings').create(data);
+    return rec;
+};
+export const updateSiteSettingsRecord = async (id, data) => {
+    await ensureAdminAuth();
+    const rec = await pb.collection('site_settings').update(id, data);
+    return rec;
+};
+export const uploadSiteSettingsImage = async (id, fieldName, file) => {
+    await ensureAdminAuth();
+    const formData = new FormData();
+    formData.append(fieldName, file);
+    const rec = await pb.collection('site_settings').update(id, formData);
+    return rec;
 };

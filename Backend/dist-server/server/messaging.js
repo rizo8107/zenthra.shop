@@ -1,8 +1,19 @@
 import express from 'express';
-import { pb, ensureAdminAuth } from '@/lib/pocketbase';
+import PocketBase from 'pocketbase';
+import dotenv from 'dotenv';
+dotenv.config();
 const router = express.Router();
+const POCKETBASE_URL = process.env.VITE_POCKETBASE_URL || 'https://backend-karigaibackend.7za6uc.easypanel.host';
+const pb = new PocketBase(POCKETBASE_URL);
+function isWhatsappConfig(config) {
+    return config.provider !== undefined ||
+        config.phoneNumberId !== undefined;
+}
+function isEvolutionConfig(config) {
+    return config.authType !== undefined ||
+        config.defaultSender !== undefined;
+}
 async function getPluginConfig(key) {
-    await ensureAdminAuth();
     try {
         const item = await pb.collection('plugins').getFirstListItem(`key = "${key}"`);
         const configRaw = item?.config;
