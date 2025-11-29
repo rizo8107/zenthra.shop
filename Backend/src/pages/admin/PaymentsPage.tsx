@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useToast } from '@/hooks/use-toast';
 import { pb } from '@/lib/pocketbase';
+import { getStorefrontBaseUrl } from '@/lib/pocketbase';
 import { format } from 'date-fns';
 import {
   PlusIcon,
@@ -89,25 +90,10 @@ const PaymentsPage = () => {
     }
   }, [activeTab]);
 
-  // Get payment link URL
+  // Get payment link URL (same logic as CreatePaymentLinkDialog)
   const getPaymentLinkUrl = (code: string) => {
-    let baseUrl = window.location.origin;
-    try {
-      const url = new URL(baseUrl);
-      const hostParts = url.hostname.split('.');
-      if (hostParts.length > 2) {
-        const subdomain = hostParts[0].toLowerCase();
-        if (['admin', 'backend', 'api', 'app'].includes(subdomain)) {
-          hostParts.shift();
-          url.hostname = hostParts.join('.');
-          baseUrl = url.origin;
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing URL:', e);
-    }
-    baseUrl = baseUrl.replace(':8081', ':8080');
-    return `${baseUrl}/pay/${code}`;
+    const base = getStorefrontBaseUrl();
+    return `${base}/pay/${code}`;
   };
 
   // Copy link to clipboard

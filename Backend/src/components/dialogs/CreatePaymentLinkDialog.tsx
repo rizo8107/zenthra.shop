@@ -14,7 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { pb } from '@/lib/pocketbase';
+import { pb, getStorefrontBaseUrl } from '@/lib/pocketbase';
 import {
   Copy,
   ExternalLink,
@@ -299,38 +299,10 @@ export function CreatePaymentLinkDialog({
     }
   };
   
-  // Get full link URL - Payment links should use the main domain, not admin subdomain
+  // Get full link URL - Payment links should use the public store domain
   const getLinkUrl = (code: string) => {
-    let baseUrl = window.location.origin;
-    
-    // Remove any subdomain (admin., backend., etc.) to use main domain
-    // e.g., https://admin.karigaistore.in -> https://karigaistore.in
-    try {
-      const url = new URL(baseUrl);
-      const hostParts = url.hostname.split('.');
-      
-      // If there's a subdomain (more than 2 parts for .in, .com, etc.)
-      // or more than 3 parts for .co.in, etc.
-      if (hostParts.length > 2) {
-        // Check if it's a subdomain like admin., backend., api.
-        const subdomain = hostParts[0].toLowerCase();
-        if (['admin', 'backend', 'api', 'app'].includes(subdomain)) {
-          // Remove the subdomain
-          hostParts.shift();
-          url.hostname = hostParts.join('.');
-          baseUrl = url.origin;
-        }
-      }
-    } catch (e) {
-      console.error('Error parsing URL:', e);
-    }
-    
-    // Handle common port mappings for local development
-    baseUrl = baseUrl.replace(':8081', ':8080');  // Production-like
-    baseUrl = baseUrl.replace(':5173', ':5174');  // Vite dev
-    baseUrl = baseUrl.replace(':3001', ':3000');  // Common dev ports
-    
-    return `${baseUrl}/pay/${code}`;
+    const base = getStorefrontBaseUrl();
+    return `${base}/pay/${code}`;
   };
   
   // Copy link to clipboard

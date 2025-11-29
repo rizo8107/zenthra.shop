@@ -422,7 +422,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
   return (
     <div className="space-y-4">
       {/* KPI cards */}
-      <div className="grid gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 pt-1 sm:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">Orders (filtered)</p>
@@ -460,7 +460,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end sm:justify-start">
             <Button
               variant="outline"
               onClick={() => setShowFilters(!showFilters)}
@@ -498,7 +498,7 @@ export const OrdersTable: FC<OrdersTableProps> = ({
             <Button
               variant="default"
               onClick={() => setShowPaymentLinkDialog(true)}
-              className="whitespace-nowrap bg-primary"
+              className="whitespace-nowrap bg-primary w-full sm:w-auto justify-center"
             >
               <Link2 size={16} className="mr-2" /> Create Payment Link
             </Button>

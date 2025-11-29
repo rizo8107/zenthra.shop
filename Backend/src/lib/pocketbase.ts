@@ -80,6 +80,44 @@ export function getPocketBaseUrl(): string {
   return (pb as any).baseUrl || POCKETBASE_URL;
 }
 
+/**
+ * Derive the public storefront base URL from the current backend / PocketBase URL.
+ *
+ * Examples:
+ *  - https://backend.karigaistore.in -> https://karigaistore.in
+ *  - https://admin.mystore.com       -> https://mystore.com
+ *  - https://api.shop.example.com    -> https://shop.example.com
+ *
+ * On native apps, this uses the dynamically configured PocketBase URL
+ * (whatever the user entered on the Configure Backend screen).
+ * On web, if VITE_ZENTHRA_FRONTEND_URL is set, that is preferred.
+ */
+export function getStorefrontBaseUrl(): string {
+  // Prefer explicit frontend URL on web
+  const envFrontend = (VITE_ENV as any).VITE_ZENTHRA_FRONTEND_URL as string | undefined;
+  if (!Capacitor.isNativePlatform() && envFrontend) {
+    return envFrontend.replace(/\/$/, '');
+  }
+
+  const rawBase = getPocketBaseUrl();
+  try {
+    const url = new URL(rawBase);
+    const hostParts = url.hostname.split('.');
+
+    if (hostParts.length > 2) {
+      const sub = hostParts[0].toLowerCase();
+      if (['backend', 'admin', 'api', 'app'].includes(sub)) {
+        hostParts.shift();
+        url.hostname = hostParts.join('.');
+      }
+    }
+
+    return url.origin.replace(/\/$/, '');
+  } catch {
+    return rawBase.replace(/\/$/, '');
+  }
+}
+
 // Ensure a user is authenticated (no auto-admin)
 export const ensureAdminAuth = async () => {
   try {

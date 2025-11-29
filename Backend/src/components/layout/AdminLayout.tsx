@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Sidebar } from './Sidebar';
 import { Bell, User, Menu } from 'lucide-react';
 import { 
@@ -25,12 +25,64 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const isMobile = useIsMobile();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     // Close sidebar when switching to mobile view
     if (isMobile) {
       setIsSidebarOpen(false);
     }
+  }, [isMobile]);
+
+  // Simple left-edge swipe to open menu on mobile
+  useEffect(() => {
+    if (!isMobile) return;
+
+    const el = containerRef.current;
+    if (!el) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      const touch = e.touches[0];
+      // only start if near left edge (<= 24px)
+      if (touch.clientX <= 24) {
+        touchStartX.current = touch.clientX;
+        touchStartY.current = touch.clientY;
+      } else {
+        touchStartX.current = null;
+        touchStartY.current = null;
+      }
+    };
+
+    const handleTouchMove = (e: TouchEvent) => {
+      if (touchStartX.current === null || touchStartY.current === null) return;
+      const touch = e.touches[0];
+      const dx = touch.clientX - touchStartX.current;
+      const dy = touch.clientY - touchStartY.current;
+
+      // basic right-swipe detection with small vertical movement
+      if (dx > 40 && Math.abs(dy) < 30) {
+        setIsSidebarOpen(true);
+        touchStartX.current = null;
+        touchStartY.current = null;
+      }
+    };
+
+    const handleTouchEnd = () => {
+      touchStartX.current = null;
+      touchStartY.current = null;
+    };
+
+    el.addEventListener('touchstart', handleTouchStart);
+    el.addEventListener('touchmove', handleTouchMove);
+    el.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      el.removeEventListener('touchstart', handleTouchStart);
+      el.removeEventListener('touchmove', handleTouchMove);
+      el.removeEventListener('touchend', handleTouchEnd);
+    };
   }, [isMobile]);
 
   const handleLogout = () => {
@@ -45,12 +97,16 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div ref={containerRef} className="flex h-screen overflow-hidden bg-background touch-pan-y">
       {/* Mobile sidebar with Sheet */}
       {isMobile ? (
         <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="md:hidden ml-2 mt-2 absolute z-50">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden ml-2 absolute z-50 top-8"
+            >
               <Menu size={24} />
               <span className="sr-only">Toggle Menu</span>
             </Button>
@@ -65,7 +121,8 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
       )}
       
       {/* Main content */}
-      <div className="flex flex-col flex-1 overflow-hidden">
+      {/* Extra top padding on small screens so content clears the Android status bar */}
+      <div className="flex flex-col flex-1 overflow-hidden pt-6 md:pt-0">
         {/* Top navigation */}
         <header className="flex items-center justify-end p-4 bg-card border-b shadow-sm">
           

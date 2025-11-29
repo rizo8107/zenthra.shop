@@ -1,13 +1,15 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import { initPushNotifications, isNativePlatform } from "@/lib/capacitor-push";
-import { isNativeApp } from "@/lib/app-config";
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { isNativeApp, isBackendConfigured } from "@/lib/app-config";
+import { pb } from "@/lib/pocketbase";
 import DashboardPage from "./pages/admin/DashboardPage";
 import OrdersPage from "./pages/admin/OrdersPage";
 import PaymentsPage from "./pages/admin/PaymentsPage";
@@ -54,11 +56,52 @@ const queryClient = new QueryClient({
   },
 });
 
+const RootRedirect: React.FC = () => {
+  const [target, setTarget] = useState<string | null>(null);
+
+  useEffect(() => {
+    const decide = async () => {
+      // On native, ensure backend is configured first
+      if (isNativeApp()) {
+        const configured = await isBackendConfigured();
+        if (!configured) {
+          setTarget('/configure');
+          return;
+        }
+      }
+
+      // If user already has a valid auth, go straight to admin
+      if (pb.authStore.isValid) {
+        setTarget('/admin');
+      } else {
+        setTarget('/login');
+      }
+    };
+
+    void decide();
+  }, []);
+
+  if (!target) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  return <Navigate to={target} replace />;
+};
+
 const App = () => {
   useEffect(() => {
-    // Initialize Capacitor push notifications on native platforms
+    // Initialize Capacitor features on native platforms
     if (isNativePlatform()) {
       initPushNotifications();
+
+      // Ensure status bar does NOT overlay the webview content
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
+      StatusBar.setBackgroundColor({ color: '#0F172A' }).catch(() => {});
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
     } else {
       // Web: register service worker for PWA
       if ('serviceWorker' in navigator) {
@@ -85,11 +128,7 @@ const App = () => {
           <BrowserRouter>
             <Routes>
               {/* Public routes */}
-              <Route path="/" element={
-                isNativeApp() 
-                  ? <Navigate to="/configure" /> 
-                  : <Navigate to="/login" />
-              } />
+              <Route path="/" element={<RootRedirect />} />
               <Route path="/configure" element={<ConfigureBackendPage />} />
               <Route path="/login" element={<LoginPage />} />
 
