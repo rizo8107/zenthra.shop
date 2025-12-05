@@ -982,10 +982,12 @@ const ProductDetail = () => {
   const handleAddToCart = () => {
     if (!product) return;
 
+    const bundleKey = selectedCombo?.id || selectedCombo?.value;
+
     // Handle Buy Any X combo selections
-    if (selectedCombo && selectedBuyAnyXProducts[selectedCombo.value] && selectedBuyAnyXProducts[selectedCombo.value].length > 0) {
-      const selectedVariants = selectedBuyAnyXProducts[selectedCombo.value];
-      const requiredQuantity = selectedCombo.items || 2;
+    if (selectedCombo && bundleKey && selectedBuyAnyXProducts[bundleKey] && selectedBuyAnyXProducts[bundleKey].length > 0) {
+      const selectedVariants = selectedBuyAnyXProducts[bundleKey];
+      const requiredQuantity = selectedCombo.requiredQuantity || selectedCombo.items || 2;
       
       if (selectedVariants.length !== requiredQuantity) {
         toast({
@@ -1156,6 +1158,19 @@ const ProductDetail = () => {
   const stickyCartTotal = currentItemQty > 0
     ? currentItemUnitPrice * currentItemQty
     : selectedTotal;
+
+  const selectedBundleKey = selectedCombo?.id || selectedCombo?.value;
+  const selectedBundleRequiredQty = selectedCombo
+    ? selectedCombo.requiredQuantity || selectedCombo.items || 2
+    : 0;
+  const selectedBundleChosenCount = selectedBundleKey
+    ? (selectedBuyAnyXProducts[selectedBundleKey]?.length || 0)
+    : 0;
+  const isBundleSelectionIncomplete =
+    !!selectedCombo &&
+    (selectedCombo.type || '').toLowerCase() === 'bundle' &&
+    selectedBundleRequiredQty > 0 &&
+    selectedBundleChosenCount < selectedBundleRequiredQty;
 
   const resolvedOriginalPrice = useMemo(() => {
     if (!product) return undefined;
@@ -1962,7 +1977,8 @@ const ProductDetail = () => {
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {colorOptions.map((color: any) => {
                                   const variantKey = `color-${color.value}`;
-                                  const selectedForCombo = selectedBuyAnyXProducts[selectedCombo.id || selectedCombo.value] || [];
+                                  const comboKey = selectedCombo.id || selectedCombo.value;
+                                  const selectedForCombo = selectedBuyAnyXProducts[comboKey] || [];
                                   const isSelected = selectedForCombo.includes(variantKey);
                                   const requiredQty = selectedCombo.requiredQuantity || selectedCombo.items || 2;
                                   return (
@@ -1980,11 +1996,11 @@ const ProductDetail = () => {
                                         id={`variant-${variantKey}`}
                                         checked={isSelected}
                                         onChange={(e) => {
-                                          const comboValue = selectedCombo.value;
+                                          const comboKey = selectedCombo.id || selectedCombo.value;
                                           const isChecked = e.target.checked;
 
                                           setSelectedBuyAnyXProducts((prev) => {
-                                            const currentSelected = prev[comboValue] || [];
+                                            const currentSelected = prev[comboKey] || [];
 
                                             if (isChecked) {
                                               if (currentSelected.length < requiredQty) {
@@ -2119,7 +2135,7 @@ const ProductDetail = () => {
                   <Button
                     className="flex-1 max-w-[180px]"
                     onClick={handleAddToCart}
-                    disabled={!product.inStock}
+                    disabled={!product.inStock || isBundleSelectionIncomplete}
                     size="lg"
                   >
                     <ShoppingCart className="mr-2 h-4 w-4" />
@@ -2396,7 +2412,7 @@ const ProductDetail = () => {
                 <Button
                   className="ml-auto flex-1 max-w-[160px]"
                   onClick={handleAddToCart}
-                  disabled={!product.inStock}
+                  disabled={!product.inStock || isBundleSelectionIncomplete}
                 >
                   <ShoppingCart className="mr-2 h-4 w-4" />
                   {product.inStock ? 'Add to cart' : 'Out of stock'}
