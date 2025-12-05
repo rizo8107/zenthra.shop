@@ -2329,7 +2329,7 @@ const ProductDetail = () => {
             )}`}
             target="_blank"
             rel="noreferrer"
-            className="fixed bottom-32 right-4 z-50 md:bottom-20 md:right-8"
+            className="fixed bottom-60 right-4 z-50 md:bottom-20 md:right-8"
             aria-label="Order via WhatsApp"
           >
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500 text-white shadow-lg hover:bg-emerald-600">
