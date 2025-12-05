@@ -225,6 +225,7 @@ const ProductDetail = () => {
     originalPrice?: number;
   } | null>(null);
   const [selectedCombo, setSelectedCombo] = useState<{
+    id?: string; // internal key used for UI selection state
     name: string;
     value: string;
     type?: 'bogo' | 'bundle' | 'custom';
@@ -1409,7 +1410,7 @@ const ProductDetail = () => {
                   {/* pager dots mobile */}
                   {displayImages?.length > 1 && (
                     <div
-                      className="md:hidden absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-white/90 px-3 py-1 text-xs shadow"
+                      className="md:hidden absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1"
                       data-no-swipe="true"
                     >
                       {displayImages.map((img, i) => (
@@ -1418,14 +1419,18 @@ const ProductDetail = () => {
                           type="button"
                           aria-label={`Go to image ${i + 1}`}
                           onClick={() => handleImageSelect(img)}
-                          className={cn(
-                            'rounded-full transition-all',
-                            currentIndex === i
-                              ? 'h-1.5 w-6 bg-gray-700'
-                              : 'h-1 w-1 bg-gray-400/80',
-                          )}
+                          className="flex h-4 w-4 items-center justify-center p-0 bg-transparent border-0"
                           data-no-swipe="true"
-                        />
+                        >
+                          <span
+                            className={cn(
+                              'block rounded-full transition-all',
+                              currentIndex === i
+                                ? 'h-2 w-2 bg-gray-800'
+                                : 'h-2 w-2 bg-gray-300/70',
+                            )}
+                          />
+                        </button>
                       ))}
                     </div>
                   )}
@@ -1787,6 +1792,7 @@ const ProductDetail = () => {
                       const itemsCount = Number(bundle.items) > 0 ? Number(bundle.items) : 1;
                       const requiredQuantity = Number(bundle.requiredQuantity) > 0 ? Number(bundle.requiredQuantity) : itemsCount;
                       const allowDuplicates = bundle.allowDuplicates !== false;
+                      const comboKey = String(bundle.id || `${bundle.value || ''}-${itemsCount}-${requiredQuantity}-${bundle.name || ''}`);
                       const discountLabel =
                         bundle.discountType && typeof bundle.discountValue === 'number'
                           ? bundle.discountType === 'percent'
@@ -1795,18 +1801,20 @@ const ProductDetail = () => {
                           : 'Special price';
                       return (
                         <button
-                          key={bundle.value}
+                          key={comboKey}
                           type="button"
                           onClick={() => {
-                            if (selectedCombo?.value === bundle.value) {
+                            const selectionKey = selectedCombo?.id || selectedCombo?.value;
+                            if (selectionKey === comboKey) {
                               setSelectedCombo(null);
                               setSelectedBuyAnyXProducts((prev) => {
                                 const next = { ...prev };
-                                delete next[bundle.value];
+                                delete next[comboKey];
                                 return next;
                               });
                             } else {
                               setSelectedCombo({
+                                id: comboKey,
                                 name: bundle.name,
                                 value: bundle.value,
                                 type: (bundle.type || 'bundle') as 'bundle' | 'bogo' | 'custom',
@@ -1823,14 +1831,14 @@ const ProductDetail = () => {
                               });
                               setSelectedBuyAnyXProducts((prev) => ({
                                 ...prev,
-                                [bundle.value]: [],
+                                [comboKey]: [],
                               }));
                             }
                             setLastVariantPick('combo');
                           }}
                           className={cn(
                             'p-3 text-left rounded-lg border transition-colors bg-background/80',
-                            selectedCombo?.value === bundle.value
+                            (selectedCombo?.id || selectedCombo?.value) === comboKey
                               ? 'border-primary bg-primary/5 text-primary'
                               : 'border-border text-foreground/80 hover:border-primary/40 hover:bg-accent/5',
                           )}
@@ -1858,7 +1866,7 @@ const ProductDetail = () => {
                           </span>
                         </span>
                         <div className="text-xs text-blue-700 bg-blue-100 px-2 py-1 rounded-full">
-                          {(selectedBuyAnyXProducts[selectedCombo.value] || []).length} / {selectedCombo.requiredQuantity || selectedCombo.items || 2} selected
+                          {(selectedBuyAnyXProducts[selectedCombo.id || selectedCombo.value] || []).length} / {selectedCombo.requiredQuantity || selectedCombo.items || 2} selected
                         </div>
                       </div>
 
@@ -1868,7 +1876,7 @@ const ProductDetail = () => {
                           Choose {selectedCombo.requiredQuantity || selectedCombo.items || 2} variants to complete your bundle:
                         </div>
 
-                        {(selectedBuyAnyXProducts[selectedCombo.value] || []).length === 0 && (
+                        {(selectedBuyAnyXProducts[selectedCombo.id || selectedCombo.value] || []).length === 0 && (
                           <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
                             <div className="text-xs text-yellow-800 font-medium mb-1">
                               👆 Getting Started:
@@ -1886,7 +1894,7 @@ const ProductDetail = () => {
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {sizeOptions.map((size: any) => {
                                   const variantKey = `size-${size.value}`;
-                                  const selectedForCombo = selectedBuyAnyXProducts[selectedCombo.value] || [];
+                                  const selectedForCombo = selectedBuyAnyXProducts[selectedCombo.id || selectedCombo.value] || [];
                                   const isSelected = selectedForCombo.includes(variantKey);
                                   const requiredQty = selectedCombo.requiredQuantity || selectedCombo.items || 2;
                                   return (
@@ -1904,7 +1912,7 @@ const ProductDetail = () => {
                                         id={`variant-${variantKey}`}
                                         checked={isSelected}
                                         onChange={(e) => {
-                                          const comboValue = selectedCombo.value;
+                                          const comboValue = selectedCombo.id || selectedCombo.value;
                                           const isChecked = e.target.checked;
 
                                           setSelectedBuyAnyXProducts((prev) => {
@@ -1954,7 +1962,7 @@ const ProductDetail = () => {
                               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {colorOptions.map((color: any) => {
                                   const variantKey = `color-${color.value}`;
-                                  const selectedForCombo = selectedBuyAnyXProducts[selectedCombo.value] || [];
+                                  const selectedForCombo = selectedBuyAnyXProducts[selectedCombo.id || selectedCombo.value] || [];
                                   const isSelected = selectedForCombo.includes(variantKey);
                                   const requiredQty = selectedCombo.requiredQuantity || selectedCombo.items || 2;
                                   return (
