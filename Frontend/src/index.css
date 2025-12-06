@@ -1,69 +1,26 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import '../tailwind.css';
 
 @layer base {
-  :root {
-    /* Neutral light background (removes blue tint from pages & navbar) */
-    --background: 0 0% 100%;
-    --foreground: 229 35% 18%;
-
-    --card: 0 0% 100%;
-    --card-foreground: 229 35% 18%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 229 35% 18%;
-
-    --primary: 223 90% 60%;
-    --primary-foreground: 0 0% 100%;
-
-    --secondary: 224 68% 94%;
-    --secondary-foreground: 229 35% 18%;
-
-    --muted: 226 44% 92%;
-    --muted-foreground: 228 24% 44%;
-
-    --accent: 224 100% 92%;
-    --accent-foreground: 229 35% 18%;
-
-    --destructive: 0 72% 58%;
-    --destructive-foreground: 0 0% 100%;
-
-    --border: 226 45% 88%;
-    --input: 226 45% 88%;
-    --ring: 223 90% 60%;
-
-    --radius: 0.5rem;
-  }
-
   .dark {
-    --background: 226 45% 10%;
-    --foreground: 220 30% 96%;
-
-    --card: 226 45% 12%;
-    --card-foreground: 220 30% 96%;
-
-    --popover: 226 45% 12%;
-    --popover-foreground: 220 30% 96%;
-
-    --primary: 210 88% 58%;
-    --primary-foreground: 210 40% 98%;
-
-    --secondary: 225 38% 18%;
-    --secondary-foreground: 220 30% 96%;
-
-    --muted: 225 30% 20%;
-    --muted-foreground: 216 20% 72%;
-
-    --accent: 214 90% 45%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 350 82% 55%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 225 38% 18%;
-    --input: 225 38% 18%;
-    --ring: 210 88% 58%;
+    --color-background: hsl(226 45% 10%);
+    --color-foreground: hsl(220 30% 96%);
+    --color-card: hsl(226 45% 12%);
+    --color-card-foreground: hsl(220 30% 96%);
+    --color-popover: hsl(226 45% 12%);
+    --color-popover-foreground: hsl(220 30% 96%);
+    --color-primary: hsl(210 88% 58%);
+    --color-primary-foreground: hsl(210 40% 98%);
+    --color-secondary: hsl(225 38% 18%);
+    --color-secondary-foreground: hsl(220 30% 96%);
+    --color-muted: hsl(225 30% 20%);
+    --color-muted-foreground: hsl(216 20% 72%);
+    --color-accent: hsl(214 90% 45%);
+    --color-accent-foreground: hsl(210 40% 98%);
+    --color-destructive: hsl(350 82% 55%);
+    --color-destructive-foreground: hsl(210 40% 98%);
+    --color-border: hsl(225 38% 18%);
+    --color-input: hsl(225 38% 18%);
+    --color-ring: hsl(210 88% 58%);
   }
 
   * {

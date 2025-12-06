@@ -1,9 +1,8 @@
-const https = require('https');
+const http = require('http');
 const url = require('url');
 
 // Configuration
-const proxyUrl = 'https://konipai-server.7za6uc.easypanel.host';
-const apiKey = '5dbe988c-f245-4ba1-b879-af12bab1eb15';
+const proxyUrl = 'http://localhost:3000/api/razorpay';
 
 // Helper function to make HTTPS requests
 function makeRequest(path, method, data = null) {
@@ -12,17 +11,17 @@ function makeRequest(path, method, data = null) {
     
     const options = {
       hostname: parsedUrl.hostname,
+      port: parsedUrl.port,
       path: parsedUrl.pathname,
       method: method,
       headers: {
-        'X-API-Key': apiKey,
         'Content-Type': 'application/json'
       }
     };
 
-    console.log(`Making request to: ${parsedUrl.hostname}${parsedUrl.pathname}`);
+    console.log(`Making request to: ${parsedUrl.hostname}:${parsedUrl.port}${parsedUrl.pathname}`);
 
-    const req = https.request(options, (res) => {
+    const req = http.request(options, (res) => {
       let responseData = '';
 
       res.on('data', (chunk) => {
@@ -76,7 +75,7 @@ async function testCreateOrder() {
   console.log('\n=== Testing Create Order Endpoint ===');
   try {
     const orderData = {
-      amount: 50000, // 500 INR in paise
+      amount: 500, // 500 INR in rupees
       currency: 'INR',
       receipt: `receipt_${Date.now()}`,
       notes: {
@@ -123,4 +122,4 @@ async function runTests() {
 }
 
 // Run all tests
-runTests().catch(console.error); 
+runTests().catch(console.error);

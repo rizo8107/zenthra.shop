@@ -640,7 +640,7 @@ const getCouponMinimumLabel = (coupon: CouponData) => {
       const orderUpdateData = {
         // Use 'paid' status to properly reflect successful payment (matching PocketBase schema)
         payment_status: 'paid',
-        status: 'processing', // Keep order processing until fulfillment
+        status: 'confirmed', // Keep order processing until fulfillment
         payment_id: paymentId,
         razorpay_order_id: razorpayOrderId,
         razorpay_payment_id: paymentId,
