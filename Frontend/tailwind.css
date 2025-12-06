@@ -1,0 +1,37 @@
+@import 'tailwindcss';
+
+@theme {
+  --color-border: hsl(226 45% 88%);
+  --color-input: hsl(226 45% 88%);
+  --color-ring: hsl(223 90% 60%);
+  --color-background: hsl(0 0% 100%);
+  --color-foreground: hsl(229 35% 18%);
+  --color-primary: hsl(223 90% 60%);
+  --color-primary-foreground: hsl(0 0% 100%);
+  --color-secondary: hsl(224 68% 94%);
+  --color-secondary-foreground: hsl(229 35% 18%);
+  --color-destructive: hsl(0 72% 58%);
+  --color-destructive-foreground: hsl(0 0% 100%);
+  --color-muted: hsl(226 44% 92%);
+  --color-muted-foreground: hsl(228 24% 44%);
+  --color-accent: hsl(224 100% 92%);
+  --color-accent-foreground: hsl(229 35% 18%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(229 35% 18%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(229 35% 18%);
+  --color-sidebar-background: hsl(0 0% 100%);
+  --color-sidebar-foreground: hsl(222.2 84% 4.9%);
+  --color-sidebar-primary: hsl(222.2 47.4% 11.2%);
+  --color-sidebar-primary-foreground: hsl(210 40% 98%);
+  --color-sidebar-accent: hsl(210 40% 96.1%);
+  --color-sidebar-accent-foreground: hsl(222.2 47.4% 11.2%);
+  --color-sidebar-border: hsl(214.3 31.8% 91.4%);
+  --color-sidebar-ring: hsl(222.2 84% 4.9%);
+  --color-konipai-beige: #f4f4f5;
+  --color-konipai-mint: #9CCBBD;
+  --color-konipai-black: #222222;
+  --color-konipai-lightBeige: #F9F5ED;
+  --color-konipai-darkMint: #7BAA9D;
+  --radius: 0.5rem;
+}
