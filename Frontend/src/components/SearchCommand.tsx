@@ -86,13 +86,6 @@ export default function SearchCommand({ open, onOpenChange }: { open: boolean; o
             onValueChange={setQuery}
             className="border-0 bg-transparent px-0 text-sm focus:ring-0 focus-visible:ring-0 focus-visible:outline-none"
           />
-          <button
-            type="button"
-            onClick={() => onOpenChange(false)}
-            className="ml-2 rounded-xl bg-white px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-sm hover:bg-gray-50"
-          >
-            CLOSE
-          </button>
         </div>
 
         {/* Results card */}
