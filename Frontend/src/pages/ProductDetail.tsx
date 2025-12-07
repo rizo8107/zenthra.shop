@@ -1663,7 +1663,7 @@ const ProductDetail = () => {
                       {selectedColor?.name || 'Choose'}
                     </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex items-center gap-[5px] flex-nowrap">
                     {colorOptions.map((color: any) => (
                       <button
                         key={color.value}
@@ -1724,7 +1724,7 @@ const ProductDetail = () => {
                               'cursor-not-allowed opacity-40 line-through',
                           )}
                         >
-                          <div className="flex flex-col items-start gap-0.5 text-left">
+                          <div className="flex flex-col items-start justify-start gap-[3px] text-left">
                             <span className="text-[14px] font-semibold text-white bg-primary px-4 py-[1px] rounded-[8px] padding-[4px]">
                               {formatSizeOptionLabel(sz)}
                             </span>
@@ -1802,7 +1802,7 @@ const ProductDetail = () => {
                     Bundle Options <span className="text-xs font-normal text-muted-foreground">(Mix & Match)</span>
                   </div>
                   {/* Bundle Buttons from backend */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+                  <div className="flex flex-wrap gap-2 mb-4">
                     {bundleCombos.map((bundle: any) => {
                       const itemsCount = Number(bundle.items) > 0 ? Number(bundle.items) : 1;
                       const requiredQuantity = Number(bundle.requiredQuantity) > 0 ? Number(bundle.requiredQuantity) : itemsCount;

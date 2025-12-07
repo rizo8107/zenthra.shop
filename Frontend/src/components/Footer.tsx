@@ -30,7 +30,7 @@ const Footer = () => {
 
   return (
     <footer className="text-white" style={{ backgroundColor: footerBgColor }}>
-      <div className="karigai-container py-5 px-4 lg:px-30 md:py-6">
+      <div className="karigai-container py-5 px-[30px] md:py-6">
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 md:gap-8 items-start">
           {/* Logo + about + socials */}
           <div className="md:col-span-4">

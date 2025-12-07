@@ -229,7 +229,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
           )}
           <h3
             className={cn(
-              'font-bold text-black group-hover:text-primary transition-colors text-[4px]',
+              'font-bold text-black group-hover:text-primary transition-colors text-[8px]',
               titleSizeCls
             )}
             style={titleStyle}
@@ -304,12 +304,12 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
         ) : (
           // Split layout (matches Frame 2)
           <div
-            className="mt-auto flex items-center justify-between gap-3"
+            className="mt-auto flex flex-col md:flex-row items-start md:items-center justify-start md:justify-between gap-2 md:gap-3"
             style={ctaVars}
           >
-            <div className="inline-flex flex-col items-start">
+            <div className="inline-flex items-baseline gap-2">
               <span
-                className="text-[22px] font-semibold text-black leading-[27px]"
+                className="text-[32px] font-semibold text-black leading-[27px]"
                 style={priceStyle}
               >
                 ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
@@ -327,7 +327,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
               onClick={handleQuickAdd}
               size={ctaSize}
               className={cn(
-                'w-auto min-w-[8.75rem] justify-center h-[40px] font-semibold text-[15px] px-6',
+                'w-full justify-center h-[40px] font-semibold text-[15px] px-6',
                 'rounded-xl',
                 pc.ctaStyle === 'outline'
                   ? 'border border-input bg-background hover:bg-accent hover:text-accent-foreground'

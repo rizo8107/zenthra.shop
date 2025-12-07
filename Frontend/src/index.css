@@ -77,6 +77,9 @@
   body {
     @apply bg-background text-foreground overflow-x-hidden;
     width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+      "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans",
+      "Helvetica Neue", sans-serif;
   }
 }
 
@@ -190,7 +193,7 @@ html {
   button,
   a,
   [role="button"] {
-    min-height: 44px;
+    min-height: 36px;
   }
   
   /* Don't force height on icon buttons */
