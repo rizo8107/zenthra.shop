@@ -422,8 +422,8 @@ export default function Shop() {
 
       <div className="konipai-container py-10">
         <div className="space-y-8">
-          {/* Search and Filters - Sticky on mobile */}
-          <div className="sticky top-14 lg:top-16 z-40 bg-background/95 backdrop-blur-sm -mx-4 px-4 py-3 sm:static sm:bg-transparent sm:backdrop-blur-none sm:mx-0 sm:px-0 sm:py-0 border-b sm:border-b-0 border-border">
+          {/* Search and Filters - only visible on desktop/tablet */}
+          <div className="hidden sm:block sticky top-16 z-40 bg-background/95 backdrop-blur-sm px-0 py-3 border-b border-border">
             <div className="bg-card border border-border/60 rounded-xl px-3 py-3 sm:px-4 sm:py-3 shadow-sm flex items-center justify-between gap-3 flex-wrap">
               {/* Search - Full width on mobile */}
               <div className="relative w-full sm:w-auto sm:max-w-sm order-1 sm:order-none">

@@ -8,6 +8,7 @@ import { CategorySection } from "./blocks/CategorySection";
 import { FeatureSection } from "./blocks/FeatureSection";
 import { TestimonialSection } from "./blocks/TestimonialSection";
 import { NewsletterSection } from "./blocks/NewsletterSection";
+import { InstagramReels } from "./blocks/InstagramReels";
 import { Text } from "./blocks/Text";
 import { Button } from "./blocks/Button";
 import { Image } from "./blocks/Image";
@@ -130,7 +131,7 @@ export const completePuckConfig: Config = {
     },
     marketing: {
       title: "Marketing",
-      components: ["FeatureSection", "TestimonialSection", "NewsletterSection", "FeaturedMedia", "InteractiveHero"],
+      components: ["FeatureSection", "TestimonialSection", "NewsletterSection", "FeaturedMedia", "InteractiveHero", "InstagramReels"],
     },
     content: {
       title: "Content",
@@ -160,6 +161,7 @@ export const completePuckConfig: Config = {
     NewsletterSection,
     FeaturedMedia,
     InteractiveHero,
+    InstagramReels,
     
     // Content Components
     Text,
