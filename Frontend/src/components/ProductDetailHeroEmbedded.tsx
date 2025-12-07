@@ -244,7 +244,7 @@ export const ProductDetailHeroEmbedded = ({
           </Card>
 
           {baseImages.length > 1 && (
-            <div className="grid grid-cols-4 gap-3">
+            <div className="flex flex-wrap gap-3 w-full">
               {baseImages.map((image, index) => (
                 <button
                   key={image || index}
