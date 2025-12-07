@@ -1,22 +1,22 @@
                       {/* Product name and price */}
-                      <div>
-                        <h3 className="font-medium text-base mb-1 group-hover:text-primary transition-colors">
+                      <div className="space-y-1">
+                        <h3 className="font-medium text-sm text-gray-900 leading-tight line-clamp-2 group-hover:text-[#7C3AED] transition-colors">
                           {product.name}
                         </h3>
-                        <div className="flex items-center justify-between">
-                          <p className="text-base font-medium">
-                            ₹{typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
+                        <p className="text-xs text-gray-500">{product.brand || 'Brand'}</p>
+                        <div className="flex items-center justify-between pt-1">
+                          <p className="text-base font-semibold text-gray-900">
+                            ₹ {typeof product.price === 'number' ? product.price.toFixed(2) : '0.00'}
                           </p>
-                          <Button
+                          <button
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
                               handleAddToCart(product);
                             }}
-                            variant="ghost"
-                            className="h-8 w-8 p-0"
+                            className="w-8 h-8 rounded-full bg-gray-100 hover:bg-[#7C3AED] hover:text-white flex items-center justify-center transition-colors"
                           >
-                            <Plus className="h-4 w-4" />
-                          </Button>
+                            <Heart className="h-4 w-4" />
+                          </button>
                         </div>
-                      </div> 
+                      </div>

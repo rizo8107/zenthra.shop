@@ -28,6 +28,7 @@ import { InteractiveHero } from "./blocks/InteractiveHero";
 import { CollectionsCarousel } from "./blocks/CollectionsCarousel";
 import { Banner } from "./blocks/Banner";
 import { SingleProductDetails } from "./blocks/SingleProductDetails";
+import { HeroCard } from "./blocks/HeroCard";
 import { CategoryCircles } from "./blocks/CategoryCircles";
 import { ProductCardV2Block } from "./blocks/ProductCardV2";
 import { CustomHtml } from "./blocks/CustomHtml";
@@ -125,7 +126,7 @@ export const completePuckConfig: Config = {
   categories: {
     ecommerce: {
       title: "E-commerce",
-      components: ["Hero", "ProductGrid", "SingleProductDetails", "CategorySection", "OfferBanner", "BrandShowcase", "CollectionsCarousel"],
+      components: ["Hero", "HeroCard", "ProductGrid", "SingleProductDetails", "CategorySection", "OfferBanner", "BrandShowcase", "CollectionsCarousel"],
     },
     marketing: {
       title: "Marketing",
@@ -143,6 +144,7 @@ export const completePuckConfig: Config = {
   components: {
     // E-commerce Components
     Hero,
+    HeroCard,
     ProductGrid,
     SingleProductDetails,
     // keep alias for backward compatibility (hidden from picker by categories)

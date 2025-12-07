@@ -27,6 +27,7 @@ import { Magazine } from "./blocks/Magazine";
 import { InteractiveHero } from "./blocks/InteractiveHero";
 import { CollectionsCarousel } from "./blocks/CollectionsCarousel";
 import { Banner } from "./blocks/Banner";
+import { HeroCard } from "./blocks/HeroCard";
 
 // Root component configuration
 const Root = {
@@ -116,29 +117,12 @@ const Root = {
   },
 };
 
-export const completePuckConfig = {
-  categories: {
-    content: {
-      title: "Content",
-      components: [
-        "Banner",
-        // ...other content blocks
-      ],
-    },
-  },
-  components: {
-    Banner,
-    // ...other blocks
-  },
-};
-
-
 export const completePuckConfig: Config = {
   root: Root,
   categories: {
     ecommerce: {
       title: "E-commerce",
-      components: ["Hero", "ProductGrid", "KarigaiProductGrid", "poructgrind", "CategorySection", "OfferBanner", "BrandShowcase", "CollectionsCarousel"],
+      components: ["Hero", "HeroCard", "ProductGrid", "KarigaiProductGrid", "CategorySection", "OfferBanner", "BrandShowcase", "CollectionsCarousel"],
     },
     marketing: {
       title: "Marketing",
@@ -146,7 +130,7 @@ export const completePuckConfig: Config = {
     },
     content: {
       title: "Content",
-      components: ["Text", "Button", "Image", "Spacer", "CardGrid", "Magazine"],
+      components: ["Text", "Button", "Image", "Spacer", "CardGrid", "Magazine", "Banner"],
     },
     layout: {
       title: "Layout",
@@ -156,6 +140,7 @@ export const completePuckConfig: Config = {
   components: {
     // E-commerce Components
     Hero,
+    HeroCard,
     ProductGrid,
     KarigaiProductGrid,
     CategorySection,
@@ -177,6 +162,7 @@ export const completePuckConfig: Config = {
     Spacer,
     CardGrid,
     Magazine,
+    Banner,
     
     // Layout Components
     Container,

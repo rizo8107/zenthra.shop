@@ -1,5 +1,6 @@
 import { Config } from "@measured/puck";
 import { Hero } from "./blocks/Hero";
+import { HeroCard } from "./blocks/HeroCard";
 import { ProductGrid } from "./blocks/ProductGrid";
 import { CategorySection } from "./blocks/CategorySection";
 import { FeatureSection } from "./blocks/FeatureSection";
@@ -82,6 +83,7 @@ export const puckConfig: Config = {
       title: "E-commerce",
       components: [
         "Hero",
+        "HeroCard",
         "ProductGrid",
         "ProductCardV2Block",
         "CategorySection",
@@ -107,6 +109,7 @@ export const puckConfig: Config = {
     
     // E-commerce Components
     Hero,
+    HeroCard,
     ProductGrid,
     ProductCardV2Block,
     CategorySection,
