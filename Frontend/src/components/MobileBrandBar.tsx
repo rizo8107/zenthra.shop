@@ -1,8 +1,15 @@
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { useDynamicTheme } from '@/contexts/ThemeContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useCart } from '@/contexts/CartContext';
 import { Logo } from '@/components/Logo';
 import { cn } from '@/lib/utils';
+import { Search, ShoppingCart, Menu, SlidersHorizontal } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Cart } from '@/components/Cart';
+import SearchCommand from '@/components/SearchCommand';
 
 /**
  * Compact brand bar shown at the top on mobile for all storefront pages.
@@ -11,18 +18,22 @@ import { cn } from '@/lib/utils';
 export function MobileBrandBar() {
   const { settings } = useSiteSettings();
   const { themeData } = useDynamicTheme();
+  const { user } = useAuth();
+  const { itemCount } = useCart();
+  const [searchOpen, setSearchOpen] = useState(false);
 
-  const siteTitle =
-    settings?.siteTitle ||
-    import.meta.env.VITE_SITE_TITLE ||
-    'Your Brand';
-
-  const tagline = settings?.siteTagline || 'Cold-pressed goodness, delivered fresh.';
-
-  const primaryBg = themeData?.primary?.hex || '#111827';
+  const primaryBg = themeData?.primary?.hex || '#15803D';
   const primaryFg = themeData?.textOnPrimary || '#FFFFFF';
 
-  // Simple path guard: hide on checkout/auth/admin/embed via layout, and hide on desktop via classes.
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const userName = user?.name?.split(' ')[0] || "there";
 
   return (
     <div
@@ -30,21 +41,58 @@ export function MobileBrandBar() {
         'md:hidden sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border safe-area-top'
       )}
     >
-      <div className="max-w-7xl mx-auto px-3 py-2 flex items-center gap-3">
-        <div className="flex items-center gap-2 min-w-0">
-          {/* Plain responsive brand image/logo */}
-          <Logo className="h-6 w-auto shrink-0" />
+      {/* Top Row: Logo + Greeting + Action Icons */}
+      <div className="max-w-7xl mx-auto px-4 pt-3 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-3 flex-1">
+          <Logo className="h-8 w-auto shrink-0" />
+          <div>
+            <p className="text-xs text-muted-foreground">{getGreeting()},</p>
+            <p className="text-base font-semibold text-foreground">{userName}</p>
+          </div>
         </div>
-        <div className="ml-auto">
+        <div className="flex items-center gap-2">
+          {/* Cart Icon */}
+          <Cart>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative h-10 w-10 rounded-xl text-white hover:opacity-90"
+              style={{ backgroundColor: primaryBg }}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {itemCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-medium text-white flex items-center justify-center">
+                  {itemCount}
+                </span>
+              )}
+            </Button>
+          </Cart>
+          {/* Menu/Shop Icon */}
           <Link
             to="/shop"
-            className="inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-medium shadow-sm"
-            style={{ backgroundColor: primaryBg, color: primaryFg }}
+            className="h-10 w-10 rounded-xl flex items-center justify-center text-white hover:opacity-90"
+            style={{ backgroundColor: primaryBg }}
           >
-            <span>Shop now</span>
+            <Menu className="h-5 w-5" />
           </Link>
         </div>
       </div>
+      
+      {/* Search Bar Row */}
+      <div className="max-w-7xl mx-auto px-4 pb-3">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="w-full flex items-center gap-3 px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+        >
+          <Search className="h-5 w-5" />
+          <span className="text-sm">Search</span>
+          <div className="ml-auto">
+            <SlidersHorizontal className="h-4 w-4" />
+          </div>
+        </button>
+      </div>
+      
+      <SearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
     </div>
   );
 }

@@ -1,73 +1,99 @@
 import { ComponentConfig } from "@measured/puck";
 import { cn } from "@/lib/utils";
 import { ImageSelector } from "@/puck/fields/ImageSelector";
+import { useState, useEffect, useRef } from "react";
 
-export interface HeroCardProps {
+export interface HeroCardSlide {
   brandName?: string;
-  title: string;
+  title?: string;
   description?: string;
   buttonText?: string;
   buttonHref?: string;
-  buttonTarget?: "_self" | "_blank";
   productImage?: string;
   gradientFrom?: string;
   gradientTo?: string;
+}
+
+export interface HeroCardProps {
+  slides?: HeroCardSlide[];
   textColor?: "white" | "black";
   cardRadius?: "none" | "md" | "lg" | "xl" | "2xl" | "3xl";
-  showSecondCard?: boolean;
-  // Second card props
-  secondBrandName?: string;
-  secondTitle?: string;
-  secondDescription?: string;
-  secondButtonText?: string;
-  secondButtonHref?: string;
-  secondProductImage?: string;
-  secondGradientFrom?: string;
-  secondGradientTo?: string;
+  autoplay?: boolean;
+  autoplayDelay?: number;
 }
 
 export const HeroCard: ComponentConfig<HeroCardProps> = {
-  label: "Hero Card",
+  label: "Hero Card Carousel",
   fields: {
-    brandName: {
-      type: "text",
-      label: "Brand Name",
-    },
-    title: {
-      type: "text",
-      label: "Product Title",
-    },
-    description: {
-      type: "textarea",
-      label: "Description",
-    },
-    buttonText: {
-      type: "text",
-      label: "Button Text",
-    },
-    buttonHref: {
-      type: "text",
-      label: "Button Link",
-    },
-    buttonTarget: {
-      type: "select",
-      label: "Button Target",
-      options: [
-        { label: "Same Tab", value: "_self" },
-        { label: "New Tab", value: "_blank" },
-      ],
-    },
-    productImage: {
-      ...ImageSelector,
-      label: "Product Image",
-    },
-    gradientFrom: {
-      type: "text",
-      label: "Gradient Start Color (hex)",
-    },
-    gradientTo: {
-      type: "text",
-      label: "Gradient End Color (hex)",
+    slides: {
+      type: "array",
+      label: "Slides",
+      arrayFields: {
+        brandName: { type: "text", label: "Brand Name" },
+        title: { type: "text", label: "Title" },
+        description: { type: "textarea", label: "Description" },
+        buttonText: { type: "text", label: "Button Text" },
+        buttonHref: { type: "text", label: "Button Link" },
+        productImage: { ...ImageSelector, label: "Background Image" },
+        gradientFrom: {
+          type: "custom" as const,
+          label: "Gradient Start",
+          render: ({ value, onChange }) => {
+            const strValue = typeof value === "string" && value ? value : "#4ade80";
+            return (
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={strValue}
+                  onChange={(e) => onChange(e.target.value)}
+                  className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+                  aria-label="Gradient start color"
+                />
+                <input
+                  type="text"
+                  value={strValue}
+                  onChange={(e) => onChange(e.target.value)}
+                  className="flex-1 px-2 py-1 border rounded text-xs"
+                />
+              </div>
+            );
+          },
+        },
+        gradientTo: {
+          type: "custom" as const,
+          label: "Gradient End",
+          render: ({ value, onChange }) => {
+            const strValue = typeof value === "string" && value ? value : "#16a34a";
+            return (
+              <div className="flex items-center gap-2">
+                <input
+                  type="color"
+                  value={strValue}
+                  onChange={(e) => onChange(e.target.value)}
+                  className="h-8 w-10 cursor-pointer rounded border border-border bg-transparent"
+                  aria-label="Gradient end color"
+                />
+                <input
+                  type="text"
+                  value={strValue}
+                  onChange={(e) => onChange(e.target.value)}
+                  className="flex-1 px-2 py-1 border rounded text-xs"
+                />
+              </div>
+            );
+          },
+        },
+      },
+      defaultItemProps: {
+        brandName: "Brand",
+        title: "Product Title",
+        description: "Amazing product description here.",
+        buttonText: "SHOP NOW",
+        buttonHref: "/shop",
+        gradientFrom: "#4ade80",
+        gradientTo: "#16a34a",
+      },
+      getItemSummary: (item) => item.title || "Slide",
     },
     textColor: {
       type: "select",
@@ -89,88 +115,73 @@ export const HeroCard: ComponentConfig<HeroCardProps> = {
         { label: "3XL", value: "3xl" },
       ],
     },
-    showSecondCard: {
+    autoplay: {
       type: "radio",
-      label: "Show Second Card",
+      label: "Autoplay",
       options: [
-        { label: "No", value: false },
-        { label: "Yes", value: true },
+        { label: "Off", value: false },
+        { label: "On", value: true },
       ],
     },
-    secondBrandName: {
-      type: "text",
-      label: "Second Card: Brand Name",
-    },
-    secondTitle: {
-      type: "text",
-      label: "Second Card: Title",
-    },
-    secondDescription: {
-      type: "textarea",
-      label: "Second Card: Description",
-    },
-    secondButtonText: {
-      type: "text",
-      label: "Second Card: Button Text",
-    },
-    secondButtonHref: {
-      type: "text",
-      label: "Second Card: Button Link",
-    },
-    secondProductImage: {
-      ...ImageSelector,
-      label: "Second Card: Product Image",
-    },
-    secondGradientFrom: {
-      type: "text",
-      label: "Second Card: Gradient Start",
-    },
-    secondGradientTo: {
-      type: "text",
-      label: "Second Card: Gradient End",
+    autoplayDelay: {
+      type: "number",
+      label: "Autoplay Delay (ms)",
     },
   },
   defaultProps: {
-    brandName: "Brand",
-    title: "Product Name Here",
-    description: "Discover our amazing product with incredible benefits for you.",
-    buttonText: "20% OFF | BUY NOW",
-    buttonHref: "/shop",
-    buttonTarget: "_self",
-    gradientFrom: "#4ade80",
-    gradientTo: "#16a34a",
+    slides: [
+      {
+        brandName: "Murad",
+        title: "Retinol Youth Renewal Night Cream",
+        description: "Retinol Tri-Active Technology helps fight the appearance of lines and wrinkles.",
+        buttonText: "20% OFF | BUY NOW",
+        buttonHref: "/shop",
+        gradientFrom: "#4ade80",
+        gradientTo: "#16a34a",
+      },
+      {
+        brandName: "Brand",
+        title: "Another Amazing Product",
+        description: "Discover our premium collection.",
+        buttonText: "SHOP NOW",
+        buttonHref: "/shop",
+        gradientFrom: "#8b5cf6",
+        gradientTo: "#6d28d9",
+      },
+    ],
     textColor: "white",
     cardRadius: "2xl",
-    showSecondCard: true,
-    secondBrandName: "Brand",
-    secondTitle: "Another Product",
-    secondGradientFrom: "#e5e7eb",
-    secondGradientTo: "#d1d5db",
+    autoplay: true,
+    autoplayDelay: 5000,
   },
   render: ({
-    brandName,
-    title,
-    description,
-    buttonText,
-    buttonHref,
-    buttonTarget,
-    productImage,
-    gradientFrom,
-    gradientTo,
+    slides = [],
     textColor,
     cardRadius,
-    showSecondCard,
-    secondBrandName,
-    secondTitle,
-    secondDescription,
-    secondButtonText,
-    secondButtonHref,
-    secondProductImage,
-    secondGradientFrom,
-    secondGradientTo,
+    autoplay,
+    autoplayDelay,
     puck,
   }) => {
-    const radiusClasses = {
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [animKey, setAnimKey] = useState(0);
+    const total = slides.length;
+
+    // Autoplay
+    useEffect(() => {
+      if (!autoplay || total <= 1) return;
+      const interval = setInterval(() => {
+        setCurrentIndex((prev) => (prev + 1) % total);
+        setAnimKey((prev) => prev + 1);
+      }, autoplayDelay || 5000);
+      return () => clearInterval(interval);
+    }, [autoplay, autoplayDelay, total]);
+
+    const goTo = (index: number) => {
+      setCurrentIndex(index);
+      setAnimKey((prev) => prev + 1);
+    };
+
+    const radiusClasses: Record<string, string> = {
       none: "rounded-none",
       md: "rounded-md",
       lg: "rounded-lg",
@@ -181,133 +192,106 @@ export const HeroCard: ComponentConfig<HeroCardProps> = {
 
     const textColorClass = textColor === "black" ? "text-gray-900" : "text-white";
 
-    const CardComponent = ({
-      brand,
-      cardTitle,
-      cardDescription,
-      btnText,
-      btnHref,
-      image,
-      fromColor,
-      toColor,
-      isPartial = false,
-    }: {
-      brand?: string;
-      cardTitle: string;
-      cardDescription?: string;
-      btnText?: string;
-      btnHref?: string;
-      image?: string;
-      fromColor?: string;
-      toColor?: string;
-      isPartial?: boolean;
-    }) => (
-      <div
-        className={cn(
-          "relative overflow-hidden flex-1 min-h-[200px] md:min-h-[280px]",
-          radiusClasses[cardRadius || "2xl"],
-          isPartial ? "w-[30%] hidden md:block" : "w-full md:w-[65%]"
-        )}
-        style={{
-          background: image 
-            ? `linear-gradient(135deg, ${fromColor || "#4ade80"}cc 0%, ${toColor || "#16a34a"}cc 100%), url(${image})`
-            : `linear-gradient(135deg, ${fromColor || "#4ade80"} 0%, ${toColor || "#16a34a"} 100%)`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }}
-      >
-        {/* Content */}
-        <div className={cn("relative z-10 p-5 md:p-6 h-full flex flex-col")}>
-          {/* Brand */}
-          {brand && (
-            <span className={cn("text-xs md:text-sm font-medium opacity-90 mb-1", textColorClass)}>
-              {brand}
-            </span>
-          )}
-          
-          {/* Title */}
-          <h2 className={cn(
-            "font-bold leading-tight mb-2",
-            textColorClass,
-            isPartial ? "text-lg md:text-xl" : "text-xl md:text-2xl lg:text-3xl"
-          )}>
-            {cardTitle}
-          </h2>
-          
-          {/* Description */}
-          {cardDescription && !isPartial && (
-            <p className={cn(
-              "text-xs md:text-sm opacity-80 mb-4 line-clamp-3",
-              textColorClass
-            )}>
-              {cardDescription}
-            </p>
-          )}
-          
-          {/* Button */}
-          {btnText && !isPartial && (
-            <div className="mt-auto">
-              {puck?.isEditing ? (
-                <button
-                  className={cn(
-                    "inline-flex items-center px-4 py-2 text-xs md:text-sm font-semibold rounded-full transition-all",
-                    textColor === "black" 
-                      ? "bg-gray-900 text-white hover:bg-gray-800" 
-                      : "bg-white/20 backdrop-blur-sm text-white border border-white/30 hover:bg-white/30"
-                  )}
-                >
-                  {btnText}
-                </button>
-              ) : (
-                <a
-                  href={btnHref || "#"}
-                  target={buttonTarget || "_self"}
-                  rel={buttonTarget === "_blank" ? "noopener noreferrer" : undefined}
-                  className={cn(
-                    "inline-flex items-center px-4 py-2 text-xs md:text-sm font-semibold rounded-full transition-all",
-                    textColor === "black" 
-                      ? "bg-gray-900 text-white hover:bg-gray-800" 
-                      : "bg-white/20 backdrop-blur-sm text-white border border-white/30 hover:bg-white/30"
-                  )}
-                >
-                  {btnText}
-                </a>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    );
+    if (total === 0) {
+      return (
+        <section className="w-full px-4 py-4">
+          <div className="h-[200px] md:h-[280px] rounded-2xl bg-gray-100 flex items-center justify-center text-gray-400">
+            Add slides to display the carousel
+          </div>
+        </section>
+      );
+    }
 
     return (
       <section className="w-full px-4 py-4">
-        <div className="flex gap-3 md:gap-4">
-          {/* Main Card */}
-          <CardComponent
-            brand={brandName}
-            cardTitle={title}
-            cardDescription={description}
-            btnText={buttonText}
-            btnHref={buttonHref}
-            image={productImage}
-            fromColor={gradientFrom}
-            toColor={gradientTo}
-          />
-          
-          {/* Second Card (partial view) */}
-          {showSecondCard && (
-            <CardComponent
-              brand={secondBrandName}
-              cardTitle={secondTitle || "Product"}
-              cardDescription={secondDescription}
-              btnText={secondButtonText}
-              btnHref={secondButtonHref}
-              image={secondProductImage}
-              fromColor={secondGradientFrom || "#e5e7eb"}
-              toColor={secondGradientTo || "#d1d5db"}
-              isPartial
-            />
-          )}
+        <div className="relative">
+          {/* Carousel Container */}
+          <div className="overflow-hidden">
+            <div
+              className="flex transition-transform duration-500 ease-out"
+              style={{ transform: `translateX(-${currentIndex * 100}%)` }}
+            >
+              {slides.map((slide, index) => (
+                <div
+                  key={index}
+                  className="w-full flex-shrink-0 px-1"
+                >
+                  <div
+                    className={cn(
+                      "relative overflow-hidden min-h-[180px] md:min-h-[280px]",
+                      radiusClasses[cardRadius || "2xl"]
+                    )}
+                    style={{
+                      background: slide.productImage
+                        ? `linear-gradient(135deg, ${slide.gradientFrom || "#4ade80"}cc 0%, ${slide.gradientTo || "#16a34a"}cc 100%), url(${slide.productImage})`
+                        : `linear-gradient(135deg, ${slide.gradientFrom || "#4ade80"} 0%, ${slide.gradientTo || "#16a34a"} 100%)`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center",
+                    }}
+                  >
+                    {/* Content */}
+                    <div className={cn("relative z-10 p-5 md:p-8 h-full flex flex-col justify-center")}>
+                      {/* Brand */}
+                      {slide.brandName && (
+                        <span className={cn("text-xs md:text-sm font-medium opacity-90 mb-1", textColorClass)}>
+                          {slide.brandName}
+                        </span>
+                      )}
+
+                      {/* Title */}
+                      <h2 className={cn(
+                        "font-bold leading-tight mb-2 text-xl md:text-2xl lg:text-3xl max-w-[70%] md:max-w-[60%]",
+                        textColorClass
+                      )}>
+                        {slide.title}
+                      </h2>
+
+                      {/* Description */}
+                      {slide.description && (
+                        <p className={cn(
+                          "text-xs md:text-sm opacity-80 mb-4 line-clamp-2 md:line-clamp-3 max-w-[65%] md:max-w-[50%]",
+                          textColorClass
+                        )}>
+                          {slide.description}
+                        </p>
+                      )}
+
+                      {/* Button */}
+                      {slide.buttonText && (
+                        <div className="mt-2">
+                          {puck?.isEditing ? (
+                            <button
+                              className={cn(
+                                "inline-flex items-center px-4 py-2 text-xs md:text-sm font-semibold rounded-full transition-all",
+                                textColor === "black"
+                                  ? "bg-gray-900 text-white hover:bg-gray-800"
+                                  : "bg-white/20 backdrop-blur-sm text-white border border-white/30 hover:bg-white/30"
+                              )}
+                            >
+                              {slide.buttonText}
+                            </button>
+                          ) : (
+                            <a
+                              href={slide.buttonHref || "#"}
+                              className={cn(
+                                "inline-flex items-center px-4 py-2 text-xs md:text-sm font-semibold rounded-full transition-all",
+                                textColor === "black"
+                                  ? "bg-gray-900 text-white hover:bg-gray-800"
+                                  : "bg-white/20 backdrop-blur-sm text-white border border-white/30 hover:bg-white/30"
+                              )}
+                            >
+                              {slide.buttonText}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
         </div>
       </section>
     );

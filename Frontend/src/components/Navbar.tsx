@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { useAuth } from "@/contexts/AuthContext"
 import { useCart } from "@/contexts/CartContext"
 import { Button } from "@/components/ui/button"
@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { ShoppingBag, Menu, Award, Sparkles, Info, Package, Heart, Settings, LogOut, Gift, Mail, Rss, Search } from "lucide-react"
+import { ShoppingBag, Menu, Award, Sparkles, Info, Package, Heart, Settings, LogOut, Gift, Mail, Rss, Search, ShoppingCart, SlidersHorizontal } from "lucide-react"
 import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Cart } from "./Cart"
 import { Logo } from '@/components/Logo'
@@ -33,204 +33,219 @@ export default function Navbar() {
     fetchConfig();
   }, []);
 
+  // Get greeting based on time of day
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good morning";
+    if (hour < 17) return "Good afternoon";
+    return "Good evening";
+  };
+
+  const userName = user?.name?.split(' ')[0] || "there";
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="mx-auto max-w-7xl px-4 lg:px-6 flex h-14 lg:h-16 items-center gap-3 relative">
-
-        {/* Mobile menu button (left side) */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button 
-              variant="ghost" 
-              className="px-0 text-base hover:bg-transparent focus-visible:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 lg:hidden"
-            >
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-[300px] sm:w-[400px] p-0">
-            <nav className="flex flex-col h-full bg-background">
-              {/* Header */}
-              <div className="border-b p-6">
-                <SheetClose asChild>
-                  <Link to="/" className="flex items-center gap-2">
-                    <Logo className="h-6" />
-                  </Link>
-                </SheetClose>
-              </div>
-              
-              {/* Menu Items */}
-              <div className="flex-1 overflow-y-auto">
-                <div className="flex flex-col gap-1 p-4">
-
-                  {navConfig?.showShop && (
+      {/* Mobile Header - App Style */}
+      <div className="lg:hidden">
+        {/* Top Row: Greeting + Action Icons */}
+        <div className="flex items-center justify-between px-4 pt-3 pb-2">
+          <div className="flex-1">
+            <p className="text-xs text-muted-foreground">{getGreeting()},</p>
+            <p className="text-base font-semibold text-foreground">{userName}</p>
+          </div>
+          <div className="flex items-center gap-1">
+            {/* Cart Icon */}
+            <Cart>
+              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-xl bg-[#15803D] text-white hover:bg-[#15803D]/90">
+                <ShoppingCart className="h-5 w-5" />
+                {itemCount > 0 && (
+                  <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-red-500 text-[10px] font-medium text-white flex items-center justify-center">
+                    {itemCount}
+                  </span>
+                )}
+              </Button>
+            </Cart>
+            {/* Menu Icon */}
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-[#15803D] text-white hover:bg-[#15803D]/90">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-[300px] sm:w-[400px] p-0">
+                <nav className="flex flex-col h-full bg-background">
+                  {/* Header */}
+                  <div className="border-b p-6">
                     <SheetClose asChild>
-                      <Link 
-                        to="/shop" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
-                      >
-                        <ShoppingBag className="h-5 w-5 text-muted-foreground" />
-                        Shop
+                      <Link to="/" className="flex items-center gap-2">
+                        <Logo className="h-6" />
                       </Link>
                     </SheetClose>
-                  )}
-                  {navConfig?.showBestsellers && (
-                    <SheetClose asChild>
-                      <Link 
-                        to="/bestsellers" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
-                      >
-                        <Award className="h-5 w-5 text-muted-foreground" />
-                        Bestsellers
-                      </Link>
-                    </SheetClose>
-                  )}
-                  {navConfig?.showNewArrivals && (
-                    <SheetClose asChild>
-                      <Link 
-                        to="/new-arrivals" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
-                      >
-                        <Sparkles className="h-5 w-5 text-muted-foreground" />
-                        New Arrivals
-                      </Link>
-                    </SheetClose>
-                  )}
-                  {navConfig?.showAbout && (
-                    <SheetClose asChild>
-                      <Link 
-                        to="/about" 
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
-                      >
-                        <Info className="h-5 w-5 text-muted-foreground" />
-                        About
-                      </Link>
-                    </SheetClose>
-                  )}
-                  {navConfig?.showGifting && (
-                    <SheetClose asChild>
-                      <Link 
-                        to="/gifting"
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
-                      >
-                        <Gift className="h-5 w-5 text-muted-foreground" />
-                        Gifting
-                      </Link>
-                    </SheetClose>
-                  )}
-                  {navConfig?.showContact && (
-                    <SheetClose asChild>
-                      <Link 
-                        to="/contact"
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
-                      >
-                        <Mail className="h-5 w-5 text-muted-foreground" />
-                        Contact
-                      </Link>
-                    </SheetClose>
-                  )}
-                  {navConfig?.showBlog && (
-                    <SheetClose asChild>
-                      <Link 
-                        to="/blog"
-                        className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent"
-                      >
-                        <Rss className="h-5 w-5 text-muted-foreground" />
-                        Blog
-                      </Link>
-                    </SheetClose>
-                  )}
-                  {/* Custom items */}
-                  {navConfig?.items?.map((item: NavItem) => (
-                    <div key={item.id} className="flex flex-col">
-                      {(() => {
-                        const label = item.label || '';
-                        const to = item.pagePath || '';
-                        const ext = item.url;
-                        const target = item.openInNewTab ? '_blank' : undefined;
-                        if (ext) {
-                          return (
-                            <a href={ext} target={target} rel={item.openInNewTab ? 'noopener noreferrer' : undefined} className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
-                              {label}
-                            </a>
-                          );
-                        }
-                        return (
-                          <SheetClose asChild>
-                            <Link to={to || '#'} className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
-                              {label}
-                            </Link>
-                          </SheetClose>
-                        );
-                      })()}
-                      {Array.isArray(item.children) && item.children.length > 0 && (
-                        <div className="ml-6 mt-1 flex flex-col">
-                          {item.children.map((ch) => {
-                            const label = ch.label || '';
-                            const to = ch.pagePath || '';
-                            const ext = ch.url;
-                            const target = ch.openInNewTab ? '_blank' : undefined;
+                  </div>
+                  
+                  {/* Menu Items */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="flex flex-col gap-1 p-4">
+                      {navConfig?.showShop && (
+                        <SheetClose asChild>
+                          <Link to="/shop" className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                            <ShoppingBag className="h-5 w-5 text-muted-foreground" />
+                            Shop
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {navConfig?.showBestsellers && (
+                        <SheetClose asChild>
+                          <Link to="/bestsellers" className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                            <Award className="h-5 w-5 text-muted-foreground" />
+                            Bestsellers
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {navConfig?.showNewArrivals && (
+                        <SheetClose asChild>
+                          <Link to="/new-arrivals" className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                            <Sparkles className="h-5 w-5 text-muted-foreground" />
+                            New Arrivals
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {navConfig?.showAbout && (
+                        <SheetClose asChild>
+                          <Link to="/about" className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                            <Info className="h-5 w-5 text-muted-foreground" />
+                            About
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {navConfig?.showGifting && (
+                        <SheetClose asChild>
+                          <Link to="/gifting" className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                            <Gift className="h-5 w-5 text-muted-foreground" />
+                            Gifting
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {navConfig?.showContact && (
+                        <SheetClose asChild>
+                          <Link to="/contact" className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                            <Mail className="h-5 w-5 text-muted-foreground" />
+                            Contact
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {navConfig?.showBlog && (
+                        <SheetClose asChild>
+                          <Link to="/blog" className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
+                            <Rss className="h-5 w-5 text-muted-foreground" />
+                            Blog
+                          </Link>
+                        </SheetClose>
+                      )}
+                      {/* Custom items */}
+                      {navConfig?.items?.map((item: NavItem) => (
+                        <div key={item.id} className="flex flex-col">
+                          {(() => {
+                            const label = item.label || '';
+                            const to = item.pagePath || '';
+                            const ext = item.url;
+                            const target = item.openInNewTab ? '_blank' : undefined;
                             if (ext) {
                               return (
-                                <a key={ch.id} href={ext} target={target} rel={ch.openInNewTab ? 'noopener noreferrer' : undefined} className="px-4 py-2 text-sm rounded-md hover:bg-accent">
+                                <a href={ext} target={target} rel={item.openInNewTab ? 'noopener noreferrer' : undefined} className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
                                   {label}
                                 </a>
                               );
                             }
                             return (
-                              <SheetClose asChild key={ch.id}>
-                                <Link to={to || '#'} className="px-4 py-2 text-sm rounded-md hover:bg-accent">
+                              <SheetClose asChild>
+                                <Link to={to || '#'} className="flex items-center gap-2 px-4 py-3 text-base font-medium rounded-lg transition-colors hover:bg-accent">
                                   {label}
                                 </Link>
                               </SheetClose>
                             );
-                          })}
+                          })()}
+                          {Array.isArray(item.children) && item.children.length > 0 && (
+                            <div className="ml-6 mt-1 flex flex-col">
+                              {item.children.map((ch) => {
+                                const label = ch.label || '';
+                                const to = ch.pagePath || '';
+                                const ext = ch.url;
+                                const target = ch.openInNewTab ? '_blank' : undefined;
+                                if (ext) {
+                                  return (
+                                    <a key={ch.id} href={ext} target={target} rel={ch.openInNewTab ? 'noopener noreferrer' : undefined} className="px-4 py-2 text-sm rounded-md hover:bg-accent">
+                                      {label}
+                                    </a>
+                                  );
+                                }
+                                return (
+                                  <SheetClose asChild key={ch.id}>
+                                    <Link to={to || '#'} className="px-4 py-2 text-sm rounded-md hover:bg-accent">
+                                      {label}
+                                    </Link>
+                                  </SheetClose>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Footer - Auth Section */}
-              <div className="border-t p-4">
-                {user ? (
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={user.avatar} alt={user.name} />
-                      <AvatarFallback>{user.name ? user.name.charAt(0) : '?'}</AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold">{user.name}</p>
-                      <p className="text-xs text-muted-foreground">{user.email}</p>
-                    </div>
-                    <SheetClose asChild>
-                      <Button variant="ghost" size="icon" onClick={() => signOut()} aria-label="Log out">
-                        <LogOut className="h-5 w-5" />
-                      </Button>
-                    </SheetClose>
                   </div>
-                ) : (
-                  <SheetClose asChild>
-                    <Button asChild className="w-full">
-                      <Link to="/auth/login">Sign In</Link>
-                    </Button>
-                  </SheetClose>
-                )}
-              </div>
-            </nav>
-          </SheetContent>
-        </Sheet>
-
-        {/* Mobile centered logo */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 lg:hidden">
-          <Link to="/" className="flex items-center">
-            <Logo className="h-6" />
-          </Link>
+                  
+                  {/* Footer - Auth Section */}
+                  <div className="border-t p-4">
+                    {user ? (
+                      <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage src={user.avatar} alt={user.name} />
+                          <AvatarFallback>{user.name ? user.name.charAt(0) : '?'}</AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold">{user.name}</p>
+                          <p className="text-xs text-muted-foreground">{user.email}</p>
+                        </div>
+                        <SheetClose asChild>
+                          <Button variant="ghost" size="icon" onClick={() => signOut()} aria-label="Log out">
+                            <LogOut className="h-5 w-5" />
+                          </Button>
+                        </SheetClose>
+                      </div>
+                    ) : (
+                      <SheetClose asChild>
+                        <Button asChild className="w-full">
+                          <Link to="/auth/login">Sign In</Link>
+                        </Button>
+                      </SheetClose>
+                    )}
+                  </div>
+                </nav>
+              </SheetContent>
+            </Sheet>
+          </div>
         </div>
         
+        {/* Search Bar Row */}
+        <div className="px-4 pb-3">
+          <button
+            onClick={() => setSearchOpen(true)}
+            className="w-full flex items-center gap-3 px-4 py-3 bg-gray-100 dark:bg-gray-800 rounded-xl text-muted-foreground hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+          >
+            <Search className="h-5 w-5" />
+            <span className="text-sm">Search</span>
+            <div className="ml-auto flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4" />
+            </div>
+          </button>
+        </div>
+        <SearchCommand open={searchOpen} onOpenChange={setSearchOpen} />
+      </div>
+
+      {/* Desktop Header - Original Style */}
+      <div className="hidden lg:flex mx-auto max-w-7xl px-4 lg:px-6 h-16 items-center gap-3 relative">
         {/* Desktop logo - left aligned */}
-        <Link to="/" className="mr-6 hidden lg:flex items-center space-x-2">
+        <Link to="/" className="mr-6 flex items-center space-x-2">
           <Logo />
         </Link>
 
