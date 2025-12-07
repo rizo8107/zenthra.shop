@@ -190,7 +190,7 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
           {product.bestseller && (
             <Badge
               variant="secondary"
-              className="bg-[#928B6D] text-white border-none rounded-[24px] px-3 py-1 text-[12px] font-semibold hover:bg-[#928B6D]/90"
+              className="bg-primary text-primary-foreground border-none rounded-[24px] px-3 py-1 text-[12px] font-semibold hover:bg-primary/90"
             >
               Best seller
             </Badge>
@@ -258,10 +258,10 @@ const ProductCard = ({ product, priority = false, overrides }: ProductCardProps)
 
         {pc.layout === 'band' ? (
           <div
-            className="mt-auto rounded-2xl bg-primary/5 px-3 py-3 flex items-center justify-between gap-3"
+            className="mt-auto flex items-center justify-between gap-2"
             style={ctaVars}
           >
-            <div className="inline-flex flex-col items-start">
+            <div className="inline-flex items-baseline gap-2">
               <span
                 className="text-base md:text-[22px] font-semibold text-black leading-[22px] md:leading-[27px]"
                 style={priceStyle}

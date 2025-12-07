@@ -178,17 +178,10 @@ html {
   padding-top: env(safe-area-inset-top, 0px);
 }
 
-/* Add bottom padding to main content on mobile to account for bottom nav */
-@media (max-width: 1023px) {
-  main.flex-grow {
-    padding-bottom: 72px; /* Height of bottom nav + some breathing room */
-  }
-  
-  /* Ensure footer has extra padding before the bottom nav */
-  footer {
-    padding-bottom: calc(72px + 1rem);
-  }
-}
+/* If needed, individual pages/components should add their own bottom padding
+   to avoid overlapping the mobile bottom nav. We no longer force global
+   padding here, so pages without the nav (e.g. product detail) do not show
+   an empty gap at the bottom. */
 
 /* Improved touch targets - minimum 44px for accessibility */
 @media (max-width: 768px) {

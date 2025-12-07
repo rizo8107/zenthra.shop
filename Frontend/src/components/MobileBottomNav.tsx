@@ -94,8 +94,8 @@ export function MobileBottomNav() {
   const { user } = useAuth();
   const pathname = location.pathname;
 
-  // Don't show on checkout, auth pages, or admin
-  const hiddenPaths = ['/checkout', '/auth', '/admin', '/puck'];
+  // Don't show on checkout, auth pages, admin, Puck, or product detail pages
+  const hiddenPaths = ['/checkout', '/auth', '/admin', '/puck', '/product'];
   const shouldHide = hiddenPaths.some(path => pathname.startsWith(path));
 
   if (shouldHide) return null;

@@ -1510,7 +1510,7 @@ const ProductDetail = () => {
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
                 {product.bestseller && (
-                  <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100">
+                  <Badge className="bg-primary text-primary-foreground hover:bg-primary/90">
                     Bestseller
                   </Badge>
                 )}
@@ -2270,7 +2270,7 @@ const ProductDetail = () => {
                     />
                     <div className="absolute left-2 top-2 flex flex-col gap-1">
                       {relatedProduct.bestseller && (
-                        <Badge className="bg-orange-500 text-white hover:bg-orange-500">
+                        <Badge className="bg-primary text-primary-foreground hover:bg-primary/90">
                           Best
                         </Badge>
                       )}
@@ -2361,7 +2361,7 @@ const ProductDetail = () => {
         )}
 
         {/* mobile bottom bar */}
-        <div className="fixed bottom-16 left-0 right-0 z-40 border-t bg-white/95 py-2.5 shadow-[0_-6px_16px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t bg-white/95 py-2.5 shadow-[0_-6px_16px_rgba(15,23,42,0.12)] backdrop-blur md:hidden">
           <div className="konipai-container mx-auto max-w-7xl px-4 space-y-2">
             {/* total price + qty + trust text at top */}
             <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">

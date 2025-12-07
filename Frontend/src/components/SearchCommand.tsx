@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { getProducts, type Product, pocketbase } from "@/lib/pocketbase";
-import { Link } from "react-router-dom";
-import { FileText, Link as LinkIcon, Search, ShoppingBag } from "lucide-react";
+import { FileText, Link as LinkIcon, Search, ShoppingBag, ShoppingCart, Mail } from "lucide-react";
 
 type PageLite = { id: string; title?: string; slug?: string; published?: boolean };
 
@@ -60,11 +59,9 @@ export default function SearchCommand({ open, onOpenChange }: { open: boolean; o
         pages: pages.slice(0, 8),
       };
     }
-    const prod = products.filter((p) =>
-      (p.name || "").toLowerCase().includes(normalizedQuery) ||
-      (p.description || "").toLowerCase().includes(normalizedQuery) ||
-      (Array.isArray(p.tags) ? p.tags : []).some((t) => t.toLowerCase().includes(normalizedQuery))
-    ).slice(0, 8);
+    const prod = products
+      .filter((p) => (p.name || "").toLowerCase().includes(normalizedQuery))
+      .slice(0, 8);
     const pg = pages.filter((p) =>
       (p.title || "").toLowerCase().includes(normalizedQuery) || (p.slug || "").toLowerCase().includes(normalizedQuery)
     ).slice(0, 8);
@@ -73,69 +70,131 @@ export default function SearchCommand({ open, onOpenChange }: { open: boolean; o
 
   const quickLinks = [
     { label: "Shop", to: "/shop", icon: ShoppingBag },
-    { label: "Cart", to: "/cart", icon: ShoppingBag },
-    { label: "Contact", to: "/contact", icon: LinkIcon },
+    { label: "Cart", to: "/cart", icon: ShoppingCart },
+    { label: "Contact", to: "/contact", icon: Mail },
   ];
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Search products and pages... (Ctrl/Cmd + K)" value={query} onValueChange={setQuery} />
-      <CommandList>
-        <CommandEmpty>{loading ? "Loading..." : "No results found."}</CommandEmpty>
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-3 p-2 sm:p-4">
+        {/* Top pill search bar with close button */}
+        <div className="flex items-center gap-2 rounded-2xl bg-muted/60 px-3 py-2 shadow-sm">
+          <Search className="h-4 w-4 text-muted-foreground" />
+          <CommandInput
+            placeholder="Search products and pages... (Ctrl/Cmd + K)"
+            value={query}
+            onValueChange={setQuery}
+            className="border-0 bg-transparent px-0 text-sm focus:ring-0 focus-visible:ring-0 focus-visible:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => onOpenChange(false)}
+            className="ml-2 rounded-xl bg-white px-3 py-1 text-[11px] font-semibold text-muted-foreground shadow-sm hover:bg-gray-50"
+          >
+            CLOSE
+          </button>
+        </div>
 
-        <CommandGroup heading="Quick Links">
-          {quickLinks.map((q) => (
-            <CommandItem
-              key={q.to}
-              onSelect={() => {
-                onOpenChange(false);
-                navigate(q.to);
-              }}
+        {/* Results card */}
+        <div className="rounded-2xl bg-background shadow-sm border border-border/60 overflow-hidden">
+          <CommandList className="max-h-[360px] overflow-y-auto">
+            <CommandEmpty className="py-6 text-center text-sm text-muted-foreground">
+              {loading ? "Loading..." : "No results found."}
+            </CommandEmpty>
+
+            <CommandGroup
+              heading={
+                <div className="px-3 pt-3 pb-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+                  Quick links
+                </div>
+              }
             >
-              <q.icon className="mr-2 h-4 w-4" />
-              <span>{q.label}</span>
-            </CommandItem>
-          ))}
-        </CommandGroup>
+              {quickLinks.map((q) => (
+                <CommandItem
+                  key={q.to}
+                  onSelect={() => {
+                    onOpenChange(false);
+                    navigate(q.to);
+                  }}
+                >
+                  <div className="flex items-center gap-3 w-full px-1 py-1.5">
+                    <q.icon className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">{q.label}</span>
+                  </div>
+                </CommandItem>
+              ))}
+            </CommandGroup>
 
-        <CommandSeparator />
+            {filtered.products.length > 0 && (
+              <>
+                <CommandSeparator className="mx-3 my-1" />
+                <CommandGroup
+                  heading={
+                    <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+                      Products
+                    </div>
+                  }
+                >
+                  {filtered.products.map((p) => (
+                    <CommandItem
+                      key={p.id}
+                      onSelect={() => {
+                        onOpenChange(false);
+                        navigate(`/product/${p.id}`);
+                      }}
+                    >
+                      <div className="flex items-center gap-3 w-full px-1 py-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Search className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-foreground truncate">
+                            {p.name}
+                          </span>
+                        </div>
+                        <span className="ml-auto text-xs font-semibold text-foreground">
+                          ₹{typeof p.price === "number" ? p.price.toFixed(2) : Number(p.price || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
 
-        {filtered.products.length > 0 && (
-          <CommandGroup heading="Products">
-            {filtered.products.map((p) => (
-              <CommandItem
-                key={p.id}
-                onSelect={() => {
-                  onOpenChange(false);
-                  navigate(`/product/${p.id}`);
-                }}
-              >
-                <Search className="mr-2 h-4 w-4" />
-                <span className="mr-2 line-clamp-1">{p.name}</span>
-                <span className="ml-auto text-xs text-muted-foreground">₹{Number(p.price || 0)}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-
-        {filtered.pages.length > 0 && (
-          <CommandGroup heading="Pages">
-            {filtered.pages.map((p) => (
-              <CommandItem
-                key={p.id}
-                onSelect={() => {
-                  onOpenChange(false);
-                  navigate(`/page/${p.slug}`);
-                }}
-              >
-                <FileText className="mr-2 h-4 w-4" />
-                <span className="mr-2 line-clamp-1">{p.title || p.slug}</span>
-                <span className="ml-auto text-xs text-muted-foreground">/page/{p.slug}</span>
-              </CommandItem>
-            ))}
-          </CommandGroup>
-        )}
-      </CommandList>
+            {filtered.pages.length > 0 && (
+              <>
+                <CommandSeparator className="mx-3 my-1" />
+                <CommandGroup
+                  heading={
+                    <div className="px-3 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground uppercase tracking-[0.08em]">
+                      Pages
+                    </div>
+                  }
+                >
+                  {filtered.pages.map((p) => (
+                    <CommandItem
+                      key={p.id}
+                      onSelect={() => {
+                        onOpenChange(false);
+                        navigate(`/page/${p.slug}`);
+                      }}
+                    >
+                      <div className="flex items-center gap-3 w-full px-1 py-1.5">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileText className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm text-foreground truncate">{p.title || p.slug}</span>
+                        </div>
+                        <span className="ml-auto text-xs text-muted-foreground truncate max-w-[120px]">
+                          /page/{p.slug}
+                        </span>
+                      </div>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              </>
+            )}
+          </CommandList>
+        </div>
+      </div>
     </CommandDialog>
   );
 }

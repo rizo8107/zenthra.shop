@@ -83,8 +83,7 @@ export default function Shop() {
   const filteredProducts = useMemo(() => {
     const lower = searchTerm.toLowerCase();
     const list = products.filter((product) => {
-      const matchesSearch = product.name.toLowerCase().includes(lower) ||
-        product.description.toLowerCase().includes(lower);
+      const matchesSearch = product.name.toLowerCase().includes(lower);
       const matchesCategory = category === 'all' || product.category === category;
       const matchesPrice = Number(product.price || 0) >= priceRange[0] && Number(product.price || 0) <= priceRange[1];
       const tagsArr = Array.isArray(product.tags) ? product.tags : [];

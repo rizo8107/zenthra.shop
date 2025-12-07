@@ -2,11 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSiteSettings } from '@/contexts/SiteSettingsContext';
 import { useDynamicTheme } from '@/contexts/ThemeContext';
-import { useAuth } from '@/contexts/AuthContext';
 import { useCart } from '@/contexts/CartContext';
 import { Logo } from '@/components/Logo';
 import { cn } from '@/lib/utils';
-import { Search, ShoppingCart, Menu, SlidersHorizontal } from 'lucide-react';
+import { Search, ShoppingCart, Menu, SlidersHorizontal, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Cart } from '@/components/Cart';
 import SearchCommand from '@/components/SearchCommand';
@@ -18,22 +17,11 @@ import SearchCommand from '@/components/SearchCommand';
 export function MobileBrandBar() {
   const { settings } = useSiteSettings();
   const { themeData } = useDynamicTheme();
-  const { user } = useAuth();
   const { itemCount } = useCart();
   const [searchOpen, setSearchOpen] = useState(false);
 
   const primaryBg = themeData?.primary?.hex || '#15803D';
   const primaryFg = themeData?.textOnPrimary || '#FFFFFF';
-
-  // Get greeting based on time of day
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 17) return "Good afternoon";
-    return "Good evening";
-  };
-
-  const userName = user?.name?.split(' ')[0] || "there";
 
   return (
     <div
@@ -41,14 +29,17 @@ export function MobileBrandBar() {
         'md:hidden sticky top-0 z-40 bg-background/95 backdrop-blur border-b border-border safe-area-top'
       )}
     >
-      {/* Top Row: Logo + Greeting + Action Icons */}
+      {/* Top Row: Home + Logo + Action Icons */}
       <div className="max-w-7xl mx-auto px-4 pt-3 pb-2 flex items-center justify-between">
         <div className="flex items-center gap-3 flex-1">
+          <Link
+            to="/"
+            className="h-9 w-9 rounded-full flex items-center justify-center bg-muted text-foreground hover:bg-muted/80 transition-colors"
+            aria-label="Go to home"
+          >
+            <Home className="h-5 w-5" />
+          </Link>
           <Logo className="h-8 w-auto shrink-0" />
-          <div>
-            <p className="text-xs text-muted-foreground">{getGreeting()},</p>
-            <p className="text-base font-semibold text-foreground">{userName}</p>
-          </div>
         </div>
         <div className="flex items-center gap-2">
           {/* Cart Icon */}

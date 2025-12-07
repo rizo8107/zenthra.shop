@@ -16,6 +16,10 @@ export interface ProductGridProps {
   category?: string;
   limit?: number;
   backgroundColor?: string;
+  // Section title sizes per device
+  titleSizeMobile?: "sm" | "md" | "lg";
+  titleSizeTablet?: "sm" | "md" | "lg";
+  titleSizeDesktop?: "sm" | "md" | "lg";
   // Section padding (px)
   paddingTop?: number;
   paddingRight?: number;
@@ -63,6 +67,9 @@ const ProductGridContent = ({
   category,
   limit,
   backgroundColor,
+  titleSizeMobile,
+  titleSizeTablet,
+  titleSizeDesktop,
   paddingTop,
   paddingRight,
   paddingBottom,
@@ -124,13 +131,7 @@ const ProductGridContent = ({
           const term = internalCategory.toLowerCase();
           filtered = filtered.filter((p) => {
             const name = p.name?.toLowerCase() || "";
-            const cat =
-              (p as any).category?.toLowerCase?.() ||
-              ("" + (p as any).category || "").toLowerCase();
-            const desc =
-              (p as any).description?.toLowerCase?.() ||
-              ("" + (p as any).description || "").toLowerCase();
-            return name.includes(term) || cat.includes(term) || desc.includes(term);
+            return name.includes(term);
           });
         }
 
@@ -146,6 +147,29 @@ const ProductGridContent = ({
 
     fetchProducts();
   }, [limit, internalCategory, showFeatured]);
+
+  // Compute responsive section title classes based on selected sizes
+  const baseTitleClasses = "font-semibold text-foreground";
+  const mobileSize = titleSizeMobile || "lg"; // default ~ text-2xl
+  const tabletSize = titleSizeTablet || "lg"; // default ~ md:text-3xl
+  const desktopSize = titleSizeDesktop || "lg";
+
+  const mobileClass =
+    mobileSize === "sm" ? "text-lg" : mobileSize === "md" ? "text-xl" : "text-2xl";
+  const tabletClass =
+    tabletSize === "sm"
+      ? "sm:text-xl"
+      : tabletSize === "md"
+      ? "sm:text-2xl"
+      : "sm:text-3xl";
+  const desktopClass =
+    desktopSize === "sm"
+      ? "lg:text-2xl"
+      : desktopSize === "md"
+      ? "lg:text-3xl"
+      : "lg:text-4xl";
+
+  const sectionTitleClassName = cn(baseTitleClasses, mobileClass, tabletClass, desktopClass);
 
   // track breakpoint
   useEffect(() => {
@@ -317,9 +341,7 @@ const ProductGridContent = ({
         {(title || description) && (
           <header className="mb-6 md:mb-8 text-center flex flex-col items-center gap-2">
             {title && (
-              <h2 className="text-2xl md:text-3xl font-semibold text-foreground">
-                {title}
-              </h2>
+              <h2 className={sectionTitleClassName}>{title}</h2>
             )}
             {description && (
               <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
@@ -500,6 +522,33 @@ const ProductGridContent = ({
 export const ProductGrid: ComponentConfig<ProductGridProps> = {
   fields: {
     title: { type: "text", label: "Section Title" },
+    titleSizeMobile: {
+      type: "select",
+      label: "Title Size (Mobile)",
+      options: [
+        { label: "Small", value: "sm" },
+        { label: "Medium", value: "md" },
+        { label: "Large", value: "lg" },
+      ],
+    },
+    titleSizeTablet: {
+      type: "select",
+      label: "Title Size (Tablet)",
+      options: [
+        { label: "Small", value: "sm" },
+        { label: "Medium", value: "md" },
+        { label: "Large", value: "lg" },
+      ],
+    },
+    titleSizeDesktop: {
+      type: "select",
+      label: "Title Size (Desktop)",
+      options: [
+        { label: "Small", value: "sm" },
+        { label: "Medium", value: "md" },
+        { label: "Large", value: "lg" },
+      ],
+    },
     description: { type: "textarea", label: "Description (optional)" },
     category: { type: "text", label: "Category Filter" },
     limit: { type: "number", label: "Number of Products", min: 1, max: 40 },

@@ -135,9 +135,7 @@
 }
 
 .puck-editor-root [data-puck-drawer-item]::before {
-  content: "⬚";
-  display: block;
-  font-size: 1.4rem;
-  line-height: 1;
-  color: #2563eb;
+  /* Remove default blue square icon above each drawer item */
+  content: "";
+  display: none;
 }
