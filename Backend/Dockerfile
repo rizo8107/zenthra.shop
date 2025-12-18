@@ -97,8 +97,8 @@ RUN chmod +x docker-entrypoint.sh
 ENV NODE_ENV=production
 ENV PORT=8080
 
-# Expose single port (serves both static files and API)
-EXPOSE 8080
+# Expose ports (3001 for API, 8080 for static)
+EXPOSE 3001 8080
 
-# Run the unified production server
-CMD ["node", "dist-server/server/production.js"]
+# Run using entrypoint script that starts both servers
+ENTRYPOINT ["./docker-entrypoint.sh"]
