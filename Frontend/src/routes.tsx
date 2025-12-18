@@ -90,9 +90,10 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 // Loading fallback for lazy-loaded components
+// Takes full remaining viewport height to prevent footer from jumping up
 function PageLoader() {
   return (
-    <div className="min-h-screen flex items-center justify-center">
+    <div className="min-h-[calc(100vh-200px)] flex items-center justify-center">
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   )
@@ -104,19 +105,19 @@ function ScrollToTop() {
   const { pathname } = useLocation();
   // Initialize UTM parameter tracking
   useUtmParams();
-  
+
   useEffect(() => {
     // Scroll to top of page
     window.scrollTo(0, 0);
-    
+
     // Get UTM parameters for analytics
     const utmParams = getUtmParamsForAnalytics();
-    
+
     // Track page view in Google Analytics with UTM data
     trackPageView(pathname, document.title);
     trackJourneyPageView(pathname);
   }, [pathname]);
-  
+
   return null;
 }
 
@@ -125,127 +126,127 @@ export function Routes() {
     <BrowserRouter>
       <MetaPixelRouterTracker />
       <DynamicThemeProvider>
-      <PluginProvider>
-        <TooltipProvider>
-          <Sonner />
-          {(() => {
-            const flags = typeof window !== 'undefined' && (() => {
-              const search = new URLSearchParams(window.location.search);
-              const embedParam = search.get('embed') === '1';
-              const path = window.location.pathname || '';
-              const isPuckAdmin = path.startsWith('/admin/pages/');
-              return { isEmbed: embedParam, isPuckAdmin };
-            })();
-            const isEmbed = !!(flags && (flags as any).isEmbed);
-            const isPuckAdmin = !!(flags && (flags as any).isPuckAdmin);
-            return (
-              <div className="flex flex-col min-h-screen">
-                {/* Hide Navbar on Puck admin editor pages and embed mode; only show on md+ */}
-                {!isPuckAdmin && !isEmbed && (
-                  <>
-                    <div className="hidden md:block">
-                      <Navbar />
-                    </div>
-                    {/* Mobile brand bar (shown only on mobile via its own classes) */}
-                    <MobileBrandBar />
-                  </>
-                )}
-                {isEmbed && <EmbedBridge />}
-                <main className="flex-grow">
-                  <Suspense fallback={<PageLoader />}>
-                    <ScrollToTop />
-                    <RouterRoutes>
-                      <Route path="/" element={<PuckHome />} />
+        <PluginProvider>
+          <TooltipProvider>
+            <Sonner />
+            {(() => {
+              const flags = typeof window !== 'undefined' && (() => {
+                const search = new URLSearchParams(window.location.search);
+                const embedParam = search.get('embed') === '1';
+                const path = window.location.pathname || '';
+                const isPuckAdmin = path.startsWith('/admin/pages/');
+                return { isEmbed: embedParam, isPuckAdmin };
+              })();
+              const isEmbed = !!(flags && (flags as any).isEmbed);
+              const isPuckAdmin = !!(flags && (flags as any).isPuckAdmin);
+              return (
+                <div className="flex flex-col min-h-screen">
+                  {/* Hide Navbar on Puck admin editor pages and embed mode; only show on md+ */}
+                  {!isPuckAdmin && !isEmbed && (
+                    <>
+                      <div className="hidden md:block">
+                        <Navbar />
+                      </div>
+                      {/* Mobile brand bar (shown only on mobile via its own classes) */}
+                      <MobileBrandBar />
+                    </>
+                  )}
+                  {isEmbed && <EmbedBridge />}
+                  <main className="flex-grow min-h-[calc(100vh-200px)]">
+                    <Suspense fallback={<PageLoader />}>
+                      <ScrollToTop />
+                      <RouterRoutes>
+                        <Route path="/" element={<PuckHome />} />
 
-                      <Route path="/shop" element={<Shop />} />
-                      <Route path="/product/:id" element={<ProductDetail />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route path="/bestsellers" element={<Bestsellers />} />
-                      <Route path="/new-arrivals" element={<NewArrivals />} />
-                      <Route path="/about" element={<About />} />
-                      
-                      {/* Policy Pages */}
-                      <Route path="/contact-us" element={<ContactUs />} />
-                      <Route path="/shipping-policy" element={<ShippingPolicy />} />
-                      <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-                      <Route path="/cancellations-refunds" element={<CancellationsRefunds />} />
-                      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-                      
-                      <Route
-                        path="/checkout"
-                        element={<Checkout />}
-                      />
-                      <Route
-                        path="/order-confirmation/:orderId"
-                        element={<OrderConfirmation />}
-                      />
-                      <Route
-                        path="/track-order"
-                        element={<OrderTracking />}
-                      />
-                      <Route
-                        path="/orders"
-                        element={
-                          <PrivateRoute>
-                            <Orders />
-                          </PrivateRoute>
-                        }
-                      />
-                      <Route
-                        path="/orders/:orderId"
-                        element={
-                          <PrivateRoute>
-                            <OrderDetail />
-                          </PrivateRoute>
-                        }
-                      />
-                      <Route path="/auth/login" element={<LoginPage />} />
-                      <Route path="/auth/signup" element={<SignupPage />} />
-                      <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
-                      <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-                      <Route
-                        path="/profile"
-                        element={
-                          <PrivateRoute>
-                            <ProfilePage />
-                          </PrivateRoute>
-                        }
-                      />
-                      <Route path="/webhook-test" element={<WebhookTest />} />
-                      
-                      {/* Payment Link - public checkout page */}
-                      <Route path="/pay/:code" element={<PaymentLink />} />
+                        <Route path="/shop" element={<Shop />} />
+                        <Route path="/product/:id" element={<ProductDetail />} />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/bestsellers" element={<Bestsellers />} />
+                        <Route path="/new-arrivals" element={<NewArrivals />} />
+                        <Route path="/about" element={<About />} />
 
-                      {/* Puck CMS routes */}
-                      <Route path="/page/:slug" element={<PuckRenderer />} />
-                      <Route path="/admin" element={<AdminRoute />}>
-                        <Route path="pages" element={<PagesManager />} />
-                        <Route path="pages/:pageId/edit" element={<PuckEditor />} />
-                        <Route path="product-pages/:pageId/edit" element={<ProductPageEditor />} />
-                        <Route path="plugins" element={<PluginsManager />} />
-                        <Route path="themes" element={<ThemeManager />} />
-                        <Route path="settings" element={<SiteSettingsPage />} />
-                      </Route>
-                      <Route path="/403" element={<Forbidden />} />
-                      
-                      {/* Builder.io routes */}
-                      <Route path="/builder/*" element={<BuilderPage />} />
-                      <Route path="/builder-preview/:path/*" element={<BuilderPage />} />
-                      <Route path="/builder-example" element={<BuilderExample />} />
+                        {/* Policy Pages */}
+                        <Route path="/contact-us" element={<ContactUs />} />
+                        <Route path="/shipping-policy" element={<ShippingPolicy />} />
+                        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+                        <Route path="/cancellations-refunds" element={<CancellationsRefunds />} />
+                        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
-                      {/* Fallback */}
-                      <Route path="*" element={<NotFound />} />
-                    </RouterRoutes>
-                  </Suspense>
-                </main>
-                {!isEmbed && !isPuckAdmin && <Footer />}
-                {/* Mobile bottom navigation - shows on mobile screens only */}
-                {!isEmbed && !isPuckAdmin && <MobileBottomNav />}
-              </div>
-            )
-          })()}
-        </TooltipProvider>
-      </PluginProvider>
+                        <Route
+                          path="/checkout"
+                          element={<Checkout />}
+                        />
+                        <Route
+                          path="/order-confirmation/:orderId"
+                          element={<OrderConfirmation />}
+                        />
+                        <Route
+                          path="/track-order"
+                          element={<OrderTracking />}
+                        />
+                        <Route
+                          path="/orders"
+                          element={
+                            <PrivateRoute>
+                              <Orders />
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route
+                          path="/orders/:orderId"
+                          element={
+                            <PrivateRoute>
+                              <OrderDetail />
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route path="/auth/login" element={<LoginPage />} />
+                        <Route path="/auth/signup" element={<SignupPage />} />
+                        <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+                        <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
+                        <Route
+                          path="/profile"
+                          element={
+                            <PrivateRoute>
+                              <ProfilePage />
+                            </PrivateRoute>
+                          }
+                        />
+                        <Route path="/webhook-test" element={<WebhookTest />} />
+
+                        {/* Payment Link - public checkout page */}
+                        <Route path="/pay/:code" element={<PaymentLink />} />
+
+                        {/* Puck CMS routes */}
+                        <Route path="/page/:slug" element={<PuckRenderer />} />
+                        <Route path="/admin" element={<AdminRoute />}>
+                          <Route path="pages" element={<PagesManager />} />
+                          <Route path="pages/:pageId/edit" element={<PuckEditor />} />
+                          <Route path="product-pages/:pageId/edit" element={<ProductPageEditor />} />
+                          <Route path="plugins" element={<PluginsManager />} />
+                          <Route path="themes" element={<ThemeManager />} />
+                          <Route path="settings" element={<SiteSettingsPage />} />
+                        </Route>
+                        <Route path="/403" element={<Forbidden />} />
+
+                        {/* Builder.io routes */}
+                        <Route path="/builder/*" element={<BuilderPage />} />
+                        <Route path="/builder-preview/:path/*" element={<BuilderPage />} />
+                        <Route path="/builder-example" element={<BuilderExample />} />
+
+                        {/* Fallback */}
+                        <Route path="*" element={<NotFound />} />
+                      </RouterRoutes>
+                    </Suspense>
+                  </main>
+                  {!isEmbed && !isPuckAdmin && <Footer />}
+                  {/* Mobile bottom navigation - shows on mobile screens only */}
+                  {!isEmbed && !isPuckAdmin && <MobileBottomNav />}
+                </div>
+              )
+            })()}
+          </TooltipProvider>
+        </PluginProvider>
       </DynamicThemeProvider>
     </BrowserRouter>
   )
