@@ -303,3 +303,5 @@ MIT
 ---
 
 **Note**: Keep your PocketBase URL consistent across all environments for seamless data synchronization!
+#   T r i g g e r   r e d e p l o y  
+ 
