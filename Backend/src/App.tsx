@@ -34,6 +34,7 @@ import CheckoutFlowPage from "./pages/admin/CheckoutFlowPage";
 import BrandingPage from "./pages/admin/BrandingPage";
 import ProductPageEditor from "./pages/admin/ProductPageEditor";
 import WhatsAppConfigPage from "./pages/admin/WhatsAppConfigPage";
+import EmailConfigPage from "./pages/admin/EmailConfigPage";
 import CampaignBuilderPage from "./pages/admin/CampaignBuilderPage";
 import CampaignsPage from "./pages/admin/CampaignsPage";
 import ConfigureBackendPage from "./pages/ConfigureBackendPage";
@@ -99,9 +100,9 @@ const App = () => {
       initPushNotifications();
 
       // Ensure status bar does NOT overlay the webview content
-      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => {});
-      StatusBar.setBackgroundColor({ color: '#0F172A' }).catch(() => {});
-      StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+      StatusBar.setOverlaysWebView({ overlay: false }).catch(() => { });
+      StatusBar.setBackgroundColor({ color: '#0F172A' }).catch(() => { });
+      StatusBar.setStyle({ style: Style.Dark }).catch(() => { });
     } else {
       // Web: register service worker for PWA
       if ('serviceWorker' in navigator) {
@@ -154,6 +155,7 @@ const App = () => {
               <Route path="/admin/automation" element={<ProtectedRoute><AutomationFlowsPage /></ProtectedRoute>} />
               <Route path="/admin/automation/:flowId" element={<ProtectedRoute><AutomationFlowBuilderPage /></ProtectedRoute>} />
               <Route path="/admin/whatsapp" element={<ProtectedRoute><WhatsAppConfigPage /></ProtectedRoute>} />
+              <Route path="/admin/email" element={<ProtectedRoute><EmailConfigPage /></ProtectedRoute>} />
               <Route path="/admin/campaigns" element={<ProtectedRoute><CampaignBuilderPage /></ProtectedRoute>} />
               <Route path="/admin/bulk-campaigns" element={<ProtectedRoute><CampaignsPage /></ProtectedRoute>} />
 

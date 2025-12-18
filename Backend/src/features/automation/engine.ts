@@ -31,7 +31,7 @@ function substituteVariables(template: string, context: ExecutionContext): strin
   return template.replace(/\{\{([^}]+)\}\}/g, (match, path) => {
     const trimmedPath = path.trim();
     const value = getByPath(context, trimmedPath);
-    
+
     // Debug logging
     if (value === undefined || value === null) {
       console.log(`[substituteVariables] Could not resolve: ${trimmedPath}`);
@@ -39,7 +39,7 @@ function substituteVariables(template: string, context: ExecutionContext): strin
       console.log(`[substituteVariables] Input keys:`, context.input ? Object.keys(context.input) : 'no input');
       console.log(`[substituteVariables] Event keys:`, context.event ? Object.keys(context.event) : 'no event');
     }
-    
+
     return value !== undefined && value !== null ? String(value) : match;
   });
 }
@@ -51,12 +51,12 @@ function substituteVariables(template: string, context: ExecutionContext): strin
 function getByPath(obj: any, path: string): any {
   const parts = path.split('.');
   let current = obj;
-  
+
   for (const part of parts) {
     if (current === null || current === undefined) return undefined;
     current = current[part];
   }
-  
+
   // If not found and path starts with "input." and obj has event, try event instead
   if (current === undefined && obj.event && path.startsWith('input.')) {
     const eventPath = path.substring(6); // Remove "input." prefix
@@ -67,7 +67,7 @@ function getByPath(obj: any, path: string): any {
       current = current[part];
     }
   }
-  
+
   return current;
 }
 
@@ -137,7 +137,7 @@ async function executePbFind(
   context: ExecutionContext
 ): Promise<NodeExecutionResult> {
   const config = node.data?.config as Record<string, any> || {};
-  
+
   const collection = config.collection as string;
   if (!collection) {
     throw new Error('pb.find: collection is required');
@@ -145,19 +145,19 @@ async function executePbFind(
 
   // Substitute variables in filter
   let filterTemplate = config.filter as string || '';
-  
+
   // Handle date placeholders
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterdayStart = new Date(todayStart.getTime() - 24 * 60 * 60 * 1000);
-  
+
   filterTemplate = filterTemplate
     .replace(/@todayStart/g, `"${todayStart.toISOString()}"`)
     .replace(/@yesterdayStart/g, `"${yesterdayStart.toISOString()}"`)
     .replace(/@now/g, `"${now.toISOString()}"`);
-  
+
   const filter = substituteVariables(filterTemplate, context);
-  
+
   const sort = (config.sort as string) || '-created';
   const limit = Number(config.limit) || 50;
   const page = Number(config.page) || 1;
@@ -183,21 +183,21 @@ async function executePbFind(
     // Add sales summary if querying orders collection
     if (collection === 'orders' && result.items.length > 0) {
       const today = new Date();
-      const dateStr = today.toLocaleDateString('en-IN', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
+      const dateStr = today.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
       });
-      
+
       // Calculate totals
       let totalSales = 0;
       let productCount = 0;
-      
+
       for (const order of result.items) {
-        const orderTotal = Number((order as Record<string, unknown>).total_amount) || 
-                          Number((order as Record<string, unknown>).total) || 0;
+        const orderTotal = Number((order as Record<string, unknown>).total_amount) ||
+          Number((order as Record<string, unknown>).total) || 0;
         totalSales += orderTotal;
-        
+
         // Count products from order items
         const items = (order as Record<string, unknown>).items;
         if (Array.isArray(items)) {
@@ -208,25 +208,25 @@ async function executePbFind(
           productCount += 1; // At least 1 product per order
         }
       }
-      
+
       const orderCount = result.items.length;
       const avgOrderValue = orderCount > 0 ? Math.round(totalSales / orderCount) : 0;
-      
+
       // Add summary fields
       output.report_date = dateStr;
       output.total_sales = totalSales.toLocaleString('en-IN');
       output.order_count = orderCount;
       output.product_count = productCount;
       output.avg_order_value = avgOrderValue.toLocaleString('en-IN');
-      
+
       console.log(`[pb.find] Sales summary: ₹${totalSales} from ${orderCount} orders, ${productCount} products`);
     } else if (collection === 'orders') {
       // No orders - add empty summary
       const today = new Date();
-      output.report_date = today.toLocaleDateString('en-IN', { 
-        day: '2-digit', 
-        month: 'short', 
-        year: 'numeric' 
+      output.report_date = today.toLocaleDateString('en-IN', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
       });
       output.total_sales = '0';
       output.order_count = 0;
@@ -444,7 +444,7 @@ async function executeUtilDelay(
   context: ExecutionContext
 ): Promise<NodeExecutionResult> {
   const config = node.data?.config as Record<string, any> || {};
-  
+
   const amount = Number(config.amount) || 0;
   const unit = (config.unit as string) || 'seconds';
 
@@ -478,7 +478,7 @@ async function executeWhatsAppSend(
   context: ExecutionContext
 ): Promise<NodeExecutionResult> {
   const config = node.data?.config as Record<string, any> || {};
-  
+
   const toPath = (config.toPath as string) || 'input.phone';
   const template = (config.template as string) || '';
   const connectionId = config.connectionId as string;
@@ -489,7 +489,7 @@ async function executeWhatsAppSend(
 
   // Get phone number - either from context path OR use directly if it's a phone number
   let phone: string | undefined;
-  
+
   // Check if toPath looks like a phone number (starts with digits)
   if (/^\d+$/.test(toPath)) {
     // It's a direct phone number, use it as-is
@@ -500,7 +500,7 @@ async function executeWhatsAppSend(
     phone = getByPath(context, toPath);
     console.log(`[whatsapp.send] Resolved phone from path "${toPath}": ${phone}`);
   }
-  
+
   if (!phone) {
     throw new Error(`whatsapp.send: Could not resolve phone from path "${toPath}"`);
   }
@@ -514,7 +514,7 @@ async function executeWhatsAppSend(
   try {
     // Get Evolution API config from plugins collection
     let evolutionConfig: any;
-    
+
     try {
       console.log(`[whatsapp.send] Fetching plugin config for: ${connectionId}`);
       const pluginRecord = await pb.collection('plugins').getFirstListItem(`key="${connectionId}"`, {
@@ -530,7 +530,7 @@ async function executeWhatsAppSend(
     if (!evolutionConfig?.baseUrl || !evolutionConfig?.tokenOrKey) {
       throw new Error('Evolution API baseUrl or tokenOrKey not configured');
     }
-    
+
     // Use instanceId from node config, or fall back to plugin config
     const finalInstanceId = instanceId || evolutionConfig.defaultSender || 'zenthra';
     const apiKey = evolutionConfig.tokenOrKey;
@@ -539,7 +539,7 @@ async function executeWhatsAppSend(
 
     // Send directly to Evolution API
     const url = `${evolutionConfig.baseUrl.replace(/\/$/, '')}/message/sendText/${finalInstanceId}`;
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -592,6 +592,133 @@ async function executeWhatsAppSend(
   }
 }
 
+/**
+ * Execute email.send node
+ */
+async function executeEmailSend(
+  node: FlowNode,
+  context: ExecutionContext
+): Promise<NodeExecutionResult> {
+  const config = node.data?.config as Record<string, any> || {};
+
+  const toPath = (config.toPath as string) || 'input.email';
+  const template = (config.template as string) || '';
+  const subjectTemplate = (config.subject as string) || 'Notification';
+  const connectionId = config.connectionId as string || 'smtp';
+
+  // Get email address - either from context path OR use directly if it's an email
+  let email: string | undefined;
+
+  // Check if toPath looks like an email address
+  if (/@/.test(toPath)) {
+    // It's a direct email address, use it as-is
+    email = toPath;
+    console.log(`[email.send] Using direct email address: ${email}`);
+  } else {
+    // It's a path, resolve from context
+    email = getByPath(context, toPath);
+    console.log(`[email.send] Resolved email from path "${toPath}": ${email}`);
+  }
+
+  if (!email) {
+    throw new Error(`email.send: Could not resolve email from path "${toPath}"`);
+  }
+
+  // Substitute variables in template and subject
+  const htmlContent = substituteVariables(template, context);
+  const subject = substituteVariables(subjectTemplate, context);
+
+  console.log(`[email.send] Sending to ${email}: ${subject}`);
+
+  try {
+    // Get SMTP config from plugins collection
+    let smtpConfig: any;
+
+    try {
+      console.log(`[email.send] Fetching plugin config for: ${connectionId}`);
+      const pluginRecord = await pb.collection('plugins').getFirstListItem(`key="${connectionId}"`, {
+        $autoCancel: false,
+      });
+      smtpConfig = typeof pluginRecord.config === 'string'
+        ? JSON.parse(pluginRecord.config)
+        : pluginRecord.config;
+      console.log(`[email.send] SMTP config loaded successfully`);
+    } catch (error) {
+      console.error('[email.send] Error fetching SMTP config:', error);
+      throw new Error('SMTP not configured in Plugins Manager');
+    }
+
+    if (!smtpConfig?.host || !smtpConfig?.user) {
+      throw new Error('SMTP host or user not configured');
+    }
+
+    console.log(`[email.send] SMTP: ${smtpConfig.host}:${smtpConfig.port}`);
+
+    // Send email via backend API (you need to implement this endpoint)
+    const response = await fetch(`${import.meta.env.VITE_BACKEND_URL || 'http://localhost:3001'}/api/email/send`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        to: email,
+        subject: subject,
+        html: htmlContent,
+        config: smtpConfig,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(error || `Email API error: ${response.status}`);
+    }
+
+    const result = await response.json();
+    console.log(`[email.send] Email sent successfully:`, result);
+
+    // Log to email_activity
+    try {
+      await pb.collection('email_activity').create({
+        recipient: email,
+        subject: subject,
+        template_name: config.templateName || 'CUSTOM',
+        status: 'sent',
+        order_id: (context.input as any).orderId || (context.input as any).id,
+      });
+    } catch (logError) {
+      console.warn('[email.send] Failed to log activity:', logError);
+    }
+
+    return {
+      output: {
+        email,
+        subject,
+        sent: true,
+        result,
+      },
+    };
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error(`[email.send] Error sending email:`, errorMessage);
+
+    // Log failed attempt
+    try {
+      await pb.collection('email_activity').create({
+        recipient: email,
+        subject: subject,
+        template_name: config.templateName || 'CUSTOM',
+        status: 'failed',
+        error_message: errorMessage,
+        order_id: (context.input as any).orderId || (context.input as any).id,
+      });
+    } catch (logError) {
+      console.warn('[email.send] Failed to log error activity:', logError);
+    }
+
+    throw new Error(`Failed to send email: ${errorMessage}`);
+  }
+}
+
 // ============================================================================
 // CORE EXECUTOR
 // ============================================================================
@@ -604,7 +731,7 @@ async function executeNode(
   context: ExecutionContext
 ): Promise<NodeExecutionResult> {
   const nodeType = node.data?.type as string;
-  
+
   console.log(`[executor] Executing node ${node.id} (${nodeType})`);
 
   switch (nodeType) {
@@ -622,6 +749,8 @@ async function executeNode(
       return await executeUtilDelay(node, context);
     case 'whatsapp.send':
       return await executeWhatsAppSend(node, context);
+    case 'email.send':
+      return await executeEmailSend(node, context);
     default:
       console.warn(`[executor] Unsupported node type: ${nodeType}`);
       return {
@@ -800,9 +929,9 @@ export async function startRunFromJourneyEvent(
           console.warn(`[engine] Flow ${flow.id} has no canvasJson, skipping`);
           continue;
         }
-        
+
         canvas = typeof rawCanvas === 'string' ? JSON.parse(rawCanvas) : rawCanvas;
-        
+
         if (!canvas.nodes || !Array.isArray(canvas.nodes)) {
           console.warn(`[engine] Flow ${flow.id} has invalid canvas structure, skipping`);
           continue;
@@ -905,12 +1034,12 @@ const WEEKDAY_CRON: Record<string, string> = {
  */
 function buildCronExpression(config: Record<string, unknown>): string {
   const scheduleType = (config.scheduleType as string) || 'daily';
-  
+
   // If custom cron is provided and scheduleType is custom, use it
   if (scheduleType === 'custom' && config.cron) {
     return config.cron as string;
   }
-  
+
   // Legacy support: if 'schedule' key exists (old format)
   if (config.schedule && !config.scheduleType) {
     const legacySchedules: Record<string, string> = {
@@ -922,19 +1051,19 @@ function buildCronExpression(config: Record<string, unknown>): string {
     };
     return legacySchedules[config.schedule as string] || '';
   }
-  
+
   switch (scheduleType) {
     case 'interval': {
       const interval = (config.interval as string) || '1h';
       return INTERVAL_SCHEDULES[interval] || '0 * * * *';
     }
-    
+
     case 'daily': {
       const time = (config.time as string) || '09:00';
       const [hour, minute] = time.split(':').map(Number);
       return `${minute || 0} ${hour || 9} * * *`;
     }
-    
+
     case 'weekly': {
       const time = (config.time as string) || '09:00';
       const [hour, minute] = time.split(':').map(Number);
@@ -942,11 +1071,11 @@ function buildCronExpression(config: Record<string, unknown>): string {
       const dayOfWeek = WEEKDAY_CRON[weekdays] || '*';
       return `${minute || 0} ${hour || 9} * * ${dayOfWeek}`;
     }
-    
+
     case 'custom': {
       return (config.cron as string) || '0 9 * * *';
     }
-    
+
     default:
       return '0 9 * * *'; // Default: 9 AM daily
   }
@@ -975,35 +1104,35 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 function cronMatchesNow(cronExpression: string): boolean {
   const now = new Date();
   const parts = cronExpression.split(' ');
-  
+
   if (parts.length !== 5) return false;
-  
+
   const [minute, hour, dayOfMonth, month, dayOfWeek] = parts;
-  
+
   const matchPart = (part: string, value: number): boolean => {
     if (part === '*') return true;
-    
+
     // Handle */n (every n)
     if (part.startsWith('*/')) {
       const interval = parseInt(part.substring(2), 10);
       return value % interval === 0;
     }
-    
+
     // Handle comma-separated values
     if (part.includes(',')) {
       return part.split(',').map(Number).includes(value);
     }
-    
+
     // Handle range (e.g., 1-5)
     if (part.includes('-')) {
       const [start, end] = part.split('-').map(Number);
       return value >= start && value <= end;
     }
-    
+
     // Direct match
     return parseInt(part, 10) === value;
   };
-  
+
   return (
     matchPart(minute, now.getMinutes()) &&
     matchPart(hour, now.getHours()) &&
@@ -1037,15 +1166,15 @@ async function refreshCronFlowCache(): Promise<void> {
 
       // Find cron trigger nodes
       const cronNodes: Array<{ nodeId: string; cron: string }> = [];
-      
+
       for (const node of canvas.nodes) {
         if ((node.data?.type as string) !== 'trigger.cron') continue;
-        
+
         const config = node.data?.config as Record<string, unknown> || {};
-        
+
         // Build cron expression from config (handles all schedule types)
         const cronExpression = buildCronExpression(config);
-        
+
         if (cronExpression) {
           cronNodes.push({ nodeId: node.id, cron: cronExpression });
         }
@@ -1062,7 +1191,7 @@ async function refreshCronFlowCache(): Promise<void> {
     }
 
     cronFlowCache = { flows: cronFlows, lastRefresh: Date.now() };
-    
+
     if (cronFlows.length > 0) {
       console.log(`[cron] Cache refreshed: ${cronFlows.length} cron flow(s) found`);
     }
@@ -1085,12 +1214,12 @@ export function invalidateCronCache(): void {
 export async function startRunFromCron(): Promise<void> {
   const now = Date.now();
   const currentMinute = Math.floor(now / 60000); // Minute-level timestamp
-  
+
   // Refresh cache if stale (every 5 minutes) or empty
   if (now - cronFlowCache.lastRefresh > CACHE_TTL || cronFlowCache.flows.length === 0) {
     await refreshCronFlowCache();
   }
-  
+
   // Skip if no cron flows exist (no DB query, no logging)
   if (cronFlowCache.flows.length === 0) {
     return;
@@ -1107,12 +1236,12 @@ export async function startRunFromCron(): Promise<void> {
 
       // Use minute-level key to prevent duplicates even after server restart
       const runKey = `${flow.id}:${nodeId}:${currentMinute}`;
-      
+
       // Check in-memory first (fast path)
       if (lastCronRuns.has(runKey)) {
         continue; // Already ran this minute
       }
-      
+
       // Check database for recent runs (handles server restarts)
       try {
         const fiveMinutesAgo = new Date(now - 5 * 60 * 1000).toISOString();
@@ -1121,7 +1250,7 @@ export async function startRunFromCron(): Promise<void> {
           sort: '-started_at',
           $autoCancel: false,
         });
-        
+
         if (recentRuns.items.length > 0) {
           const lastRunTime = new Date(recentRuns.items[0].started_at).getTime();
           if (now - lastRunTime < 60000) {
@@ -1134,10 +1263,10 @@ export async function startRunFromCron(): Promise<void> {
         // If DB check fails, rely on in-memory check only
         console.warn(`[cron] DB check failed for flow ${flow.id}, using memory only`);
       }
-      
+
       // Mark as run BEFORE executing to prevent race conditions
       lastCronRuns.set(runKey, now);
-      
+
       // Clean up old entries (keep only last 100)
       if (lastCronRuns.size > 100) {
         const oldestKey = lastCronRuns.keys().next().value;

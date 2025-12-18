@@ -775,17 +775,17 @@ export default function CheckoutPage() {
 
         console.log("Payment verification result:", verificationResult);
         verificationSuccess = verificationResult.success;
-        
+
         if (!verificationSuccess) {
-           console.error("Payment verification failed:", verificationResult.error);
-           // We will still proceed to update the order but maybe with a warning note
-           // or if strict, we should throw. But existing logic suggests we proceed.
-           // However, strict verification is safer. Let's throw if it's a clear failure.
-           if (verificationResult.error && !verificationResult.error.includes("network")) {
-               // If it's not a network error, it's a signature/auth error.
-               // But to be safe and not block users who paid, we'll log it and proceed
-               // but mark verification as false in notes.
-           }
+          console.error("Payment verification failed:", verificationResult.error);
+          // We will still proceed to update the order but maybe with a warning note
+          // or if strict, we should throw. But existing logic suggests we proceed.
+          // However, strict verification is safer. Let's throw if it's a clear failure.
+          if (verificationResult.error && !verificationResult.error.includes("network")) {
+            // If it's not a network error, it's a signature/auth error.
+            // But to be safe and not block users who paid, we'll log it and proceed
+            // but mark verification as false in notes.
+          }
         }
 
       } catch (verifyError) {
@@ -818,39 +818,116 @@ export default function CheckoutPage() {
         // Only include shipping_address_text if it exists in the original order
         ...(existingOrder?.shipping_address_text
           ? {
-              shipping_address_text: existingOrder.shipping_address_text,
-            }
+            shipping_address_text: existingOrder.shipping_address_text,
+          }
           : {}),
       };
 
-      console.log("Updating order with data:", orderUpdateData);
+      console.log("📝 Preparing to update order with data:", orderUpdateData);
+      console.log("🔍 Order update breakdown:", {
+        orderId,
+        paymentStatus: orderUpdateData.payment_status,
+        orderStatus: orderUpdateData.status,
+        paymentId: orderUpdateData.payment_id,
+        total: orderUpdateData.total,
+        hasShippingAddress: !!orderUpdateData.shipping_address,
+      });
 
       // Try to update order with multiple attempts
       let orderUpdated = false;
       let attempts = 0;
       const maxAttempts = 3;
+      let lastError: any = null;
 
       while (!orderUpdated && attempts < maxAttempts) {
         try {
           attempts++;
           console.log(
-            `Updating order ${orderId} (attempt ${attempts}/${maxAttempts})`,
+            `🔄 Updating order ${orderId} (attempt ${attempts}/${maxAttempts})`,
           );
+
+          // CRITICAL: Log PocketBase auth status
+          console.log("🔐 PocketBase auth status:", {
+            isValid: pocketbase.authStore.isValid,
+            token: pocketbase.authStore.token ? "Present" : "Missing",
+            model: pocketbase.authStore.model?.id || "No user"
+          });
+
           await pocketbase
             .collection("orders")
             .update(orderId, orderUpdateData);
+
           console.log("✅ Order updated successfully with payment details");
+
+          // VERIFICATION: Immediately fetch the order to confirm update worked
+          const verifyOrder = await pocketbase.collection("orders").getOne(orderId);
+          console.log("🔍 Verification - Order fetched after update:", {
+            id: verifyOrder.id,
+            payment_status: verifyOrder.payment_status,
+            status: verifyOrder.status,
+            total: verifyOrder.total,
+            totalAmount: verifyOrder.totalAmount
+          });
+
+          // Check if the update actually stuck
+          if (verifyOrder.payment_status !== 'paid') {
+            console.error("❌ CRITICAL: Update did not persist! Payment status is:", verifyOrder.payment_status);
+            throw new Error(`Update failed to persist. Status is still: ${verifyOrder.payment_status}`);
+          }
+
+          console.log("✅✅ Verified: Order payment status is now 'paid'");
           orderUpdated = true;
-        } catch (updateError) {
+
+        } catch (updateError: any) {
+          lastError = updateError;
           console.error(
-            `Failed to update order (attempt ${attempts}/${maxAttempts}):`,
-            updateError,
+            `❌ Failed to update order (attempt ${attempts}/${maxAttempts}):`,
           );
+          console.error("Error details:", {
+            message: updateError?.message,
+            status: updateError?.status,
+            data: updateError?.data,
+            isAbort: updateError?.isAbort,
+            originalError: updateError
+          });
+
+          // Check for specific error types
+          if (updateError?.status === 403) {
+            console.error("🚫 Permission denied - User may not have access to update orders");
+          } else if (updateError?.status === 404) {
+            console.error("🔍 Order not found - Order ID may be invalid:", orderId);
+          } else if (updateError?.status === 400) {
+            console.error("⚠️ Validation error - Check field types:", updateError?.data);
+          } else if (updateError?.isAbort) {
+            console.error("⏱️ Request was aborted - May be network timeout");
+          }
+
           if (attempts < maxAttempts) {
-            // Wait before retrying
+            console.log(`⏳ Waiting 1 second before retry...`);
             await new Promise((resolve) => setTimeout(resolve, 1000));
+          } else {
+            console.error("💥 All update attempts exhausted. Last error:", lastError);
           }
         }
+      }
+
+      // CRITICAL: Report final update status
+      if (orderUpdated) {
+        console.log("🎉 SUCCESS: Order payment status updated to 'paid'");
+      } else {
+        console.error("💀 FAILURE: Failed to update order payment status after all attempts");
+        console.error("📊 Failure Summary:", {
+          orderId,
+          paymentId,
+          attemptsMade: attempts,
+          lastError: lastError?.message || "Unknown error",
+          lastErrorStatus: lastError?.status,
+          lastErrorData: lastError?.data,
+          authWasValid: pocketbase.authStore.isValid,
+        });
+
+        // Create a visible alert for debugging
+        alert(`⚠️ DEBUG: Order update failed!\n\nOrder ID: ${orderId}\nPayment ID: ${paymentId}\n\nError: ${lastError?.message || 'Unknown'}\nStatus Code: ${lastError?.status || 'N/A'}\n\nCheck console for details.`);
       }
 
       // Now attempt capture (if verification was successful or skipped)
@@ -860,16 +937,16 @@ export default function CheckoutPage() {
         const captureResult = await captureRazorpayPayment(paymentId);
         console.log("Payment capture result:", captureResult);
         captureSuccess = captureResult.success;
-        
+
         // Update notes with capture result
         if (captureSuccess || !captureSuccess) { // Always update notes
-             try {
-                 await pocketbase.collection("orders").update(orderId, {
-                     notes: `Payment received via Razorpay. Payment ID: ${paymentId}. Verified: ${verificationSuccess ? "Yes" : "No"}. Captured: ${captureSuccess ? "Yes" : "Failed (" + captureResult.error + ")"}`
-                 });
-             } catch (noteError) {
-                 console.error("Failed to update capture notes:", noteError);
-             }
+          try {
+            await pocketbase.collection("orders").update(orderId, {
+              notes: `Payment received via Razorpay. Payment ID: ${paymentId}. Verified: ${verificationSuccess ? "Yes" : "No"}. Captured: ${captureSuccess ? "Yes" : "Failed (" + captureResult.error + ")"}`
+            });
+          } catch (noteError) {
+            console.error("Failed to update capture notes:", noteError);
+          }
         }
       } catch (captureError) {
         console.error("Payment capture error:", captureError);
@@ -1215,7 +1292,7 @@ export default function CheckoutPage() {
 
     // Check if all items have free shipping enabled
     const allItemsHaveFreeShipping = items.length > 0 && items.every(item => item.product.free_shipping === true);
-    
+
     // If all items have free shipping, override shipping cost to 0
     if (allItemsHaveFreeShipping) {
       shippingCost = 0;
@@ -1234,8 +1311,8 @@ export default function CheckoutPage() {
     const finalTotal = Math.max(
       0,
       finalSubtotal +
-        (shouldIncludeShipping ? shippingCost : 0) -
-        finalDiscount,
+      (shouldIncludeShipping ? shippingCost : 0) -
+      finalDiscount,
     );
     console.log(
       `Final calculation: ${finalSubtotal} + ${shouldIncludeShipping ? shippingCost : 0} - ${finalDiscount} = ${finalTotal}`,
@@ -1993,7 +2070,7 @@ export default function CheckoutPage() {
       if (razorpayOrderResponse.amount !== expectedAmountInPaise) {
         console.error(
           `⚠️ AMOUNT MISMATCH: Razorpay order amount (${razorpayOrderResponse.amount} paise) ` +
-            `doesn't match our calculated total (${expectedAmountInPaise} paise)`,
+          `doesn't match our calculated total (${expectedAmountInPaise} paise)`,
         );
         // We'll force our expected amount in `openRazorpayCheckout` below
         console.log(
@@ -2430,7 +2507,7 @@ export default function CheckoutPage() {
                   <div className="space-y-2">
                     {/* Force disable address autocomplete in production to prevent any issues */}
                     {import.meta.env.MODE === "development" &&
-                    import.meta.env.VITE_ENABLE_ADDRESS_AUTOCOMPLETE ===
+                      import.meta.env.VITE_ENABLE_ADDRESS_AUTOCOMPLETE ===
                       "true" ? (
                       <AddressAutocomplete
                         onAddressSelect={handleAddressSelect}
@@ -2618,7 +2695,7 @@ export default function CheckoutPage() {
                               );
                             }
                           }
-                          
+
                           // Handle regular combo variants
                           interface ComboVariant {
                             value: string | number;
@@ -2668,7 +2745,7 @@ export default function CheckoutPage() {
                         (() => {
                           const totals = calculateFinalTotal();
                           const allItemsHaveFreeShipping = items.length > 0 && items.every(item => item.product.free_shipping === true);
-                          
+
                           if (totals.shippingCost === 0 && allItemsHaveFreeShipping) {
                             return (
                               <div className="flex items-center gap-1 text-green-600">

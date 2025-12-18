@@ -26,7 +26,7 @@ const DEFAULT_POCKETBASE_URL =
   (VITE_ENV as any).VITE_POCKETBASE_URL ||
   (typeof process !== 'undefined' ? process.env?.VITE_POCKETBASE_URL : undefined) ||
   (typeof window !== 'undefined' && (window as any).__ENV__?.VITE_POCKETBASE_URL) ||
-  'https://backend.viruthigold.in';
+  'https://backend.karigaistore.in';
 
 // Get stored URL for native apps
 let POCKETBASE_URL = DEFAULT_POCKETBASE_URL;

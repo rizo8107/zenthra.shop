@@ -8,6 +8,8 @@ import webhooksRouter from './webhooks.js';
 import messagingRouter from './messaging.js';
 import aiRouter from './ai.js';
 import fcmRouter from './fcm.js';
+import emailRouter from './email.js';
+import razorpayWebhookRouter from './razorpay-webhook.js';
 import customerJourneyRoutes from '../api/customerJourney.js';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
@@ -44,20 +46,20 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use((req, res, next) => {
   const start = Date.now();
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Request started`);
-  
+
   // Log request body for POST/PUT requests
   if ((req.method === 'POST' || req.method === 'PUT') && req.body) {
     console.log('Request body:', JSON.stringify(req.body));
   }
-  
+
   // Capture response
   const originalSend = res.send;
-  res.send = function(body) {
+  res.send = function (body) {
     const duration = Date.now() - start;
     console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Response sent in ${duration}ms with status ${res.statusCode}`);
     return originalSend.call(this, body);
   };
-  
+
   next();
 });
 
@@ -68,6 +70,8 @@ app.use('/api/webhooks', webhooksRouter);
 app.use('/api/messaging', messagingRouter);
 app.use('/api', aiRouter);
 app.use('/api', fcmRouter);
+app.use('/api', emailRouter);
+app.use('/api', razorpayWebhookRouter);
 
 // In-memory store for push subscriptions
 const subscriptions: webpush.PushSubscription[] = [];
@@ -117,6 +121,6 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
- 
+
 
 export default app;
